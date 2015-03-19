@@ -44,6 +44,7 @@ public:
   template<int P>
   struct PartialDomain
   {
+    static_assert( P <= sizeof...(Domain), "Derivative direction is greater than the number of parameters in the signature");
     using type = typename std::tuple_element< P-1, std::tuple<Domain...> >::type;
   };
   template<typename P>

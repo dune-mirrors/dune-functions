@@ -22,7 +22,7 @@ namespace Imp {
 template<class Dummy, class F, int D,
   typename std::enable_if<
     Dune::Functions::Concept::models< HasFreeDerivative<D>, F>() , int>::type = 0>
-auto derivativeIfImplemented(const F& f, DerivativeDirection<D> d) -> decltype(derivative(f))
+auto derivativeIfImplemented(const F& f, DerivativeDirection<D> d) -> decltype(derivative(f,d))
 {
   return derivative(f,d);
 }

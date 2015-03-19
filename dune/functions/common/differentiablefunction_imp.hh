@@ -27,11 +27,25 @@ auto derivativeIfImplemented(const F& f, DerivativeDirection<D> d) -> decltype(d
   return derivative(f,d);
 }
 
+template<class Dummy, class F,
+  typename std::enable_if<
+    Dune::Functions::Concept::models< HasFreeDerivativeWithoutDirection, F>()
+    and
+    not(Dune::Functions::Concept::models< HasFreeDerivative<1>, F>())
+    , int>::type = 0>
+auto derivativeIfImplemented(const F& f, DerivativeDirection<1> d) -> decltype(derivative(f))
+{
+  return derivative(f);
+}
+
 template<class Dummy, class F, int D,
   typename std::enable_if<
+    not(Dune::Functions::Concept::models< HasFreeDerivativeWithoutDirection, F>())
+    and
     not(Dune::Functions::Concept::models< HasFreeDerivative<D>, F>()) , int>::type = 0>
 Dummy derivativeIfImplemented(const F& f, DerivativeDirection<D> d)
 {
+  // static_assert(Dune::AlwaysFalse<F>::value, "Derivative not implemented");
   DUNE_THROW(Dune::NotImplemented, "Derivative not implemented");
 }
 
@@ -124,6 +138,7 @@ class DifferentiableFunctionWrapper< Range(Domain...), std::tuple<DerivativeInte
                                     DifferentiableFunctionWrapper< Range(Domain...), std::tuple<DerivativeInterfaces...>, FImp> >
 {
   static_assert( sizeof...(Domain) == sizeof...(DerivativeInterfaces), "Type Mismatch");
+  static_assert( sizeof...(Domain) > 0, "Type Mismatch");
 
 public:
 

@@ -8,24 +8,22 @@
 namespace Dune {
 namespace Functions {
 
-
-
 template<class Signature>
 struct SignatureTraits;
 
-template<class R, class D>
-struct SignatureTraits<R(D)>
+template<typename R, typename... D>
+struct SignatureTraits<R(D...)>
 {
-    using Range = R;
-    using Domain = D;
+  using Range = R;
+  using Domains = std::tuple< D... >;
 
-    using RawRange = typename std::decay<Range>::type;
-    using RawDomain = typename std::decay<Domain>::type;
+  using RawRange = typename std::decay<Range>::type;
+  using RawDomains = std::tuple< typename std::decay<D>::type... >;
 
-    using RawSignature = RawRange(RawDomain);
+  using RawSignature = RawRange(typename std::decay<D>::type...);
+
+  enum { DomainSize = sizeof...(D) };
 };
-
-
 
 } // namespace Functions
 } // namespace Dune

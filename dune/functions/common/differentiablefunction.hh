@@ -7,6 +7,7 @@
 
 #include <dune/functions/common/type_traits.hh>
 #include <dune/functions/common/defaultderivativetraits.hh>
+#include <dune/functions/common/derivativedirection.hh>
 #include <dune/functions/common/differentiablefunction_imp.hh>
 #include <dune/functions/common/polymorphicsmallobject.hh>
 #include <dune/functions/common/concept.hh>
@@ -14,8 +15,6 @@
 
 namespace Dune {
 namespace Functions {
-
-
 
 /**
  * Default implementation is empty
@@ -32,30 +31,33 @@ class DifferentiableFunction
  * \brief Class storing differentiable functions using type erasure
  *
  */
-template<class Range, class Domain, template<class> class DerivativeTraits, size_t bufferSize>
-class DifferentiableFunction< Range(Domain), DerivativeTraits, bufferSize>
+template<typename Range, typename... Domain, template<class> class DerivativeTraits, size_t bufferSize>
+class DifferentiableFunction< Range(Domain...), DerivativeTraits, bufferSize>
 {
 public:
 
   /**
    * \brief Signature of wrapped functions
    */
-  using Signature = Range(Domain);
+  using Signature = Range(Domain...);
 
-  /**
-   * \brief Raw signature of wrapped functions without possible const and reference qualifiers
-   */
-  using RawSignature = typename SignatureTraits<Signature>::RawSignature;
+  template<int P>
+  struct PartialDomain
+  {
+    using type = typename std::tuple_element< P-1, std::tuple<Domain...> >::type;
+  };
+  template<typename P>
+  struct DerivativeInterface
+  {
+    using PartialDomain = P;
+    using PartialSignature = Range(PartialDomain);
+    using RawSignature = typename SignatureTraits<PartialSignature>::RawSignature;
+    using DerivativeRange = typename DerivativeTraits<RawSignature>::Range;
+    using DerivativeSignature = DerivativeRange(Domain...);
+    using type = DifferentiableFunction<DerivativeSignature, DerivativeTraits, bufferSize>;
+  };
 
-  /**
-   * \brief Signature of derivative of wrapped functions
-   */
-  using DerivativeSignature = typename DerivativeTraits<RawSignature>::Range(Domain);
-
-  /**
-   * \brief Wrapper type of returned derivatives
-   */
-  using DerivativeInterface = DifferentiableFunction<DerivativeSignature, DerivativeTraits, bufferSize>;
+  using DerivativeInterfaces = std::tuple<typename DerivativeInterface<Domain>::type...>;
 
   /**
    * \brief Construct from function
@@ -70,7 +72,7 @@ public:
    */
   template<class F, disableCopyMove<DifferentiableFunction, F> = 0 >
   DifferentiableFunction(F&& f) :
-    f_(Imp::DifferentiableFunctionWrapper<Signature, DerivativeInterface, typename std::decay<F>::type>(std::forward<F>(f)))
+    f_(Imp::DifferentiableFunctionWrapper<Signature, DerivativeInterfaces, typename std::decay<F>::type>(std::forward<F>(f)))
   {}
 
   DifferentiableFunction() = default;
@@ -78,9 +80,9 @@ public:
   /**
    * \brief Evaluation of wrapped function
    */
-  Range operator() (const Domain& x) const
+  Range operator() (const Domain&... x) const
   {
-    return f_.get().operator()(x);
+    return f_.get().operator()(x...);
   }
 
   /**
@@ -88,13 +90,16 @@ public:
    *
    * This is a free function that will be found by ADL.
    */
-  friend DerivativeInterface derivative(const DifferentiableFunction& t)
+  template<int D = 1>
+  friend
+  typename DerivativeInterface< typename PartialDomain<D>::type >::type
+  derivative(const DifferentiableFunction& t, DerivativeDirection<D> dir = DerivativeDirection<D>())
   {
-    return t.f_.get().derivative();
+    return t.f_.get().derivative(dir);
   }
 
 private:
-  PolymorphicSmallObject<Imp::DifferentiableFunctionWrapperBase<Signature, DerivativeInterface>, bufferSize > f_;
+  PolymorphicSmallObject<Imp::DifferentiableFunctionWrapperBase<Signature, DerivativeInterfaces>, bufferSize > f_;
 };
 
 

@@ -3,10 +3,14 @@
 #ifndef DUNE_FUNCTIONS_COMMON_DIFFERENTIABLE_FUNCTION_IMP_HH
 #define DUNE_FUNCTIONS_COMMON_DIFFERENTIABLE_FUNCTION_IMP_HH
 
+#include <tuple>
+
 #include <dune/common/exceptions.hh>
 
+#include <dune/functions/common/signature.hh>
 #include <dune/functions/common/type_traits.hh>
 #include <dune/functions/common/interfaces.hh>
+#include <dune/functions/common/derivativedirection.hh>
 
 #include "concept.hh"
 
@@ -19,15 +23,15 @@ namespace Imp {
  */
 struct HasFreeDerivative
 {
-  template<class F>
-  auto require(F&& f) -> decltype(
-    derivative(f)
+  template<class F, int D>
+  auto require(F&& f, DerivativeDirection<D>&& d) -> decltype(
+    derivative(f,d)
   );
 };
 
 
 
-template<class Dummy, class F,
+template<class Dummy, class F, int D,
   typename std::enable_if<
     Dune::Functions::Concept::models< HasFreeDerivative, F>() , int>::type = 0>
 auto derivativeIfImplemented(const F& f) -> decltype(derivative(f))
@@ -37,41 +41,94 @@ auto derivativeIfImplemented(const F& f) -> decltype(derivative(f))
 
 
 
-template<class Dummy, class F,
+template<class Dummy, class F, int D,
   typename std::enable_if<
     not(Dune::Functions::Concept::models< HasFreeDerivative, F>()) , int>::type = 0>
-Dummy derivativeIfImplemented(const F& f)
+Dummy derivativeIfImplemented(const F& f, DerivativeDirection<D> d)
 {
   DUNE_THROW(Dune::NotImplemented, "Derivative not implemented");
 }
 
-
-
-template<class Signature, class DerivativeInterface>
-class DifferentiableFunctionWrapperBase
-{};
-
-template<class Range, class Domain, class DerivativeInterface>
-class DifferentiableFunctionWrapperBase<Range(Domain), DerivativeInterface> :
-  public PolymorphicType<DifferentiableFunctionWrapperBase<Range(Domain), DerivativeInterface> >
+template<typename DerivativeInterfaces, int P>
+class PartialDerivativeWrapperBase;
+template<typename... DerivativeInterfaces>
+class PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, 0> {};
+template<typename... DerivativeInterfaces, int P>
+class PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, P> :
+  public PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, P-1>
 {
+
+  /**
+   * \brief Wrapper type of returned derivatives
+   */
+  using DerivativeInterface = typename std::tuple_element< P-1, std::tuple<DerivativeInterfaces...> >::type;
+
 public:
 
-  virtual Range operator() (const Domain& x) const = 0;
+  /**
+   * \brief compute partial derivative wrt P'th parameter
+   */
+  virtual DerivativeInterface derivative(DerivativeDirection<P> d) const = 0;
 
-  virtual DerivativeInterface derivative() const = 0;
+};
+
+template<class Signature, class DerivativePack>
+class DifferentiableFunctionWrapperBase;
+
+template<typename Range, typename... Domain, typename... DerivativeInterfaces>
+class DifferentiableFunctionWrapperBase<Range(Domain...), std::tuple<DerivativeInterfaces...> > :
+  public PolymorphicType<DifferentiableFunctionWrapperBase<Range(Domain...), std::tuple<DerivativeInterfaces...> > >,
+  public PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, sizeof...(DerivativeInterfaces)>
+{
+  static_assert( sizeof...(Domain) == sizeof...(DerivativeInterfaces), "Type Mismatch");
+public:
+  virtual Range operator() (const Domain&... x) const = 0;
 };
 
 
 
-template<class Signature, class DerivativeInterface, class FImp>
-class DifferentiableFunctionWrapper
+template<typename Signature, typename DerivativeInterfaces, int P, class WrapperImp>
+class PartialDerivativeWrapper;
+
+template<typename Signature, typename... DerivativeInterfaces, class WrapperImp>
+class PartialDerivativeWrapper<Signature, std::tuple<DerivativeInterfaces...>, 0, WrapperImp> :
+    public DifferentiableFunctionWrapperBase<Signature, std::tuple<DerivativeInterfaces...> >
 {};
 
-template<class Range, class Domain, class DerivativeInterface, class FImp>
-class DifferentiableFunctionWrapper< Range(Domain), DerivativeInterface, FImp> :
-  public DifferentiableFunctionWrapperBase<Range(Domain), DerivativeInterface>
+template<typename Signanture, typename... DerivativeInterfaces, int P, class WrapperImp>
+class PartialDerivativeWrapper<Signanture, std::tuple<DerivativeInterfaces...>, P, WrapperImp> :
+  public PartialDerivativeWrapper<Signanture, std::tuple<DerivativeInterfaces...>, P-1, WrapperImp>
 {
+
+  /**
+   * \brief Wrapper type of returned derivatives
+   */
+  using DerivativeInterface = typename std::tuple_element< P-1, std::tuple<DerivativeInterfaces...> >::type;
+
+public:
+
+  /**
+   * \brief compute partial derivative wrt P'th parameter
+   */
+  virtual DerivativeInterface derivative(DerivativeDirection<P> d) const
+  {
+    auto f_ = static_cast<const WrapperImp*>(this)->f_;
+    using FImp = decltype(f_);
+    return derivativeIfImplemented<DerivativeInterface, FImp>(f_,d);
+  };
+
+};
+
+template<class Signature, class DerivativeInterfaces, class FImp>
+class DifferentiableFunctionWrapper;
+
+template<typename Range, typename... Domain, typename... DerivativeInterfaces, class FImp>
+class DifferentiableFunctionWrapper< Range(Domain...), std::tuple<DerivativeInterfaces...>, FImp> :
+    public PartialDerivativeWrapper< Range(Domain...), std::tuple<DerivativeInterfaces...>, sizeof...(DerivativeInterfaces),
+                                    DifferentiableFunctionWrapper< Range(Domain...), std::tuple<DerivativeInterfaces...>, FImp> >
+{
+  static_assert( sizeof...(Domain) == sizeof...(DerivativeInterfaces), "Type Mismatch");
+
 public:
 
   template<class F, disableCopyMove<DifferentiableFunctionWrapper, F> = 0>
@@ -79,14 +136,9 @@ public:
     f_(std::forward<F>(f))
   {}
 
-  virtual Range operator() (const Domain& x) const
+  virtual Range operator() (const Domain&... x) const
   {
-    return f_(x);
-  }
-
-  virtual DerivativeInterface derivative() const
-  {
-    return derivativeIfImplemented<DerivativeInterface, FImp>(f_);
+    return f_(x...);
   }
 
   virtual DifferentiableFunctionWrapper* clone() const
@@ -104,7 +156,7 @@ public:
     return new (buffer) DifferentiableFunctionWrapper(std::move(*this));
   }
 
-private:
+// private:
   FImp f_;
 };
 

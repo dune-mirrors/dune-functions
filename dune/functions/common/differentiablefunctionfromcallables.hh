@@ -88,26 +88,6 @@ private:
 };
 
 
-template<class Signature, template<class> class DerivativeTraits=DefaultDerivativeTraits>
-struct SignatureTag;
-
-/**
- * \brief Tag-class to encapsulate signature information
- *
- * \tparam Range range type
- * \tparam Domain domain type
- * \tparam DerivativeTraits traits template used to determine derivative traits
- */
-template<typename Range, typename... Domain, template<class> class DerivativeTraitsT>
-struct SignatureTag<Range(Domain...), DerivativeTraitsT>
-{
-  using Signature = Range(Domain...);
-
-  template<class T>
-  using DerivativeTraits = DerivativeTraitsT<T>;
-};
-
-
 /**
  * \brief Create a DifferentiableFunction from callables
  *

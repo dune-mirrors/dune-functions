@@ -1,0 +1,16 @@
+      auto f = [](Coord x, double u) -> int { return c(x)*u*u; };
+      auto u = U(x);
+      f.bind(e);
+      auto r = f(x,u);
+      derivative(f) == derivative(f, Component<0>());
+      auto dfdx == derivative(f, Component<0>());
+      auto dfdx == derivative(f, _1);
+      auto dfdu == derivative(f, Component<1>());
+      auto dfdu == derivative(f, _2);
+      auto fx = std::bind(f, _1, u);
+      auto fx_eval_u = std::bind(f, _1, std::bind(U,_1));
+      auto fu = std::bind(f, x, _1);
+      auto fux = std::bind(f, _2, _1);
+      f(x,u) == fu(x) == fx(u) == fux(u,x);
+      f(x,U(x)) == f(x,u) == fx_eval_u(x);
+

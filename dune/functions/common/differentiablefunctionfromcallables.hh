@@ -98,10 +98,10 @@ struct SignatureTag;
  * \tparam Domain domain type
  * \tparam DerivativeTraits traits template used to determine derivative traits
  */
-template<class Range, class Domain, template<class> class DerivativeTraitsT>
-struct SignatureTag<Range(Domain), DerivativeTraitsT>
+template<typename Range, typename... Domain, template<class> class DerivativeTraitsT>
+struct SignatureTag<Range(Domain...), DerivativeTraitsT>
 {
-  using Signature = Range(Domain);
+  using Signature = Range(Domain...);
 
   template<class T>
   using DerivativeTraits = DerivativeTraitsT<T>;

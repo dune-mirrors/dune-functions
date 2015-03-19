@@ -9,13 +9,14 @@
 namespace Dune {
 namespace Functions {
 
-template<int D>
-struct DerivativeDirection :
+  template<int D>
+  struct DerivativeDirection :
     public std::integral_constant<int, D>
-{};
+  {};
 
   namespace derivativeDirection
   {
+    extern DerivativeDirection<1> _default;
     extern DerivativeDirection<1> _d1;
     extern DerivativeDirection<2> _d2;
     extern DerivativeDirection<3> _d3;
@@ -28,6 +29,8 @@ struct DerivativeDirection :
     extern DerivativeDirection<10> _d10;
     extern DerivativeDirection<10> _dN;
   }
+
+  using DefaultDerivativeDirection = DerivativeDirection<1>;
 
   /**
    * A concept describing types that have a derivative(f,dir) method found by ADL

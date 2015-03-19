@@ -18,32 +18,18 @@ namespace Dune {
 namespace Functions {
 namespace Imp {
 
-/**
- * A concept describing types that have a derivative() method found by ADL
- */
-struct HasFreeDerivative
-{
-  template<class F, int D>
-  auto require(F&& f, DerivativeDirection<D>&& d) -> decltype(
-    derivative(f,d)
-  );
-};
-
-
 
 template<class Dummy, class F, int D,
   typename std::enable_if<
-    Dune::Functions::Concept::models< HasFreeDerivative, F>() , int>::type = 0>
-auto derivativeIfImplemented(const F& f) -> decltype(derivative(f))
+    Dune::Functions::Concept::models< HasFreeDerivative<D>, F>() , int>::type = 0>
+auto derivativeIfImplemented(const F& f, DerivativeDirection<D> d) -> decltype(derivative(f))
 {
-  return derivative(f);
+  return derivative(f,d);
 }
 
-
-
 template<class Dummy, class F, int D,
   typename std::enable_if<
-    not(Dune::Functions::Concept::models< HasFreeDerivative, F>()) , int>::type = 0>
+    not(Dune::Functions::Concept::models< HasFreeDerivative<D>, F>()) , int>::type = 0>
 Dummy derivativeIfImplemented(const F& f, DerivativeDirection<D> d)
 {
   DUNE_THROW(Dune::NotImplemented, "Derivative not implemented");

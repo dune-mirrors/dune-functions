@@ -4,6 +4,7 @@
 #define DUNE_FUNCTIONS_COMMON_DERIVATIVEDIRECTION_HH
 
 #include <dune/functions/common/type_traits.hh>
+#include "concept.hh"
 
 namespace Dune {
 namespace Functions {
@@ -28,10 +29,48 @@ struct DerivativeDirection :
     extern DerivativeDirection<10> _dN;
   }
 
-#ifdef DOXYGEN
+  /**
+   * A concept describing types that have a derivative(f,dir) method found by ADL
+   */
   template<int D>
-  DerivativeType derivative(const Function & f, DerivativeDirection<D>);
-#endif
+  struct HasFreeDerivative
+  {
+    template<class F>
+    auto require(F&& f, DerivativeDirection<D>&& d) -> decltype(
+      derivative(f,d)
+      );
+  };
+
+  /**
+   * A concept describing types that have a derivative(f) method found by ADL
+   */
+  struct HasFreeDerivativeWithoutDirection
+  {
+    template<class F>
+    auto require(F&& f) -> decltype(
+      derivative(f)
+      );
+  };
+
+  #warning add SFINAE to remove this from the lookup table iff Function takes only one parameter
+  template<typename Function,
+           typename std::enable_if<
+             Concept::models< HasFreeDerivativeWithoutDirection, Function>()
+             and
+             not Concept::models< HasFreeDerivative<1>, Function>(), int>::type = 0>
+  auto derivative(const Function & f, DerivativeDirection<1>)
+    -> decltype(derivative(f))
+  {
+    return derivative(f);
+  }
+
+  // #warning add SFINAE to remove this from the lookup table iff Function takes multiple parameter
+  // template<typename Function>
+  // auto derivative(const Function & f)
+  //   -> decltype(derivative(f, derivativeDirection::_d1))
+  // {
+  //   return derivative(f, derivativeDirection::_d1);
+  // }
 
 }
 }

@@ -38,7 +38,10 @@ Dummy derivativeIfImplemented(const F& f, DerivativeDirection<D> d)
 template<typename DerivativeInterfaces, int P>
 class PartialDerivativeWrapperBase;
 template<typename... DerivativeInterfaces>
-class PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, 0> {};
+class PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, 0> {
+public:
+  void derivative() const {};
+};
 template<typename... DerivativeInterfaces, int P>
 class PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, P> :
   public PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, P-1>
@@ -50,6 +53,8 @@ class PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, P> :
   using DerivativeInterface = typename std::tuple_element< P-1, std::tuple<DerivativeInterfaces...> >::type;
 
 public:
+
+  using PartialDerivativeWrapperBase<std::tuple<DerivativeInterfaces...>, P-1>::derivative;
 
   /**
    * \brief compute partial derivative wrt P'th parameter
@@ -79,7 +84,10 @@ class PartialDerivativeWrapper;
 template<typename Signature, typename... DerivativeInterfaces, class WrapperImp>
 class PartialDerivativeWrapper<Signature, std::tuple<DerivativeInterfaces...>, 0, WrapperImp> :
     public DifferentiableFunctionWrapperBase<Signature, std::tuple<DerivativeInterfaces...> >
-{};
+{
+public:
+  void derivative() const {};
+};
 
 template<typename Signanture, typename... DerivativeInterfaces, int P, class WrapperImp>
 class PartialDerivativeWrapper<Signanture, std::tuple<DerivativeInterfaces...>, P, WrapperImp> :
@@ -92,6 +100,8 @@ class PartialDerivativeWrapper<Signanture, std::tuple<DerivativeInterfaces...>, 
   using DerivativeInterface = typename std::tuple_element< P-1, std::tuple<DerivativeInterfaces...> >::type;
 
 public:
+
+  using PartialDerivativeWrapper<Signanture, std::tuple<DerivativeInterfaces...>, P-1, WrapperImp>::derivative;
 
   /**
    * \brief compute partial derivative wrt P'th parameter

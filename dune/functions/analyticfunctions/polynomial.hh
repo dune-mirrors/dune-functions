@@ -44,7 +44,7 @@ public:
     return y;
   }
 
-  friend Polynomial derivative(const Polynomial& p)
+  friend Polynomial derivative(const Polynomial& p, DefaultDerivativeDirection = derivativeDirection::_default)
   {
     auto derivative = Polynomial();
     derivative.coefficients_.resize(p.coefficients_.size()-1);

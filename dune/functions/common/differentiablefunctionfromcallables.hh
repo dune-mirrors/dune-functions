@@ -77,7 +77,8 @@ public:
     return f_(x);
   }
 
-  friend Derivative derivative(const DifferentiableFunctionFromCallables& t)
+  friend Derivative derivative(const DifferentiableFunctionFromCallables& t,
+    DefaultDerivativeDirection = derivativeDirection::_default)
   {
     return t.df_;
   }

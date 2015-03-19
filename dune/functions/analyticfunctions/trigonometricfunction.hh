@@ -21,7 +21,8 @@ public:
 
 
 template<class K, int sinFactor, int cosFactor>
-TrigonometricFunction<K, -cosFactor, sinFactor> derivative(const TrigonometricFunction<K, sinFactor, cosFactor>& f)
+TrigonometricFunction<K, -cosFactor, sinFactor> derivative(const TrigonometricFunction<K, sinFactor, cosFactor>& f,
+  DefaultDerivativeDirection = derivativeDirection::_default)
 {
   return TrigonometricFunction<K, -cosFactor, sinFactor>();
 }

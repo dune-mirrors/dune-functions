@@ -24,17 +24,13 @@ public:
     return V;
   }
 
-  template<int D>
+  template<int D = 1>
   friend ConstantIntegerFunction<0> derivative(const ConstantIntegerFunction& p,
-    Dune::Functions::DerivativeDirection<D>)
+    Dune::Functions::DerivativeDirection<D> = Dune::Functions::DerivativeDirection<D>())
   {
     return ConstantIntegerFunction<0>();
   }
 
-  friend ConstantIntegerFunction<0> derivative(const ConstantIntegerFunction& p)
-  {
-    return ConstantIntegerFunction<0>();
-  }
 };
 
 class MultiParamTestFunction
@@ -108,13 +104,13 @@ struct DifferentiableFunctionImplementableTest
       auto dfdn = derivative(f,diffDir);
       std::cout << "Derivative at x=5: " << dfdn(params...) << std::endl;
 
-      // // Test whether I can evaluate the second derivative through FunctionHandle
-      // auto ddfdn = derivative(df,diffDir);
-      // std::cout << "Second derivative at x=5: " << ddfdn(params...) << std::endl;
+      // Test whether I can evaluate the second derivative through FunctionHandle
+      auto ddfdn = derivative(df,diffDir);
+      std::cout << "Second derivative at x=5: " << ddfdn(params...) << std::endl;
 
-      // // Test whether I can evaluate the third derivative through FunctionHandle
-      // auto dddfdn = derivative(ddf,diffDir);
-      // std::cout << "Third derivative at x=5: " << dddfdn(params...) << std::endl;
+      // Test whether I can evaluate the third derivative through FunctionHandle
+      auto dddfdn = derivative(ddf,diffDir);
+      std::cout << "Third derivative at x=5: " << dddfdn(params...) << std::endl;
 
       std::cout << std::endl << "Check calling derivatives through DifferentiableFunction object" << std::endl;
       Dune::Functions::DifferentiableFunction<Range(Domain...)> fi = f;
@@ -205,8 +201,8 @@ struct DifferentiableFunctionImplementableTest
     // auto df2dt = [](double x, double t){ return -1; };
     // auto F2 = makeDifferentiableFunctionFromCallables(signature2, f2, df2dx);
     MultiParamTestFunction F2;
-//    passed = passed and checkWithFunction(signature2, F2, _d1, 1.0, 2.0);
-//    passed = passed and checkWithFunction(signature2, F2, _d2, 1.0, 2.0);
+    passed = passed and checkWithFunction(signature2, F2, _d1, 1.0, 2.0);
+    passed = passed and checkWithFunction(signature2, F2, _d2, 1.0, 2.0);
 
     return passed;
   }

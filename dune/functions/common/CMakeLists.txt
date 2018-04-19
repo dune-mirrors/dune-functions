@@ -12,6 +12,7 @@ install(FILES
         localfunction_imp.hh
         multiindex.hh
         overflowarray.hh
+        persistentgridview.hh
         polymorphicsmallobject.hh
         reserveddeque.hh
         signature.hh

@@ -16,6 +16,7 @@
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 namespace Dune::Functions
 {
@@ -202,6 +203,12 @@ public:
   size_type dimension() const
   {
     return mapper_.size();
+  }
+
+  //! Return a flat index-tree for this preBasis
+  auto indexTree() const
+  {
+    return FlatIndexTree{dimension()};
   }
 
   size_type maxNodeSize() const

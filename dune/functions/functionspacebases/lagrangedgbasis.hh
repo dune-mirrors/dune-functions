@@ -11,6 +11,7 @@
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 
 
@@ -129,6 +130,12 @@ public:
       }
     }
     DUNE_THROW(Dune::NotImplemented, "No size method for " << dim << "d grids available yet!");
+  }
+
+  //! Return a flat index-tree for this preBasis
+  auto indexTree() const
+  {
+    return FlatIndexTree{dimension()};
   }
 
   size_type maxNodeSize() const

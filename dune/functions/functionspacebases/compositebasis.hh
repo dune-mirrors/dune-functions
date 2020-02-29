@@ -20,6 +20,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 
 namespace Dune {
@@ -165,6 +166,27 @@ public:
   {
     return size(prefix, IndexMergingStrategy{});
   }
+
+  //! Return the associated index-tree
+  auto indexTree() const
+  {
+    using namespace Dune::Functions::BasisFactory;
+    if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
+    {
+      return std::apply([&](auto const&... spb) {
+        return StaticNonUniformIndexTree{spb.indexTree()...};
+      }, subPreBases_);
+    }
+    else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
+    {
+      return std::apply([&](auto const&... spb) {
+        return mergeIndexTrees(spb.indexTree()...);
+      }, subPreBases_);
+    }
+    else
+      return UnknownIndexTree{};
+  }
+
 
 private:
 

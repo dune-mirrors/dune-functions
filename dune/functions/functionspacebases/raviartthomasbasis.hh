@@ -24,6 +24,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 namespace Dune {
 namespace Functions {
@@ -253,6 +254,12 @@ public:
   size_type dimension() const
   {
     return dofsPerCodim_[0] * gridView_.size(0) + dofsPerCodim_[1] * gridView_.size(1);
+  }
+
+  //! Return a flat index-tree for this preBasis
+  auto indexTree() const
+  {
+    return FlatIndexTree{dimension()};
   }
 
   size_type maxNodeSize() const

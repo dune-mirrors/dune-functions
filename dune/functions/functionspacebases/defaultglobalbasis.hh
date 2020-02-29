@@ -151,6 +151,12 @@ public:
     return preBasis_.size(prefix);
   }
 
+  //! Return the index-tree associated with the pre-basis
+  auto indexTree() const
+  {
+    return preBasis_.indexTree();
+  }
+
   //! Return local view for basis
   LocalView localView() const
   {

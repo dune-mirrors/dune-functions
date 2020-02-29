@@ -13,6 +13,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 
 
@@ -124,6 +125,23 @@ public:
   {
     return size(prefix, IndexMergingStrategy{});
   }
+
+  //! Return the associated index-tree
+  auto indexTree() const
+  {
+    using namespace Dune::Functions::BasisFactory;
+
+    auto subIndexTree = subPreBasis_.indexTree();
+    if constexpr(std::is_same_v<IMS, FlatInterleaved> || std::is_same_v<IMS, FlatLexicographic>)
+      return mergeIndexTrees<children>(std::move(subIndexTree));
+    else if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
+      return StaticUniformIndexTree<decltype(subIndexTree), children>{std::move(subIndexTree)};
+    else if constexpr(std::is_same_v<IMS, BlockedInterleaved>)
+      return appendToIndexTree<children>(std::move(subIndexTree));
+    else
+      return UnknownIndexTree{};
+  }
+
 
 private:
 

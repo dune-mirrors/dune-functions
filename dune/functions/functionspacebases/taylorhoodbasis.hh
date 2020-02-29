@@ -14,6 +14,7 @@
 
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 namespace Dune {
 namespace Functions {
@@ -131,6 +132,25 @@ public:
   size_type size(const SizePrefix& prefix) const
   {
     return sizeImp<useHybridIndices>(prefix);
+  }
+
+  /**
+   * \brief Return an index-tree depending on the flag `useHybridIndices`.
+   * Either return a `StaticNonUniformIndexTree` if hybrid indices should be used,
+   * otherwise return a `StaticTypeUniformIndexTree`.
+   **/
+  auto indexTree() const
+  {
+    if constexpr(useHybridIndices)
+      return StaticNonUniformIndexTree{
+        UniformIndexTree{pq2PreBasis_.size(), StaticFlatIndexTree<dim>{}},
+        FlatIndexTree{pq1PreBasis_.size()}
+      };
+    else
+      return StaticTypeUniformIndexTree<FlatIndexTree,2>{
+        FlatIndexTree{dim * pq2PreBasis_.size()},
+        FlatIndexTree{pq1PreBasis_.size()}
+      };
   }
 
 private:

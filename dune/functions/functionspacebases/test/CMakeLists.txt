@@ -36,7 +36,13 @@ dune_add_test(SOURCES makebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES hierarchicallagrangebasistest.cc LABELS quick)
 
+dune_add_test(SOURCES indextreetest.cc LABELS quick)
+
+dune_add_test(SOURCES vectorgeneratortest.cc LABELS quick)
+
+
 install(
   FILES
+  basisfactories.hh
   basistest.hh
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/test)

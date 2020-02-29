@@ -16,6 +16,7 @@ install(FILES
         hierarchicallagrangebasis.hh
         hierarchicnodetorangemap.hh
         hierarchicvectorwrapper.hh
+        indextree.hh
         interpolate.hh
         lagrangebasis.hh
         lagrangedgbasis.hh

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <dune/functions/functionspacebases/concepts.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 #include <dune/functions/functionspacebases/transformedindexbasis.hh>
 
 
@@ -114,6 +115,13 @@ public:
   auto dimension(const PreBasis& preBasis) const
   {
     return numIndices_;
+  }
+
+  //! Return a flat index-tree for this preBasis
+  template<class PreBasis>
+  auto indexTree(const PreBasis& preBasis) const
+  {
+    return FlatIndexTree{numIndices_};
   }
 
 private:

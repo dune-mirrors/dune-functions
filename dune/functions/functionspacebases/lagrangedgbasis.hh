@@ -10,6 +10,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 
 
@@ -145,6 +146,12 @@ public:
   size_type dimension() const
   {
     return size();
+  }
+
+  //! Return a flat index-tree for this preBasis
+  auto indexTree() const
+  {
+    return FlatIndexTree{dimension()};
   }
 
   size_type maxNodeSize() const

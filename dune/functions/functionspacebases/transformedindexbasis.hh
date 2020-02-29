@@ -127,6 +127,12 @@ public:
     return transformation_.size(prefix, rawPreBasis_);
   }
 
+  //! Return the index-tree of the transformed pre-basis
+  auto indexTree() const
+  {
+    return transformation_.indexTree(rawPreBasis_);
+  }
+
   //! Get the total dimension of the space spanned by this basis
   size_type dimension() const
   {
@@ -223,10 +229,11 @@ auto transformIndices(
  *
  * \tparam IndexTransformation Callback type for transforming multi-indices
  * \tparam SizeImplementation Callback type for implementation of size(prefix)
+ * \tparam IndexTreeImplementation Callback type for implementation of indexTree()
  * \tparam minIS Minimal multi-index size
  * \tparam maxIS Maximal multi-index size. Notice that this has to large enough to also store the untransformed indices.
  */
-template<class IndexTransformation, class SizeImplementation, std::size_t minIS, std::size_t maxIS>
+template<class IndexTransformation, class SizeImplementation, class IndexTreeImplementation, std::size_t minIS, std::size_t maxIS>
 class GenericIndexingTransformation
 {
 public:
@@ -234,10 +241,11 @@ public:
   static constexpr std::size_t minIndexSize = minIS;
   static constexpr std::size_t maxIndexSize = maxIS;
 
-  template<class IT_R, class SI_R>
-  GenericIndexingTransformation(IT_R&& indexTransformation, SI_R&& sizeImplementation) :
+  template<class IT_R, class SI_R, class T_R>
+  GenericIndexingTransformation(IT_R&& indexTransformation, SI_R&& sizeImplementation, T_R&& indexTreeImplementation) :
     indexTransformation_(std::forward<IT_R>(indexTransformation)),
-    sizeImplementation_(std::forward<SI_R>(sizeImplementation))
+    sizeImplementation_(std::forward<SI_R>(sizeImplementation)),
+    indexTreeImplementation_(std::forward<T_R>(indexTreeImplementation))
   {}
 
   template<class MultiIndex, class PreBasis>
@@ -258,9 +266,16 @@ public:
     return preBasis.dimension();
   }
 
+  template<class PreBasis>
+  auto indexTree(const PreBasis& preBasis) const
+  {
+    return indexTreeImplementation_(preBasis);
+  }
+
 private:
   IndexTransformation indexTransformation_;
   SizeImplementation sizeImplementation_;
+  IndexTreeImplementation indexTreeImplementation_;
 };
 
 
@@ -280,18 +295,25 @@ private:
  *
  * \tparam IndexTransformation Callback type for transforming multi-indices
  * \tparam SizeImplementation Callback type for implementation of size(prefix)
+ * \tparam IndexTreeImplementation Callback type for implementation of indexTree()
  * \tparam minIS Minimal multi-index size
  * \tparam maxIS Maximal multi-index size. Notice that this has to be large enough to also store the untransformed indices.
  */
-template<class IndexTransformation, class SizeImplementation, std::size_t minIndexSize, std::size_t maxIndexSize>
-auto indexTransformation(IndexTransformation&& indexTransformation, SizeImplementation&& sizeImplementation, Dune::index_constant<minIndexSize>, Dune::index_constant<maxIndexSize>)
+template<class IndexTransformation, class SizeImplementation, class IndexTreeImplementation, std::size_t minIndexSize, std::size_t maxIndexSize>
+auto indexTransformation(IndexTransformation&& indexTransformation,
+                         SizeImplementation&& sizeImplementation,
+                         IndexTreeImplementation&& indexTreeImplementation,
+                         Dune::index_constant<minIndexSize>,
+                         Dune::index_constant<maxIndexSize>)
 {
   return GenericIndexingTransformation<
     std::decay_t<IndexTransformation>,
     std::decay_t<SizeImplementation>,
+    std::decay_t<IndexTreeImplementation>,
     minIndexSize, maxIndexSize>(
         std::forward<IndexTransformation>(indexTransformation),
-        std::forward<SizeImplementation>(sizeImplementation));
+        std::forward<SizeImplementation>(sizeImplementation),
+        std::forward<IndexTreeImplementation>(indexTreeImplementation));
 }
 
 

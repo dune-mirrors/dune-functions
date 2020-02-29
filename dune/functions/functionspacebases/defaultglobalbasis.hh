@@ -151,6 +151,12 @@ public:
     return preBasis_.size(prefix);
   }
 
+  //! Return the BlockingTag representing a structure that can be accessed by the multi indices
+  auto blocking() const
+  {
+    return preBasis_.blocking();
+  }
+
   //! Return local view for basis
   LocalView localView() const
   {

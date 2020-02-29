@@ -18,6 +18,7 @@
 #include <dune/functions/common/type_traits.hh>
 #include <dune/functions/common/utility.hh>
 #include <dune/functions/functionspacebases/basistags.hh>
+#include <dune/functions/functionspacebases/blockingtags.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
@@ -167,6 +168,12 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
+  //! Return the BlockingTag, either Blocked or Flat depending on the IndexMergingStrategy.
+  auto blocking() const
+  {
+    return blocking(IndexMergingStrategy{});
+  }
+
 private:
 
   template<class SizePrefix>
@@ -211,6 +218,21 @@ private:
         });
     }
     return result;
+  }
+
+
+  auto blocking(BasisFactory::FlatLexicographic) const
+  {
+    if constexpr (!std::is_same<std::tuple<decltype(std::declval<SPB>().blocking())...,BlockingTag::Flat>,
+                                std::tuple<BlockingTag::Flat,decltype(std::declval<SPB>().blocking())...> >::value)
+      return BlockingTag::Unknown{};
+    else
+      return BlockingTag::Flat{};
+  }
+
+  auto blocking(BasisFactory::BlockedLexicographic) const
+  {
+    return BlockingTag::Blocked<decltype(std::declval<SPB>().blocking())...>{};
   }
 
 public:

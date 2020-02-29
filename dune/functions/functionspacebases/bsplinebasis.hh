@@ -21,6 +21,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 
 namespace Dune
 {
@@ -694,6 +695,12 @@ public:
   Node makeNode() const
   {
     return Node{this};
+  }
+
+  //! Return a flat index-tree for this preBasis
+  auto indexTree() const
+  {
+    return FlatIndexTree{dimension()};
   }
 
   //! Get the maximal number of DOFs associated to node for any element

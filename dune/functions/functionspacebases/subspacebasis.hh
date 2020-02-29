@@ -102,6 +102,12 @@ public:
     return rootBasis_->size(prefix);
   }
 
+  //! Return the index-tree associated with the root-basis
+  auto indexTree() const
+  {
+    return rootBasis_->indexTree();
+  }
+
   /** \brief Return local view for basis
    *
    */

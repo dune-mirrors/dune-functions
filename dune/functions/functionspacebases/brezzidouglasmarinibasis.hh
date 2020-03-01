@@ -16,6 +16,7 @@
 #include <dune/localfunctions/brezzidouglasmarini/brezzidouglasmarini2cube2d.hh>
 #include <dune/localfunctions/brezzidouglasmarini/brezzidouglasmarini2simplex2d.hh>
 
+#include <dune/functions/functionspacebases/blockingtags.hh>
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>

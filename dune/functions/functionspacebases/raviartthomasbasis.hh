@@ -20,6 +20,7 @@
 #include <dune/localfunctions/raviartthomas/raviartthomas12d.hh>
 #include <dune/localfunctions/raviartthomas/raviartthomas2cube2d.hh>
 
+#include <dune/functions/functionspacebases/blockingtags.hh>
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>

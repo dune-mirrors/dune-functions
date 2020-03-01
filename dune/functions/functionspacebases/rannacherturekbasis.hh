@@ -11,6 +11,7 @@
 #include <dune/localfunctions/rannacherturek.hh>
 #include <dune/localfunctions/crouzeixraviart.hh>
 
+#include <dune/functions/functionspacebases/blockingtags.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 

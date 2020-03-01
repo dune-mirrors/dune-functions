@@ -128,6 +128,12 @@ public:
     return transformation_.size(prefix, rawPreBasis_);
   }
 
+  //! Return the BlockingTag of the transformed indexset
+  auto blocking() const
+  {
+    return transformation_.blocking();
+  }
+
   //! Get the total dimension of the space spanned by this basis
   size_type dimension() const
   {
@@ -224,10 +230,11 @@ auto transformIndices(
  *
  * \tparam IndexTransformation Callback type for transforming multi-indices
  * \tparam SizeImplementation Callback type for implementation of size(prefix)
+ * \tparam BlockingImplementation Callback type for implementation of blocking()
  * \tparam minIS Minimal multi-index size
  * \tparam maxIS Maximal multi-index size. Notice that this has to large enough to also store the untransformed indices.
  */
-template<class IndexTransformation, class SizeImplementation, std::size_t minIS, std::size_t maxIS>
+template<class IndexTransformation, class SizeImplementation, class BlockingImplementation, std::size_t minIS, std::size_t maxIS>
 class GenericIndexingTransformation
 {
 public:
@@ -235,10 +242,11 @@ public:
   static constexpr std::size_t minIndexSize = minIS;
   static constexpr std::size_t maxIndexSize = maxIS;
 
-  template<class IT_R, class SI_R>
-  GenericIndexingTransformation(IT_R&& indexTransformation, SI_R&& sizeImplementation) :
+  template<class IT_R, class SI_R, class BI_R>
+  GenericIndexingTransformation(IT_R&& indexTransformation, SI_R&& sizeImplementation, BI_R&& blockingImplementation) :
     indexTransformation_(std::forward<IT_R>(indexTransformation)),
-    sizeImplementation_(std::forward<SI_R>(sizeImplementation))
+    sizeImplementation_(std::forward<SI_R>(sizeImplementation)),
+    blockingImplementation_(std::forward<BI_R>(blockingImplementation))
   {}
 
   template<class MultiIndex, class PreBasis>
@@ -259,9 +267,15 @@ public:
     return preBasis.dimension();
   }
 
+  auto blocking() const
+  {
+    return blockingImplementation_();
+  }
+
 private:
   IndexTransformation indexTransformation_;
   SizeImplementation sizeImplementation_;
+  BlockingImplementation blockingImplementation_;
 };
 
 
@@ -281,18 +295,25 @@ private:
  *
  * \tparam IndexTransformation Callback type for transforming multi-indices
  * \tparam SizeImplementation Callback type for implementation of size(prefix)
+ * \tparam BlockingImplementation Callback type for implementation of blocking()
  * \tparam minIS Minimal multi-index size
  * \tparam maxIS Maximal multi-index size. Notice that this has to be large enough to also store the untransformed indices.
  */
-template<class IndexTransformation, class SizeImplementation, std::size_t minIndexSize, std::size_t maxIndexSize>
-auto indexTransformation(IndexTransformation&& indexTransformation, SizeImplementation&& sizeImplementation, Dune::index_constant<minIndexSize>, Dune::index_constant<maxIndexSize>)
+template<class IndexTransformation, class SizeImplementation, class BlockingImplementation, std::size_t minIndexSize, std::size_t maxIndexSize>
+auto indexTransformation(IndexTransformation&& indexTransformation,
+                         SizeImplementation&& sizeImplementation,
+                         BlockingImplementation&& blockingImplementation,
+                         Dune::index_constant<minIndexSize>,
+                         Dune::index_constant<maxIndexSize>)
 {
   return GenericIndexingTransformation<
     std::decay_t<IndexTransformation>,
     std::decay_t<SizeImplementation>,
+    std::decay_t<BlockingImplementation>,
     minIndexSize, maxIndexSize>(
         std::forward<IndexTransformation>(indexTransformation),
-        std::forward<SizeImplementation>(sizeImplementation));
+        std::forward<SizeImplementation>(sizeImplementation),
+        std::forward<BlockingImplementation>(blockingImplementation));
 }
 
 

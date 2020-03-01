@@ -271,6 +271,12 @@ public:
     return size();
   }
 
+  //! Return the flat BlockingTag.
+  BlockingTag::Flat blocking() const
+  {
+    return {};
+  }
+
   size_type maxNodeSize() const
   {
     size_type result = 0;

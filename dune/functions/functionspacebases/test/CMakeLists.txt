@@ -3,15 +3,19 @@
 # Path to the example grid files in dune-grid
 add_definitions(-DDUNE_GRID_EXAMPLE_GRIDS_PATH=\"${DUNE_GRID_EXAMPLE_GRIDS_PATH}\")
 
-dune_add_test(SOURCES brezzidouglasmarinibasistest.cc)
+dune_add_test(SOURCES brezzidouglasmarinibasistest.cc
+              CMAKE_GUARD HAVE_UG)
 
 dune_add_test(SOURCES bsplinebasistest.cc)
 
-dune_add_test(SOURCES globalvaluedlfetest.cc)
+dune_add_test(SOURCES globalvaluedlfetest.cc
+              CMAKE_GUARD HAVE_UG)
 
-dune_add_test(SOURCES gridviewfunctionspacebasistest.cc)
+dune_add_test(SOURCES gridviewfunctionspacebasistest.cc
+              CMAKE_GUARD HAVE_UG)
 
-dune_add_test(SOURCES lagrangebasistest.cc)
+dune_add_test(SOURCES lagrangebasistest.cc
+              CMAKE_GUARD HAVE_UG)
 
 dune_add_test(SOURCES lagrangedgbasistest.cc)
 
@@ -19,7 +23,8 @@ dune_add_test(SOURCES taylorhoodbasistest.cc)
 
 dune_add_test(SOURCES rannacherturekbasistest.cc)
 
-dune_add_test(SOURCES raviartthomasbasistest.cc)
+dune_add_test(SOURCES raviartthomasbasistest.cc
+              CMAKE_GUARD HAVE_UG)
 
 dune_add_test(SOURCES hierarchicvectorwrappertest.cc)
 

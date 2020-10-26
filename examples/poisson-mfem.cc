@@ -1,5 +1,10 @@
 // -*- tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
 // vi: set et ts=4 sw=2 sts=2:
+
+#define DIM2 // Use a two-dimensional test, otherwise three-dimensional
+//#define SIMPLEX // Use simplex mesh. Otherwise quad mesh is used.
+#define BUGFIX // Use the transposed Jacobian in the Piola transform.
+
 #include <config.h>
 
 #include <vector>
@@ -26,9 +31,6 @@
 #include <dune/functions/functionspacebases/subspacebasis.hh>
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
 #include <dune/functions/gridfunctions/gridviewfunction.hh>
-
-#define DIM2 // Use a two-dimensional test, otherwise three-dimensional
-#define SIMPLEX // Use simplex mesh. Otherwise quad mesh is used.
 
 #ifdef SIMPLEX
   #include <dune/grid/uggrid.hh>

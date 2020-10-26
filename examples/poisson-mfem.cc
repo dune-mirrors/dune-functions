@@ -10,7 +10,6 @@
 
 #include <dune/geometry/quadraturerules.hh>
 
-#include <dune/grid/yaspgrid.hh>
 #include <dune/grid/io/file/vtk/subsamplingvtkwriter.hh>
 
 #include <dune/istl/matrix.hh>
@@ -29,6 +28,15 @@
 #include <dune/functions/gridfunctions/gridviewfunction.hh>
 
 #define DIM2 // Use a two-dimensional test, otherwise three-dimensional
+#define SIMPLEX // Use simplex mesh. Otherwise quad mesh is used.
+
+#ifdef SIMPLEX
+  #include <dune/grid/uggrid.hh>
+  #include <dune/grid/utility/structuredgridfactory.hh>
+  #include <dune/grid/io/file/gmshreader.hh>
+#else
+  #include <dune/grid/yaspgrid.hh>
+#endif
 
 using namespace Dune;
 
@@ -325,19 +333,38 @@ int main (int argc, char *argv[])
   //   Generate the grid
   ///////////////////////////////////
 
-#ifdef DIM2
-  const int dim = 2;
-  std::array<int,dim> elements = {{50, 50}};
-#else
-  const int dim = 3;
-  std::array<int,dim> elements = {{10, 10, 10}};
-#endif
-  typedef YaspGrid<dim> GridType;
-  FieldVector<double,dim> l(1);
-  GridType grid(l,elements);
+//#ifdef DIM2
+//  const int dim = 2;
+//  std::array<int,dim> elements = {{50, 50}};
+//#else
+//  const int dim = 3;
+//  std::array<int,dim> elements = {{10, 10, 10}};
+//#endif
+//  typedef YaspGrid<dim> GridType;
+//  FieldVector<double,dim> l(1);
+//  GridType grid(l,elements);
+//
+//  typedef GridType::LeafGridView GridView;
+//  GridView gridView = grid.leafGridView();
 
-  typedef GridType::LeafGridView GridView;
-  GridView gridView = grid.leafGridView();
+  const int dim = 2;
+  int numElements = 50;
+  FieldVector<double,dim> ll(0.0), l(1.0);
+
+#ifdef SIMPLEX
+  typedef UGGrid<dim> GridType;
+  typedef std::shared_ptr<GridType> Grid;
+  std::array<unsigned int, dim> elements;
+  std::fill(elements.begin(), elements.end(), (unsigned int)(numElements));
+  auto grid = StructuredGridFactory<GridType>::createSimplexGrid(ll,l,elements);
+  auto gridView = grid->leafGridView();
+#else
+  typedef YaspGrid<dim> GridType;
+  std::array<int,dim> elements = {numElements, numElements};
+  GridType grid(l,elements);
+  auto gridView = grid.leafGridView();
+#endif
+  using GridView = decltype(gridView);
 
   /////////////////////////////////////////////////////////
   //   Choose a finite element space
@@ -383,8 +410,8 @@ int main (int argc, char *argv[])
   assembleMixedPoissonRhs(basis, rhs, rightHandSide);
 
   auto pi = std::acos(-1.0);
-  auto topFluxBC   = [&pi] (const Domain& x) { return -0.05 * (1. - x[0]) * std::sin(2.*pi*x[0]); };
-  auto lowerFluxBC = [&pi] (const Domain& x) { return  0.05 * (1. - x[0]) * std::sin(2.*pi*x[0]); };
+  auto topFluxBC   = [&pi] (const Domain& x) { return 3; }; //-0.05 * (1. - x[0]) * std::sin(2.*pi*x[0]); };
+  auto lowerFluxBC = [&pi] (const Domain& x) { return -2; }; //0.05 * (1. - x[0]) * std::sin(2.*pi*x[0]); };
 
   using namespace Dune::Indices;
   using BitVectorType = BlockVector<BlockVector<FieldVector<char,1> > >;

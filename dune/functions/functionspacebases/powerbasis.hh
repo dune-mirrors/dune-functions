@@ -480,7 +480,7 @@ private:
 template<std::size_t k, class ChildPreBasisFactory, class IndexMergingStrategy>
 auto power(ChildPreBasisFactory&& childPreBasisFactory, const IndexMergingStrategy& ims)
 {
-  return Imp::PowerPreBasisFactory<k, IndexMergingStrategy, ChildPreBasisFactory>(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
+  return Imp::PowerPreBasisFactory<k, IndexMergingStrategy, std::decay_t<ChildPreBasisFactory>>(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
 }
 
 /**
@@ -496,7 +496,7 @@ auto power(ChildPreBasisFactory&& childPreBasisFactory, const IndexMergingStrate
 template<std::size_t k, class ChildPreBasisFactory>
 auto power(ChildPreBasisFactory&& childPreBasisFactory)
 {
-  return Imp::PowerPreBasisFactory<k, BlockedInterleaved, ChildPreBasisFactory>(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
+  return Imp::PowerPreBasisFactory<k, BlockedInterleaved, std::decay_t<ChildPreBasisFactory>>(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
 }
 
 } // end namespace BasisFactory

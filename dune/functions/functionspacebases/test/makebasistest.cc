@@ -14,6 +14,7 @@
 #include <dune/grid/yaspgrid.hh>
 
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/dynamicpowerbasis.hh>
 #include <dune/functions/functionspacebases/powerbasis.hh>
 #include <dune/functions/functionspacebases/compositebasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
@@ -43,11 +44,12 @@ int main (int argc, char* argv[])
   auto gridView = grid.leafGridView();
   auto basis = makeBasis(gridView,
       power<N>(
-        power<M>(
+        power(
           composite(
             lagrange<3>(),
             lagrange<1>(),
             flatLexicographic()),
+          M,
           flatLexicographic()),
         blockedInterleaved())
       );

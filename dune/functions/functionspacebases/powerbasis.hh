@@ -39,13 +39,11 @@ namespace Functions {
  * \tparam MI  Type to be used for multi-indices
  * \tparam IMS An IndexMergingStrategy used to merge the global indices of the child factories
  * \tparam SPB  The child pre-basis
- * \tparam C   The exponent of the power node
+ * \tparam C    The exponent of the power node, if -1 use runtime exponent passed to constructor
  */
-template<class MI, class IMS, class SPB, std::size_t C>
+template<class MI, class IMS, class SPB, int C = -1>
 class PowerPreBasis
 {
-  static const std::size_t children = C;
-
 public:
 
   //! The child pre-basis
@@ -63,7 +61,7 @@ public:
   using SubNode = typename SubPreBasis::Node;
 
   //! Template mapping root tree path to type of created tree node
-  using Node = PowerBasisNode<SubNode, children>;
+  using Node = std::conditional_t<C >= 0, PowerBasisNode<SubNode, C>, DynamicPowerBasisNode<SubNode>>;
 
   //! Type of created tree node index set. \deprecated
   using IndexSet = Impl::DefaultNodeIndexSet<PowerPreBasis>;
@@ -88,10 +86,27 @@ public:
   template<class... SFArgs,
     disableCopyMove<PowerPreBasis, SFArgs...> = 0,
     enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  PowerPreBasis(SFArgs&&... sfArgs) :
+  explicit PowerPreBasis(SFArgs&&... sfArgs) :
     subPreBasis_(std::forward<SFArgs>(sfArgs)...)
   {
     static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to PowerPreBasis does not model the PreBasis concept.");
+  }
+
+  /**
+   * \brief Constructor for given child pre-basis objects
+   *
+   * The child factories will be stored as copies
+   *
+   * \param children  The number of children
+   */
+  template<class... SFArgs,
+    enableIfConstructible<SubPreBasis, SFArgs...> = 0>
+  explicit PowerPreBasis(std::size_t children, SFArgs&&... sfArgs) :
+    children_(children),
+    subPreBasis_(std::forward<SFArgs>(sfArgs)...)
+  {
+    static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to PowerPreBasis does not model the PreBasis concept.");
+    assert(C < 0 || std::size_t(C) == children);
   }
 
   //! Initialize the global indices
@@ -117,8 +132,11 @@ public:
    */
   Node makeNode() const
   {
-    auto node = Node{};
-    for (std::size_t i=0; i<children; ++i)
+    auto node = [&]{
+      if constexpr(C >= 0) return Node{};
+      else return Node{children_};
+    }();
+    for (std::size_t i=0; i<children_; ++i)
       node.setChild(i, subPreBasis_.makeNode());
     return node;
   }
@@ -157,7 +175,7 @@ private:
     // multiplied by the number of subnodes because we enumerate all
     // child indices in a row.
     if (prefix.size() == 0)
-      return children*subPreBasis_.size({});
+      return children_*subPreBasis_.size({});
 
     // The first prefix entry refers to one of the (root index size)
     // subindex trees. Hence we have to first compute the corresponding
@@ -165,7 +183,7 @@ private:
     // the other prefix entries unmodified, because the index tree
     // looks the same after the first level.
     typename SubPreBasis::SizePrefix subPrefix;
-    subPrefix.push_back(prefix[0] / children);
+    subPrefix.push_back(prefix[0] / children_);
     for(std::size_t i=1; i<prefix.size(); ++i)
       subPrefix.push_back(prefix[i]);
     return subPreBasis_.size(subPrefix);
@@ -177,7 +195,7 @@ private:
     // root of a single subnode multiplied by the number of subnodes
     // because we enumerate all child indices in a row.
     if (prefix.size() == 0)
-      return children*subPreBasis_.size({});
+      return children_*subPreBasis_.size({});
 
     // The first prefix entry refers to one of the (root index size)
     // subindex trees. Hence we have to first compute the corresponding
@@ -185,7 +203,7 @@ private:
     // the other prefix entries unmodified, because the index tree
     // looks the same after the first level.
     typename SubPreBasis::SizePrefix subPrefix;
-    subPrefix.push_back(prefix[0] % children);
+    subPrefix.push_back(prefix[0] % children_);
     for(std::size_t i=1; i<prefix.size(); ++i)
       subPrefix.push_back(prefix[i]);
     return subPreBasis_.size(subPrefix);
@@ -194,7 +212,7 @@ private:
   size_type size(const SizePrefix& prefix, BasisFactory::BlockedLexicographic) const
   {
     if (prefix.size() == 0)
-      return children;
+      return children_;
     typename SubPreBasis::SizePrefix subPrefix;
     for(std::size_t i=1; i<prefix.size(); ++i)
       subPrefix.push_back(prefix[i]);
@@ -216,7 +234,7 @@ private:
     subPrefix.push_back(prefix.back());
     r = subPreBasis_.size(subPrefix);
     if (r==0)
-      return children;
+      return children_;
     return r;
   }
 
@@ -225,13 +243,13 @@ public:
   //! Get the total dimension of the space spanned by this basis
   size_type dimension() const
   {
-    return subPreBasis_.dimension() * children;
+    return subPreBasis_.dimension() * children_;
   }
 
   //! Get the maximal number of DOFs associated to node for any element
   size_type maxNodeSize() const
   {
-    return subPreBasis_.maxNodeSize() * children;
+    return subPreBasis_.maxNodeSize() * children_;
   }
 
   //! Const access to the stored prebasis of the factor in the power space
@@ -265,8 +283,8 @@ private:
     // Multiply first component of all indices for first child by
     // number of children to strech the index range for interleaving.
     for (std::size_t i = 0; i<subTreeSize; ++i)
-      multiIndices[i][0] *= children;
-    for (std::size_t child = 1; child<children; ++child)
+      multiIndices[i][0] *= children_;
+    for (std::size_t child = 1; child<children_; ++child)
     {
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
@@ -290,7 +308,7 @@ private:
     size_type firstIndexEntrySize = subPreBasis().size({});
     // Fill indices for first child at the beginning.
     auto next = Impl::preBasisIndices(subPreBasis(), node.child(_0), multiIndices);
-    for (std::size_t child = 1; child<children; ++child)
+    for (std::size_t child = 1; child<children_; ++child)
     {
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
@@ -324,7 +342,7 @@ private:
     // Insert 0 before first component of all indices for first child.
     for (std::size_t i = 0; i<subTreeSize; ++i)
       multiIndexPushFront(multiIndices[i], 0);
-    for (std::size_t child = 1; child<children; ++child)
+    for (std::size_t child = 1; child<children_; ++child)
     {
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
@@ -350,7 +368,7 @@ private:
     // Append 0 after last component of all indices for first child.
     for (std::size_t i = 0; i<subTreeSize; ++i)
       multiIndices[i].push_back(0);
-    for (std::size_t child = 1; child<children; ++child)
+    for (std::size_t child = 1; child<children_; ++child)
     {
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
@@ -364,6 +382,7 @@ private:
     return next;
   }
 
+  const std::size_t children_ = C;
   SubPreBasis subPreBasis_;
 };
 
@@ -373,7 +392,7 @@ namespace BasisFactory {
 
 namespace Imp {
 
-template<std::size_t k, class IndexMergingStrategy, class ChildPreBasisFactory>
+template<int k, class IndexMergingStrategy, class ChildPreBasisFactory>
 class PowerPreBasisFactory
 {
   static const bool isBlocked = std::is_same<IndexMergingStrategy,BlockedLexicographic>::value or std::is_same<IndexMergingStrategy,BlockedInterleaved>::value;
@@ -384,24 +403,33 @@ public:
 
   static const std::size_t requiredMultiIndexSize = isBlocked ? (maxChildIndexSize+1) : maxChildIndexSize;
 
-  PowerPreBasisFactory(const ChildPreBasisFactory& childPreBasisFactory) :
-    childPreBasisFactory_(childPreBasisFactory)
+  PowerPreBasisFactory(const ChildPreBasisFactory& childPreBasisFactory, std::size_t children = 0) :
+    childPreBasisFactory_(childPreBasisFactory),
+    children_(children)
   {}
 
-  PowerPreBasisFactory(ChildPreBasisFactory&& childPreBasisFactory) :
-    childPreBasisFactory_(std::move(childPreBasisFactory))
+  PowerPreBasisFactory(ChildPreBasisFactory&& childPreBasisFactory, std::size_t children = 0) :
+    childPreBasisFactory_(std::move(childPreBasisFactory)),
+    children_(children)
   {}
 
   template<class MultiIndex, class GridView>
   auto makePreBasis(const GridView& gridView) const
   {
-    auto childPreBasis = childPreBasisFactory_.template makePreBasis<MultiIndex>(gridView);
-    using ChildPreBasis = decltype(childPreBasis);
+    return [&]{
+      auto childPreBasis = childPreBasisFactory_.template makePreBasis<MultiIndex>(gridView);
+      using ChildPreBasis = decltype(childPreBasis);
+      using PreBasis = PowerPreBasis<MultiIndex,  IndexMergingStrategy, ChildPreBasis, k>;
 
-    return PowerPreBasis<MultiIndex,  IndexMergingStrategy, ChildPreBasis, k>(std::move(childPreBasis));
+      if constexpr(k >= 0)
+        return PreBasis(std::move(childPreBasis));
+      else
+        return PreBasis(children_, std::move(childPreBasis));
+    }();
   }
 
 private:
+  const std::size_t children_ = 0;
   ChildPreBasisFactory childPreBasisFactory_;
 };
 
@@ -421,10 +449,18 @@ private:
  *
  * This overload can be used to explicitly supply an IndexMergingStrategy.
  */
-template<std::size_t k, class ChildPreBasisFactory, class IndexMergingStrategy>
+template<int k, class ChildPreBasisFactory, class IndexMergingStrategy>
 auto power(ChildPreBasisFactory&& childPreBasisFactory, const IndexMergingStrategy& ims)
 {
-  return Imp::PowerPreBasisFactory<k, IndexMergingStrategy, ChildPreBasisFactory>(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
+  using PreBasisFactory = Imp::PowerPreBasisFactory<k, IndexMergingStrategy, ChildPreBasisFactory>;
+  return PreBasisFactory(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
+}
+
+template<class ChildPreBasisFactory, class IndexMergingStrategy>
+auto power(ChildPreBasisFactory&& childPreBasisFactory, std::size_t k, const IndexMergingStrategy& ims)
+{
+  using PreBasisFactory = Imp::PowerPreBasisFactory<-1, IndexMergingStrategy, ChildPreBasisFactory>;
+  return PreBasisFactory(std::forward<ChildPreBasisFactory>(childPreBasisFactory), k);
 }
 
 /**
@@ -437,10 +473,18 @@ auto power(ChildPreBasisFactory&& childPreBasisFactory, const IndexMergingStrate
  *
  * This overload will select the BasisFactory::BlockedInterleaved strategy.
  */
-template<std::size_t k, class ChildPreBasisFactory>
+template<int k, class ChildPreBasisFactory>
 auto power(ChildPreBasisFactory&& childPreBasisFactory)
 {
-  return Imp::PowerPreBasisFactory<k, BlockedInterleaved, ChildPreBasisFactory>(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
+  using PreBasisFactory = Imp::PowerPreBasisFactory<k, BlockedInterleaved, ChildPreBasisFactory>;
+  return PreBasisFactory(std::forward<ChildPreBasisFactory>(childPreBasisFactory));
+}
+
+template<class ChildPreBasisFactory>
+auto power(ChildPreBasisFactory&& childPreBasisFactory, std::size_t k)
+{
+  using PreBasisFactory = Imp::PowerPreBasisFactory<-1, BlockedInterleaved, ChildPreBasisFactory>;
+  return PreBasisFactory(std::forward<ChildPreBasisFactory>(childPreBasisFactory), k);
 }
 
 } // end namespace BasisFactory

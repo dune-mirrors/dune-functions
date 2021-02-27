@@ -119,14 +119,14 @@ struct CompositeBasisNode : Refines<BasisNode>
 template<class GridView>
 struct BasisTree : Refines<BasisNode>
 {
-  template<class N>
+  template<class N, class NodeTag = typename N::NodeTag>
   auto require(const N& node) -> decltype(
-    requireConcept<typename std::conditional< N::isLeaf, LeafBasisNode<GridView>, BasisNode>::type, N>(),
-    requireConcept<typename std::conditional< std::is_same_v<typename N::NodeTag, Dune::TypeTree::PowerNodeTag>,
-                                              PowerBasisNode<GridView>, BasisNode>::type, N>(),
-    requireConcept<typename std::conditional< std::is_same_v<typename N::NodeTag, Dune::TypeTree::DynamicPowerNodeTag>,
-                                              DynamicPowerBasisNode<GridView>, BasisNode>::type, N>(),
-    requireConcept<typename std::conditional< N::isComposite, CompositeBasisNode<GridView>, BasisNode>::type, N>()
+    requireConcept<std::conditional_t<N::isLeaf, LeafBasisNode<GridView>, BasisNode>::type, N>(),
+    requireConcept<std::conditional_t<std::is_same_v<NodeTag, Dune::TypeTree::PowerNodeTag>,
+                                      PowerBasisNode<GridView>, BasisNode>::type, N>(),
+    requireConcept<std::conditional_t<std::is_same_v<NodeTag, Dune::TypeTree::DynamicPowerNodeTag>,
+                                      DynamicPowerBasisNode<GridView>, BasisNode>::type, N>(),
+    requireConcept<std::conditional_t<N::isComposite, CompositeBasisNode<GridView>, BasisNode>::type, N>()
   );
 };
 

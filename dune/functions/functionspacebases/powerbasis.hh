@@ -61,7 +61,7 @@ public:
   using SubNode = typename SubPreBasis::Node;
 
   //! Template mapping root tree path to type of created tree node
-  using Node = std::conditional_t<C >= 0, PowerBasisNode<SubNode, C>, DynamicPowerBasisNode<SubNode>>;
+  using Node = std::conditional_t<C >= 0, PowerBasisNode<SubNode, std::size_t(C)>, DynamicPowerBasisNode<SubNode>>;
 
   //! Type of created tree node index set. \deprecated
   using IndexSet = Impl::DefaultNodeIndexSet<PowerPreBasis>;

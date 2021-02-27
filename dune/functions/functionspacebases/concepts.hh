@@ -121,12 +121,12 @@ struct BasisTree : Refines<BasisNode>
 {
   template<class N, class NodeTag = typename N::NodeTag>
   auto require(const N& node) -> decltype(
-    requireConcept<std::conditional_t<N::isLeaf, LeafBasisNode<GridView>, BasisNode>::type, N>(),
+    requireConcept<std::conditional_t<N::isLeaf, LeafBasisNode<GridView>, BasisNode>, N>(),
     requireConcept<std::conditional_t<std::is_same_v<NodeTag, Dune::TypeTree::PowerNodeTag>,
-                                      PowerBasisNode<GridView>, BasisNode>::type, N>(),
+                                      PowerBasisNode<GridView>, BasisNode>, N>(),
     requireConcept<std::conditional_t<std::is_same_v<NodeTag, Dune::TypeTree::DynamicPowerNodeTag>,
-                                      DynamicPowerBasisNode<GridView>, BasisNode>::type, N>(),
-    requireConcept<std::conditional_t<N::isComposite, CompositeBasisNode<GridView>, BasisNode>::type, N>()
+                                      DynamicPowerBasisNode<GridView>, BasisNode>, N>(),
+    requireConcept<std::conditional_t<N::isComposite, CompositeBasisNode<GridView>, BasisNode>, N>()
   );
 };
 

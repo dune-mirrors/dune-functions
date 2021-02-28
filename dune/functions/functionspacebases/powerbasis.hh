@@ -416,21 +416,19 @@ public:
   template<class MultiIndex, class GridView>
   auto makePreBasis(const GridView& gridView) const
   {
-    return [&]{
-      auto childPreBasis = childPreBasisFactory_.template makePreBasis<MultiIndex>(gridView);
-      using ChildPreBasis = decltype(childPreBasis);
-      using PreBasis = PowerPreBasis<MultiIndex,  IndexMergingStrategy, ChildPreBasis, k>;
+    auto childPreBasis = childPreBasisFactory_.template makePreBasis<MultiIndex>(gridView);
+    using ChildPreBasis = decltype(childPreBasis);
+    using PreBasis = PowerPreBasis<MultiIndex,  IndexMergingStrategy, ChildPreBasis, k>;
 
-      if constexpr(k >= 0)
-        return PreBasis(std::move(childPreBasis));
-      else
-        return PreBasis(children_, std::move(childPreBasis));
-    }();
+    if constexpr(k >= 0)
+      return PreBasis(std::move(childPreBasis));
+    else
+      return PreBasis(children_, std::move(childPreBasis));
   }
 
 private:
-  const std::size_t children_ = 0;
   ChildPreBasisFactory childPreBasisFactory_;
+  const std::size_t children_ = 0;
 };
 
 } // end namespace BasisFactory::Imp

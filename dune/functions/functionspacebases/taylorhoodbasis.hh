@@ -87,7 +87,13 @@ public:
 private:
 
   using PQMultiIndex = std::array<size_type, 1>;
+
+public:
+
+  //! PreBasis type of the pressure in the taylorhood space
   using PQ1PreBasis = LagrangePreBasis<GV,1,PQMultiIndex>;
+
+  //! PreBasis type of the velocity components in the taylorhood space
   using PQ2PreBasis = LagrangePreBasis<GV,2,PQMultiIndex>;
 
 public:

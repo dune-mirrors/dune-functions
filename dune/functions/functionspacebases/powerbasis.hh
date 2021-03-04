@@ -61,7 +61,7 @@ public:
   using SubNode = typename SubPreBasis::Node;
 
   //! Template mapping root tree path to type of created tree node
-  using Node = std::conditional_t<C >= 0, PowerBasisNode<SubNode, std::size_t(C)>, DynamicPowerBasisNode<SubNode>>;
+  using Node = std::conditional_t<(C >= 0), PowerBasisNode<SubNode, std::size_t(C)>, DynamicPowerBasisNode<SubNode>>;
 
   //! Type of created tree node index set. \deprecated
   using IndexSet = Impl::DefaultNodeIndexSet<PowerPreBasis>;
@@ -79,7 +79,7 @@ private:
 public:
 
   /**
-   * \brief Constructor for given child pre-basis objects
+   * \brief Constructor for given child pre-basis objects for static size of the power-basis
    *
    * The child factories will be stored as copies
    */
@@ -89,11 +89,12 @@ public:
   explicit PowerPreBasis(SFArgs&&... sfArgs) :
     subPreBasis_(std::forward<SFArgs>(sfArgs)...)
   {
+    static_assert((C >= 0));
     static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to PowerPreBasis does not model the PreBasis concept.");
   }
 
   /**
-   * \brief Constructor for given child pre-basis objects
+   * \brief Constructor for given child pre-basis objects for runtime size of the power-basis
    *
    * The child factories will be stored as copies
    *

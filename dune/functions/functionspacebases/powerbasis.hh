@@ -168,6 +168,11 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
+  std::size_t children() const
+  {
+    return children_;
+  }
+
 private:
 
   size_type size(const SizePrefix& prefix, BasisFactory::FlatInterleaved) const

@@ -19,21 +19,8 @@
 namespace Dune {
 namespace Functions {
 
-
-// *****************************************************************************
-// This is the reusable part of the power bases. It contains
-//
-//   DynamicPowerPreBasis
-//
-// The pre-basis allows to create the others and is the owner of possible shared
-// state. These components do _not_ depend on the global basis or index
-// set and can be used without a global basis.
-// *****************************************************************************
-
-
-
 /**
- * \brief A pre-basis for power bases
+ * \brief A pre-basis for dynamic power bases
  *
  * This pre-basis represents a power of a given pre-basis.
  * Its node type is a DynamicPowerBasisNodes for the given subnode.
@@ -47,7 +34,6 @@ class DynamicPowerPreBasis
   : public PowerPreBasis<MI,IMS,SPB,-1>
 {
 public:
-
   //! The child pre-basis
   using SubPreBasis = SPB;
 
@@ -85,27 +71,14 @@ public:
 namespace BasisFactory {
 namespace Imp {
 
-template<class IndexMergingStrategy, class ChildPreBasisFactory>
-class DynamicPowerPreBasisFactory
+template<class IMS, class ChildFactory>
+struct DynamicPowerPreBasisFactory
 {
-  static const bool isBlocked = std::is_same_v<IndexMergingStrategy,BlockedLexicographic>
-                             || std::is_same_v<IndexMergingStrategy,BlockedInterleaved>;
+  static const bool isBlocked = std::is_same_v<IMS,BlockedLexicographic>
+                             || std::is_same_v<IMS,BlockedInterleaved>;
 
-  static const std::size_t maxChildIndexSize = ChildPreBasisFactory::requiredMultiIndexSize;
-
-public:
-
-  static const std::size_t requiredMultiIndexSize = isBlocked ? (maxChildIndexSize+1) : maxChildIndexSize;
-
-  DynamicPowerPreBasisFactory (std::size_t children, const ChildPreBasisFactory& childPreBasisFactory)
-    : children_(children)
-    , childPreBasisFactory_(childPreBasisFactory)
-  {}
-
-  DynamicPowerPreBasisFactory (std::size_t children, ChildPreBasisFactory&& childPreBasisFactory)
-    : children_(children)
-    , childPreBasisFactory_(std::move(childPreBasisFactory))
-  {}
+  static const std::size_t maxChildIndexSize = Factory::requiredMultiIndexSize;
+  static const std::size_t requiredMultiIndexSize = isBlocked ? maxChildIndexSize+1 : maxChildIndexSize;
 
   template<class MultiIndex, class GridView>
   auto makePreBasis (const GridView& gridView) const
@@ -113,12 +86,11 @@ public:
     auto childPreBasis = childPreBasisFactory_.template makePreBasis<MultiIndex>(gridView);
     using ChildPreBasis = decltype(childPreBasis);
 
-    return DynamicPowerPreBasis<MultiIndex,  IndexMergingStrategy, ChildPreBasis>(children_, std::move(childPreBasis));
+    return DynamicPowerPreBasis<MultiIndex, IMS, ChildPreBasis>{children_, std::move(childPreBasis)};
   }
 
-private:
-  const std::size_t children_;
-  ChildPreBasisFactory childPreBasisFactory_;
+  std::size_t children_;
+  ChildFactory childPreBasisFactory_;
 };
 
 } // end namespace BasisFactory::Imp
@@ -133,34 +105,15 @@ private:
  * \tparam ChildPreBasisFactory Types of child pre-basis factory
  * \tparam IndexMergingStrategy An IndexMergingStrategy type
  *
- * \param childPreBasisFactory Child pre-basis factory
+ * \param cpb Child pre-basis factory
  * \param k   Number of children in this power basis
- * \param ims IndexMergingStrategy to be used
- *
- * This overload can be used to explicitly supply an IndexMergingStrategy.
+ * \param ims IndexMergingStrategy to be used [default: BasisFactory::blockedInterleaved]
  */
-template<class ChildPreBasisFactory, class IndexMergingStrategy>
-auto dynpower(ChildPreBasisFactory&& childPreBasisFactory, std::size_t k, const IndexMergingStrategy& ims)
+template<class ChildPreBasisFactory, class IndexMergingStrategy = BasisFactory::BlockedInterleaved>
+auto dynpower (ChildPreBasisFactory&& cpb, std::size_t k, IndexMergingStrategy ims = {})
 {
-  return Imp::DynamicPowerPreBasisFactory<IndexMergingStrategy, ChildPreBasisFactory>(k, std::forward<ChildPreBasisFactory>(childPreBasisFactory));
-}
-
-/**
- * \brief Create a factory builder that can build a DynamicPowerPreBasis
- *
- * \ingroup FunctionSpaceBasesImplementations
- *
- * \tparam ChildPreBasisFactory Types of child pre-basis factory
- *
- * \param childPreBasisFactory Child pre-basis factory
- * \param k   Number of children in this power basis
- *
- * This overload will select the BasisFactory::BlockedInterleaved strategy.
- */
-template<class ChildPreBasisFactory>
-auto dynpower(ChildPreBasisFactory&& childPreBasisFactory, std::size_t k)
-{
-  return Imp::DynamicPowerPreBasisFactory<BlockedInterleaved, ChildPreBasisFactory>(k, std::forward<ChildPreBasisFactory>(childPreBasisFactory));
+  using Factory = Imp::DynamicPowerPreBasisFactory<IndexMergingStrategy, ChildPreBasisFactory>;
+  return Factory{k, std::forward<ChildPreBasisFactory>(cpb)};
 }
 
 } // end namespace BasisFactory

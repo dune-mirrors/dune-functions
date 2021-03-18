@@ -85,13 +85,11 @@ public:
    */
   template<class... SFArgs,
     disableCopyMove<PowerPreBasis, SFArgs...> = 0,
-    enableIfConstructible<SubPreBasis, SFArgs...> = 0>
+    enableIfConstructible<SubPreBasis, SFArgs...> = 0,
+    std::enable_if_t<(C >= 0), int> = 0>
   explicit PowerPreBasis(SFArgs&&... sfArgs) :
-    subPreBasis_(std::forward<SFArgs>(sfArgs)...)
-  {
-    static_assert((C >= 0));
-    static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to PowerPreBasis does not model the PreBasis concept.");
-  }
+    PowerPreBasis(std::size_t(C), std::forward<SFArgs>(sfArgs)...)
+  {}
 
   /**
    * \brief Constructor for given child pre-basis objects for runtime size of the power-basis

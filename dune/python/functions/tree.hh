@@ -70,7 +70,7 @@ DUNE_EXPORT pybind11::class_<Tree> registerTree_(pybind11::handle scope, const c
   static pybind11::class_<Tree> cls(scope, name);
   registerTreeCommon(cls);
 
-  Hybrid::forEach(std::make_index_sequence<Tree::degree()>{}, [&cls](auto i) {
+  Hybrid::forEach(std::make_index_sequence<Tree::degree()>{}, [](auto i) {
       using SubTree = typename Tree::template Child<i>::Type;
       std::string subName = std::string("Tree") + std::to_string(i);
       if( !pybind11::already_registered< SubTree >() )
@@ -108,7 +108,7 @@ void registerFiniteElementProperty(pybind11::class_< Tree >& cls)
     );
 }
 
-template<typename Tree, std::enable_if_t< Tree::isLeaf, int > = 0>
+template<typename Tree, std::enable_if_t< Tree::isLeaf, int >>
 DUNE_EXPORT pybind11::class_<Tree> registerTree_(pybind11::handle scope, const char* name)
 {
   static pybind11::class_< Tree > cls(scope, name);
@@ -122,7 +122,7 @@ DUNE_EXPORT pybind11::class_<Tree> registerTree_(pybind11::handle scope, const c
   return cls;
 }
 
-template<typename Tree, std::enable_if_t< Tree::isPower, int > = 0>
+template<typename Tree, std::enable_if_t< Tree::isPower, int >>
 DUNE_EXPORT pybind11::class_<Tree> registerTree_(pybind11::handle scope, const char* name)
 {
   static pybind11::class_< Tree > cls(scope, name);

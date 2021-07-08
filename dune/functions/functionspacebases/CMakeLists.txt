@@ -21,6 +21,7 @@ install(FILES
         nedelecbasis.hh
         powerbasis.hh
         rannacherturekbasis.hh
+        refinedlagrangebasis.hh
         nodes.hh
         sizeinfo.hh
         subentitydofs.hh

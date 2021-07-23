@@ -65,35 +65,41 @@ public:
   using SizePrefix = Dune::ReservedVector<size_type, 1>;
 
   //! Constructor for a given grid view object and run-time order
-  LobattoPreBasis (const GridView& gv, unsigned int p = 1)
-    : LobattoPreBasis(gv, LobattoOrders<dim>{p})
+  explicit LobattoPreBasis (const GridView& gv, unsigned int p = 1)
+    : LobattoPreBasis{gv, LobattoOrders<dim>(p)}
   {}
 
   LobattoPreBasis (const GridView& gv, const LobattoOrders<dim>& orders)
     : gridView_(gv)
-    , orders_(orders)
+    , orders_(gv.size(0), orders)
   {}
 
   //! Initialize the global indices
   void initializeIndices ()
   {
+    // number of DOFs per entity
     std::array<std::vector<size_type>, dim> entityDofs;
 
+    // resize the vectors to number of entities and set number of DOFs to zero
     for (int c = 0; c < dim; ++c)
       entityDofs[c].resize(gridView_.size(c), 0);
 
+    // traverse all elements and extract the local number of DOFs
+    maxNodeSize_ = 0;
     auto const& indexSet = gridView_.indexSet();
     for (auto const& e : elements(gridView_)) {
       auto const& orders = orders_[indexSet.index(e)];
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders.size()));
 
       auto refElem = referenceElement(e);
       for (int c = 0; c < dim; ++c) {
         for (int i = 0; i < refElem.size(c); ++i) {
-          entityDofs[c][indexSet.subIndex(e,i,c)] += orders.size(i,c);
+          entityDofs[c][indexSet.subIndex(e,i,c)] = orders.size(i,c);
         }
       }
     }
 
+    // create partial sums of the DOF counts to obtain the offsets
     size_ = gridView_.size(dim);
     for (int d = 1; d <= dim; ++d) {
       int c = dim-d;
@@ -118,8 +124,10 @@ public:
     gridView_ = gv;
 
     // TODO: find a better way update the orders vector
-    orders_.resize(gridView_.size(0))
-    orders_.assign(LobattoOrders<dim>{1});
+    if (orders_.size() != std::size_t(gridView_.size(0))) {
+      orders_.resize(gridView_.size(0));
+      orders_.assign(orders_.size(), LobattoOrders<dim>{1});
+    }
   }
 
   //! Create tree node
@@ -131,7 +139,7 @@ public:
   //! Same as size(prefix) with empty prefix
   size_type size () const
   {
-    return size_
+    return size_;
   }
 
   //! Return number of possible values for next position in multi index
@@ -150,21 +158,25 @@ public:
   //! Get the maximal number of DOFs associated to node for any element
   size_type maxNodeSize () const
   {
-    return orders_.size();
+    assert(ready_);
+    return maxNodeSize_;
   }
 
   //! Collect the local indices on a leaf-basis node.
   template<typename It>
   It indices (const Node& node, It it) const
   {
-    for (size_type i = 0, end = node.finiteElement().size() ; i < end ; ++it, ++i)
-    {
-      Dune::LocalKey localKey = node.finiteElement().localCoefficients().localKey(i);
-      const auto& gridIndexSet = gridView().indexSet();
+    assert(ready_);
+    const auto& gridIndexSet = gridView().indexSet();
+    const auto& localFE = node.finiteElement();
+    const auto& localCoefficients = localFE.localCoefficients();
 
+    for (size_type i = 0, end = localFE.size() ; i < end ; ++it, ++i)
+    {
+      Dune::LocalKey localKey = localCoefficients.localKey(i);
       size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
 
-      *it = {{ offsets_[localKey.codim()][idx] + localKey.index() }};
+      *it = {{ offset(localKey.codim(), idx) + localKey.index() }};
     }
     return it;
   }
@@ -174,8 +186,14 @@ public:
   template<typename Entity>
   void setOrders (const Entity& entity, const LobattoOrders<dim>& orders)
   {
-    orders_[gridView.indexSet().index(entity)] = orders;
+    orders_[gridView().indexSet().index(entity)] = orders;
     ready_ = false;
+  }
+
+private:
+  size_type offset (unsigned int codim, size_type idx) const
+  {
+    return codim < dim ? offsets_[codim][idx] : idx;
   }
 
 protected:
@@ -183,6 +201,7 @@ protected:
   std::vector<LobattoOrders<dim>> orders_;
   std::array<std::vector<size_type>, dim> offsets_;
   size_type size_;
+  size_type maxNodeSize_;
 
   bool ready_ = false;
 };
@@ -251,13 +270,13 @@ namespace Imp {
 template<typename R=double, int dim=-1>
 class LobattoPreBasisFactory
 {
-  static const dim0 = (dim > 0 ? dim : 1);
+  static const int dim0 = (dim > 0 ? dim : 1);
 
 public:
   static const std::size_t requiredMultiIndexSize = 1;
 
   LobattoPreBasisFactory (unsigned int p = 1)
-    : order_(p)
+    : orders_(p)
   {}
 
   LobattoPreBasisFactory (const LobattoOrders<dim0>& orders)
@@ -302,7 +321,7 @@ auto lobatto (unsigned int p = 1)
  * \tparam R        The range type of the local basis
  * \param  orders   Polynomial orders on the elements
  */
-template<typename R=double, int dim>
+template<typename R=double, unsigned int dim>
 auto lobatto (const LobattoOrders<dim>& orders)
 {
   return Imp::LobattoPreBasisFactory<R,dim>{orders};

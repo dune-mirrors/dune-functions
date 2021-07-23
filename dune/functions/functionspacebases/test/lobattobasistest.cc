@@ -7,9 +7,8 @@
 #include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
 
-#include <dune/grid/yaspgrid.hh>
 #include <dune/grid/uggrid.hh>
-#include <dune/grid/onedgrid.hh>
+#include <dune/grid/yaspgrid.hh>
 #include <dune/grid/io/file/vtk/subsamplingvtkwriter.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
 
@@ -25,17 +24,18 @@ using namespace Dune::Functions;
 template<int dim>
 void test (Dune::TestSuite& testSuite)
 {
-  using Grid = Dune::UGGrid<dim>;
+  using Grid = Dune::YaspGrid<dim>;
 
   Dune::FieldVector<double,dim> lower; lower = 0.0;
-  Dune::FieldVector<double,dim> upper; upper = 0.0;
-  auto elems = Dune::filledArray<unsigned int,dim>(10);
+  Dune::FieldVector<double,dim> upper; upper = 1.0;
+  auto elems = Dune::filledArray<dim,unsigned int>(10);
 
   auto gridPtr = StructuredGridFactory<Grid>::createCubeGrid(lower, upper,elems);
   auto gridView = gridPtr->leafGridView();
 
+  using namespace Dune::Functions::BasisFactory;
   auto basis1 = makeBasis(gridView, lobatto(1));
-  auto basis2 = makeBasis(gridView, lobatto(LobattoOrder<dim>{2}));
+  auto basis2 = makeBasis(gridView, lobatto(LobattoOrders<dim>{2}));
 
   testSuite.subTest(checkBasis(basis1, EnableContinuityCheck()));
   testSuite.subTest(checkBasis(basis2, EnableContinuityCheck()));
@@ -51,5 +51,5 @@ int main (int argc, char* argv[])
   test<2>(testSuite);
   test<3>(testSuite);
 
-  return test.exit();
+  return testSuite.exit();
 }

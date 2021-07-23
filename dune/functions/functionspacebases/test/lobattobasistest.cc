@@ -36,9 +36,11 @@ void test (Dune::TestSuite& testSuite)
   using namespace Dune::Functions::BasisFactory;
   auto basis1 = makeBasis(gridView, lobatto(1));
   auto basis2 = makeBasis(gridView, lobatto(LobattoOrders<dim>{2}));
+  auto basis3 = makeBasis(gridView, lobatto(3));
 
   testSuite.subTest(checkBasis(basis1, EnableContinuityCheck()));
   testSuite.subTest(checkBasis(basis2, EnableContinuityCheck()));
+  testSuite.subTest(checkBasis(basis3, EnableContinuityCheck()));
 }
 
 

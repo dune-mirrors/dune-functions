@@ -176,6 +176,8 @@ public:
       Dune::LocalKey localKey = localCoefficients.localKey(i);
       size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
 
+      /// TODO: for higher-orders we might need to transform the indices or basis functions
+      /// depending on the orientation of the subEntity.
       *it = {{ offset(localKey.codim(), idx) + localKey.index() }};
     }
     return it;

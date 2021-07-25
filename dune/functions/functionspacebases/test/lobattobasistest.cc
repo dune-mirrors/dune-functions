@@ -28,19 +28,45 @@ void test (Dune::TestSuite& testSuite)
 
   Dune::FieldVector<double,dim> lower; lower = 0.0;
   Dune::FieldVector<double,dim> upper; upper = 1.0;
-  auto elems = Dune::filledArray<dim,unsigned int>(10);
+  auto elems = Dune::filledArray<dim,unsigned int>(2);
 
   auto gridPtr = StructuredGridFactory<Grid>::createCubeGrid(lower, upper,elems);
   auto gridView = gridPtr->leafGridView();
 
-  using namespace Dune::Functions::BasisFactory;
-  auto basis1 = makeBasis(gridView, lobatto(1));
-  auto basis2 = makeBasis(gridView, lobatto(LobattoOrders<dim>{2}));
-  auto basis3 = makeBasis(gridView, lobatto(3));
+  std::cout << "grid = {" << std::endl;
+  auto const& indexSet = gridView.indexSet();
+  for (auto const& e : elements(gridView))
+  {
+    std::cout << "  " << indexSet.index(e) << ": " << e.geometry().center() << std::endl;
 
-  testSuite.subTest(checkBasis(basis1, EnableContinuityCheck()));
-  testSuite.subTest(checkBasis(basis2, EnableContinuityCheck()));
-  testSuite.subTest(checkBasis(basis3, EnableContinuityCheck()));
+    auto refElem = referenceElement(e);
+    for (int c = 0; c <= dim; ++c) {
+      std::cout << "    codim " << c << ": [";
+      for (int i = 0; i < refElem.size(c); ++i) {
+        std::cout << " " << indexSet.subIndex(e,i,c);
+      }
+      std::cout << " ]" << std::endl;
+    }
+  }
+  std::cout << "}" << std::endl;
+
+
+
+
+  using namespace Dune::Functions::BasisFactory;
+  // auto basis1 = makeBasis(gridView, lobatto(1));
+  // basis1.preBasis().debug();
+
+  auto basis2 = makeBasis(gridView, lobatto(LobattoOrders<dim>{2}));
+  basis2.preBasis().debug();
+
+  // auto basis3 = makeBasis(gridView, lobatto(3));
+  // basis3.preBasis().debug();
+
+
+  // testSuite.subTest(checkBasis(basis1, EnableContinuityCheck()));
+  // testSuite.subTest(checkBasis(basis2, EnableContinuityCheck()));
+  // testSuite.subTest(checkBasis(basis3, EnableContinuityCheck()));
 }
 
 
@@ -49,8 +75,8 @@ int main (int argc, char* argv[])
   Dune::MPIHelper::instance(argc, argv);
 
   Dune::TestSuite testSuite;
-  test<1>(testSuite);
-  test<2>(testSuite);
+  // test<1>(testSuite);
+  // test<2>(testSuite);
   test<3>(testSuite);
 
   return testSuite.exit();

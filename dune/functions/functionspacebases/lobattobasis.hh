@@ -27,10 +27,10 @@ namespace Functions {
 // and can be used without a global basis.
 // *****************************************************************************
 
-template<typename GV, typename R=double>
+template<typename GV, typename R, typename Orders>
 class LobattoNode;
 
-template<typename GV, class MI, typename R=double>
+template<typename GV, typename MI, typename R, typename Orders>
 class LobattoPreBasis;
 
 
@@ -43,7 +43,7 @@ class LobattoPreBasis;
  * \tparam MI  Type to be used for multi-indices
  * \tparam R   Range type used for shape function values
  */
-template<typename GV, class MI, typename R>
+template<typename GV, typename MI, typename R, typename Orders>
 class LobattoPreBasis
 {
   static const int dim = GV::dimension;
@@ -56,7 +56,7 @@ public:
   using size_type = std::size_t;
 
   //! Template mapping root tree path to type of created tree node
-  using Node = LobattoNode<GV, R>;
+  using Node = LobattoNode<GV, R, Orders>;
 
   //! Type used for global numbering of the basis vectors
   using MultiIndex = MI;
@@ -66,10 +66,10 @@ public:
 
   //! Constructor for a given grid view object and run-time order
   explicit LobattoPreBasis (const GridView& gv, unsigned int p = 1)
-    : LobattoPreBasis{gv, LobattoOrders<dim>(p)}
+    : LobattoPreBasis{gv, Orders(std::uint8_t(p))}
   {}
 
-  LobattoPreBasis (const GridView& gv, const LobattoOrders<dim>& orders)
+  LobattoPreBasis (const GridView& gv, const Orders& orders)
     : gridView_(gv)
     , orders_(gv.size(0), orders)
   {}
@@ -89,7 +89,7 @@ public:
     auto const& indexSet = gridView_.indexSet();
     for (auto const& e : elements(gridView_)) {
       auto const& orders = orders_[indexSet.index(e)];
-      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders.size()));
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders.size(e.type())));
 
       auto refElem = referenceElement(e);
       for (int c = 0; c < dim; ++c) {
@@ -110,6 +110,25 @@ public:
     }
 
     ready_ = true;
+  }
+
+  void debug() const
+  {
+    std::cout << "orders = {" << std::endl;
+    for (std::size_t i = 0; i < orders_.size(); ++i)
+      std::cout << "  " << i << ": " << orders_[i] << std::endl;
+    std::cout << "}" << std::endl;
+
+    std::cout << "offsets = {" << std::endl;
+    for (int c = 0; c < dim; ++c) {
+      std::cout << "  codim " << c << ":" << std::endl;
+      for (std::size_t i = 0; i < offsets_[c].size(); ++i)
+        std::cout << "    " << i << ": " << offsets_[c][i] << std::endl;
+    }
+    std::cout << "}" << std::endl;
+
+    std::cout << "size = " << size_ << std::endl;
+    std::cout << "maxNodeSize = " << maxNodeSize_ << std::endl;
   }
 
   //! Obtain the grid view that the basis is defined on
@@ -133,12 +152,14 @@ public:
   //! Create tree node
   Node makeNode () const
   {
+    assert(ready_);
     return Node{orders_, gridView_.indexSet()};
   }
 
   //! Same as size(prefix) with empty prefix
   size_type size () const
   {
+    assert(ready_);
     return size_;
   }
 
@@ -186,7 +207,7 @@ public:
   /// Set new set of polynomial orders for the given entity.
   /// NOTE: Must call initializeIndices() afterwards.
   template<typename Entity>
-  void setOrders (const Entity& entity, const LobattoOrders<dim>& orders)
+  void setOrders (const Entity& entity, const Orders& orders)
   {
     orders_[gridView().indexSet().index(entity)] = orders;
     ready_ = false;
@@ -200,7 +221,7 @@ private:
 
 protected:
   GridView gridView_;
-  std::vector<LobattoOrders<dim>> orders_;
+  std::vector<Orders> orders_;
   std::array<std::vector<size_type>, dim> offsets_;
   size_type size_;
   size_type maxNodeSize_;
@@ -209,7 +230,7 @@ protected:
 };
 
 
-template<typename GV, typename R>
+template<typename GV, typename R, typename Orders>
 class LobattoNode
   : public LeafBasisNode
 {
@@ -219,14 +240,16 @@ class LobattoNode
 public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
-  using FiniteElement = LobattoLocalFiniteElement<typename GV::ctype, R, dim>;
+
+  // TODO: use a GeometryType factory
+  using FiniteElement = LobattoCubeLocalFiniteElement<typename GV::ctype, R, dim, Orders>;
 
   //! Default construction
   LobattoNode () = default;
 
   //! Constructor gets the vector or order information that is accessed in the bind method to
   //! build the corresponding local finite-element
-  LobattoNode (const std::vector<LobattoOrders<dim>>& orders, const IndexSet& indexSet)
+  LobattoNode (const std::vector<Orders>& orders, const IndexSet& indexSet)
     : orders_(&orders)
     , indexSet_(&indexSet)
     , finiteElement_(std::nullopt)
@@ -257,7 +280,7 @@ public:
   }
 
 protected:
-  const std::vector<LobattoOrders<dim>>* orders_ = nullptr;
+  const std::vector<Orders>* orders_ = nullptr;
   const IndexSet* indexSet_ = nullptr;
 
   std::optional<FiniteElement> finiteElement_ = std::nullopt;
@@ -269,33 +292,28 @@ protected:
 namespace BasisFactory {
 namespace Imp {
 
-template<typename R=double, int dim=-1>
+template <typename R, typename Orders>
 class LobattoPreBasisFactory
 {
-  static const int dim0 = (dim > 0 ? dim : 1);
-
 public:
   static const std::size_t requiredMultiIndexSize = 1;
 
-  LobattoPreBasisFactory (unsigned int p = 1)
-    : orders_(p)
-  {}
-
-  LobattoPreBasisFactory (const LobattoOrders<dim0>& orders)
+  LobattoPreBasisFactory (const Orders& orders)
     : orders_(orders)
   {}
 
-  template<class MultiIndex, class GridView>
+  template <typename MultiIndex, typename GridView>
   auto makePreBasis (const GridView& gridView) const
   {
-    if constexpr(dim > 0)
-      return LobattoPreBasis<GridView, MultiIndex, R>(gridView, orders_);
-    else
-      return LobattoPreBasis<GridView, MultiIndex, R>(gridView, order_);
+    if constexpr(!std::is_integral_v<Orders>)
+      return LobattoPreBasis<GridView, MultiIndex, R, Orders>(gridView, orders_);
+    else {
+      using O = LobattoHomogeneousOrders<GridView::dimension>;
+      return LobattoPreBasis<GridView, MultiIndex, R, O>(gridView, orders_);
+    }
   }
 
-  unsigned int order_;
-  LobattoOrders<dim0> orders_;
+  Orders orders_;
 };
 
 } // end namespace BasisFactory::Imp
@@ -312,7 +330,7 @@ public:
 template<typename R=double>
 auto lobatto (unsigned int p = 1)
 {
-  return Imp::LobattoPreBasisFactory<R,-1>{p};
+  return Imp::LobattoPreBasisFactory<R,unsigned int>{p};
 }
 
 /**
@@ -326,7 +344,13 @@ auto lobatto (unsigned int p = 1)
 template<typename R=double, unsigned int dim>
 auto lobatto (const LobattoOrders<dim>& orders)
 {
-  return Imp::LobattoPreBasisFactory<R,dim>{orders};
+  return Imp::LobattoPreBasisFactory<R,LobattoOrders<dim>>{orders};
+}
+
+template<typename R=double, unsigned int dim>
+auto lobatto (const LobattoHomogeneousOrders<dim>& orders)
+{
+  return Imp::LobattoPreBasisFactory<R,LobattoHomogeneousOrders<dim>>{orders};
 }
 
 } // end namespace BasisFactory
@@ -341,9 +365,10 @@ auto lobatto (const LobattoOrders<dim>& orders)
  *
  * \tparam GV The GridView that the space is defined on
  * \tparam R The range type of the local basis
+ * \tparam Orders Type encoding the polynomial orders of the local shape functions
  */
-template<typename GV, typename R=double>
-using LobattoBasis = DefaultGlobalBasis<LobattoPreBasis<GV, FlatMultiIndex<std::size_t>, R> >;
+template<typename GV, typename R=double, typename Orders=LobattoOrders<GV::dimension>>
+using LobattoBasis = DefaultGlobalBasis<LobattoPreBasis<GV, FlatMultiIndex<std::size_t>, R, Orders> >;
 
 } // end namespace Functions
 } // end namespace Dune

@@ -20,20 +20,37 @@
 using namespace Dune;
 using namespace Dune::Functions;
 
-
-template<int dim>
-void test (Dune::TestSuite& testSuite)
+template <class Basis>
+void print (Basis const& basis)
 {
-  using Grid = Dune::YaspGrid<dim>;
+  std::cout << "basis.dimension = " << basis.dimension() << std::endl;
 
-  Dune::FieldVector<double,dim> lower; lower = 0.0;
-  Dune::FieldVector<double,dim> upper; upper = 1.0;
-  auto elems = Dune::filledArray<dim,unsigned int>(2);
+  auto localView = basis.localView();
+  for (auto const& e : elements(basis.gridView()))
+  {
+    std::cout << "element " << basis.gridView().indexSet().index(e) << " {" << std::endl;
+    localView.bind(e);
 
-  auto gridPtr = StructuredGridFactory<Grid>::createCubeGrid(lower, upper,elems);
-  auto gridView = gridPtr->leafGridView();
+    auto const& node = localView.tree();
+    auto const& localFE = node.finiteElement();
+
+    for (std::size_t i = 0; i < localFE.size(); ++i)
+      std::cout << "  " << i << ": " << localFE.localCoefficients().localKey(i) << " => "
+                << localView.index(node.localIndex(i)) << std::endl;
+
+    std::cout << "}" << std::endl;
+  }
+}
+
+template <class GridView>
+void printGridView (GridView const& gridView)
+{
+  const int dim = GridView::dimension;
 
   std::cout << "grid = {" << std::endl;
+  for (int c = 0; c <= dim; ++c)
+    for (auto&& t : gridView.indexSet().types(c))
+      std::cout << "  size[" << t << "] = " << gridView.size(t) << std::endl;
   auto const& indexSet = gridView.indexSet();
   for (auto const& e : elements(gridView))
   {
@@ -49,24 +66,34 @@ void test (Dune::TestSuite& testSuite)
     }
   }
   std::cout << "}" << std::endl;
+}
 
 
+template<int dim>
+void test (Dune::TestSuite& testSuite)
+{
+  using Grid = Dune::YaspGrid<dim>;
 
+  Dune::FieldVector<double,dim> lower; lower = 0.0;
+  Dune::FieldVector<double,dim> upper; upper = 1.0;
+  auto elems = Dune::filledArray<dim,unsigned int>(2);
+  elems[0] = 2;
+
+  auto gridPtr = StructuredGridFactory<Grid>::createCubeGrid(lower, upper,elems);
+  auto gridView = gridPtr->leafGridView();
+  // printGridView(gridView);
 
   using namespace Dune::Functions::BasisFactory;
-  // auto basis1 = makeBasis(gridView, lobatto(1));
-  // basis1.preBasis().debug();
 
-  auto basis2 = makeBasis(gridView, lobatto(LobattoOrders<dim>{2}));
-  basis2.preBasis().debug();
+  for (unsigned int p = 1; p < 6; ++p) {
+    auto basis = makeBasis(gridView, lobatto(p));
+    testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
+  }
 
-  // auto basis3 = makeBasis(gridView, lobatto(3));
-  // basis3.preBasis().debug();
-
-
-  // testSuite.subTest(checkBasis(basis1, EnableContinuityCheck()));
-  // testSuite.subTest(checkBasis(basis2, EnableContinuityCheck()));
-  // testSuite.subTest(checkBasis(basis3, EnableContinuityCheck()));
+  for (unsigned int p = 1; p < 6; ++p) {
+    auto basis = makeBasis(gridView, lobatto(LobattoOrders<dim>{std::uint8_t(p)}));
+    testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
+  }
 }
 
 
@@ -75,8 +102,8 @@ int main (int argc, char* argv[])
   Dune::MPIHelper::instance(argc, argv);
 
   Dune::TestSuite testSuite;
-  // test<1>(testSuite);
-  // test<2>(testSuite);
+  test<1>(testSuite);
+  test<2>(testSuite);
   test<3>(testSuite);
 
   return testSuite.exit();

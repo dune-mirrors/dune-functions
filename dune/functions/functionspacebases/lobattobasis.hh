@@ -450,6 +450,7 @@ public:
   void bind (const Element& e)
   {
     element_ = &e;
+    assert(e.type().isCube()); // currently only implemented for cubes.
     finiteElement_.emplace(orders_(e), Orientation<dim>{*element_, *indexSet_});
     this->setSize(finiteElement_->size());
   }

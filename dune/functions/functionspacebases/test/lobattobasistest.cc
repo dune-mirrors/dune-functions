@@ -91,7 +91,7 @@ void test (Dune::TestSuite& testSuite)
   }
 
   for (unsigned int p = 1; p < 6; ++p) {
-    auto basis = makeBasis(gridView, lobatto(LobattoOrders<dim>{std::uint8_t(p)}));
+    auto basis = makeBasis(gridView, lobatto(LobattoOrders<dim>{GeometryTypes::cube(dim), p}));
     testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
   }
 }

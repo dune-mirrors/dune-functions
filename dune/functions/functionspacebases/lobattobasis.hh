@@ -4,6 +4,7 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_LOBATTOBASIS_HH
 
 #include <algorithm>
+#include <map>
 #include <numeric>
 #include <type_traits>
 
@@ -67,13 +68,22 @@ public:
 
   //! Constructor for a given grid view object and run-time order
   explicit LobattoPreBasis (const GridView& gv, unsigned int p = 1)
-    : LobattoPreBasis{gv, Orders(std::uint8_t(p))}
-  {}
+    : gridView_(gv)
+    , orders_(gv.size(0))
+  {
+    auto const& indexSet = gv.indexSet();
+    for (auto const& e : elements(gv))
+      orders_[indexSet.index(e)] = Orders{e.type(), p};
+  }
 
   LobattoPreBasis (const GridView& gv, const Orders& orders)
     : gridView_(gv)
-    , orders_(gv.size(0), orders)
-  {}
+    , orders_(gv.size(0))
+  {
+    auto const& indexSet = gv.indexSet();
+    for (auto const& e : elements(gv))
+      orders_[indexSet.index(e)] = Orders{e.type(), orders};
+  }
 
   //! Initialize the global indices
   void initializeIndices ()
@@ -90,12 +100,12 @@ public:
     auto const& indexSet = gridView_.indexSet();
     for (auto const& e : elements(gridView_)) {
       auto const& orders = orders_[indexSet.index(e)];
-      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders.size(e.type())));
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders.size()));
 
       auto refElem = referenceElement(e);
       for (int c = 0; c < dim; ++c) {
         for (int i = 0; i < refElem.size(c); ++i) {
-          entityDofs[c][indexSet.subIndex(e,i,c)] = orders.size(e.type(),i,c);
+          entityDofs[c][indexSet.subIndex(e,i,c)] = orders.size(i,c);
         }
       }
     }
@@ -146,7 +156,9 @@ public:
     // TODO: find a better way update the orders vector
     if (orders_.size() != std::size_t(gridView_.size(0))) {
       orders_.resize(gridView_.size(0));
-      orders_.assign(orders_.size(), LobattoOrders<dim>{1});
+      auto const& indexSet = gv.indexSet();
+      for (auto const& e : elements(gv))
+        orders_[indexSet.index(e)] = Orders{e.type(), 1};
     }
   }
 
@@ -257,13 +269,19 @@ public:
 
   //! Constructor for a given grid view object and run-time order
   explicit LobattoPreBasis (const GridView& gv, unsigned int p = 1)
-    : LobattoPreBasis{gv, Orders(std::uint8_t(p))}
-  {}
+    : gridView_(gv)
+  {
+    for (auto type : gv.indexSet().types(0))
+      orders_[type] = Orders(type, p);
+  }
 
+  //! Constructor for a given grid view object and run-time order
   LobattoPreBasis (const GridView& gv, const Orders& orders)
     : gridView_(gv)
-    , orders_(orders)
-  {}
+  {
+    for (auto type : gv.indexSet().types(0))
+      orders_[type] = Orders(type, orders);
+  }
 
   //! Initialize the global indices
   void initializeIndices ()
@@ -276,7 +294,7 @@ public:
       auto refElem = referenceElement<double,dim>(type);
       for (int c = 0; c <= dim; ++c) {
         for (int i = 0; i < refElem.size(c); ++i)
-          entityDofs[refElem.type(i,c)] = orders_.size(type, i,c);
+          entityDofs[refElem.type(i,c)] = orders_[type].size(i,c);
       }
     }
 
@@ -289,7 +307,7 @@ public:
     size_ = sum;
     maxNodeSize_ = 0;
     for (auto t : indexSet.types(0))
-      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders_.size(t)));
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders_[t].size()));
 
     ready_ = true;
   }
@@ -322,7 +340,7 @@ public:
   Node makeNode () const
   {
     assert(ready_);
-    return Node{[&](auto const& e) { return orders_; }, gridView_.indexSet()};
+    return Node{[&](auto const& e) { return orders_.at(e.type()); }, gridView_.indexSet()};
   }
 
   //! Same as size(prefix) with empty prefix
@@ -361,12 +379,13 @@ public:
     const auto& localFE = node.finiteElement();
     const auto& localCoefficients = localFE.localCoefficients();
     auto refElem = referenceElement(node.element());
+    auto const& orders = orders_.at(refElem.type());
 
     for (size_type i = 0, end = localFE.size() ; i < end ; ++it, ++i)
     {
       Dune::LocalKey localKey = localCoefficients.localKey(i);
       size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
-      size_type entityDofs = orders_.size(refElem.type(), localKey.subEntity(), localKey.codim());
+      size_type entityDofs = orders.size(localKey.subEntity(), localKey.codim());
       GeometryType t = refElem.type(localKey.subEntity(), localKey.codim());
 
       *it = {{ offsets_.at(t) + entityDofs * idx + localKey.index() }};
@@ -376,7 +395,7 @@ public:
 
 protected:
   GridView gridView_;
-  Orders orders_;
+  std::map<GeometryType, Orders> orders_;
   std::map<GeometryType, size_type> offsets_;
   size_type size_;
   size_type maxNodeSize_;

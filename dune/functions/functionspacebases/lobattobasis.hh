@@ -4,6 +4,7 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_LOBATTOBASIS_HH
 
 #include <algorithm>
+#include <numeric>
 #include <type_traits>
 
 #include <dune/common/exceptions.hh>

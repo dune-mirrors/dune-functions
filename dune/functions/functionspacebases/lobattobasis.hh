@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <map>
-#include <numeric>
 #include <type_traits>
 
 #include <dune/common/exceptions.hh>
@@ -116,8 +115,11 @@ public:
       int c = dim-d;
       offsets_[c].resize(gridView_.size(c));
 
-      std::exclusive_scan(entityDofs[c].begin(), entityDofs[c].end(), offsets_[c].begin(), size_);
-      size_ = offsets_[c].back() + entityDofs[c].back();
+      auto it = offsets_[c].begin();
+      for (auto const& d : entityDofs[c]) {
+        *it++ = size_;
+        size_ += d;
+      }
     }
 
     ready_ = true;

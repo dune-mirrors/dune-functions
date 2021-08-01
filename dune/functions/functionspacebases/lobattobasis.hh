@@ -94,7 +94,7 @@ public:
       auto refElem = referenceElement(e);
       for (int c = 0; c < dim; ++c) {
         for (int i = 0; i < refElem.size(c); ++i) {
-          entityDofs[c][indexSet.subIndex(e,i,c)] = orders.size(i,c);
+          entityDofs[c][indexSet.subIndex(e,i,c)] = orders.size(e.type(),i,c);
         }
       }
     }
@@ -153,7 +153,8 @@ public:
   Node makeNode () const
   {
     assert(ready_);
-    return Node{orders_, gridView_.indexSet()};
+    return Node{[&](auto const& e) { return orders_[gridView_.indexSet().index(e)]; },
+                gridView_.indexSet()};
   }
 
   //! Same as size(prefix) with empty prefix
@@ -197,8 +198,6 @@ public:
       Dune::LocalKey localKey = localCoefficients.localKey(i);
       size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
 
-      /// TODO: for higher-orders we might need to transform the indices or basis functions
-      /// depending on the orientation of the subEntity.
       *it = {{ offset(localKey.codim(), idx) + localKey.index() }};
     }
     return it;
@@ -210,6 +209,7 @@ public:
   void setOrders (const Entity& entity, const Orders& orders)
   {
     orders_[gridView().indexSet().index(entity)] = orders;
+    /// TODO: enforce minimum rule!
     ready_ = false;
   }
 
@@ -228,6 +228,161 @@ protected:
 
   bool ready_ = false;
 };
+
+
+
+template<typename GV, typename MI, typename R>
+class LobattoPreBasis<GV,MI,R,LobattoHomogeneousOrders<GV::dimension>>
+{
+  static const int dim = GV::dimension;
+
+  using Orders = LobattoHomogeneousOrders<GV::dimension>;
+
+public:
+  //! The grid view that the FE basis is defined on
+  using GridView = GV;
+
+  //! Type used for indices and size information
+  using size_type = std::size_t;
+
+  //! Template mapping root tree path to type of created tree node
+  using Node = LobattoNode<GV, R, Orders>;
+
+  //! Type used for global numbering of the basis vectors
+  using MultiIndex = MI;
+
+  //! Type used for prefixes handed to the size() method
+  using SizePrefix = Dune::ReservedVector<size_type, 1>;
+
+  //! Constructor for a given grid view object and run-time order
+  explicit LobattoPreBasis (const GridView& gv, unsigned int p = 1)
+    : LobattoPreBasis{gv, Orders(std::uint8_t(p))}
+  {}
+
+  LobattoPreBasis (const GridView& gv, const Orders& orders)
+    : gridView_(gv)
+    , orders_(orders)
+  {}
+
+  //! Initialize the global indices
+  void initializeIndices ()
+  {
+    // number of DOFs per entity
+    std::map<GeometryType, size_type> entityDofs;
+
+    auto const& indexSet = gridView_.indexSet();
+    for (auto type : indexSet.types(0)) {
+      auto refElem = referenceElement<double,dim>(type);
+      for (int c = 0; c <= dim; ++c) {
+        for (int i = 0; i < refElem.size(c); ++i)
+          entityDofs[refElem.type(i,c)] = orders_.size(type, i,c);
+      }
+    }
+
+    size_type sum = 0;
+    for (auto& ts : entityDofs) {
+      offsets_[ts.first] = sum;
+      sum += ts.second * (size_type)gridView_.size(ts.first);
+    }
+
+    size_ = sum;
+    maxNodeSize_ = 0;
+    for (auto t : indexSet.types(0))
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders_.size(t)));
+
+    ready_ = true;
+  }
+
+  void debug() const
+  {
+    std::cout << "orders = " << orders_ << std::endl;
+
+    std::cout << "offsets = {" << std::endl;
+    for (auto&& ts : offsets_)
+      std::cout << "  " << ts.first << " => " << ts.second << std::endl;
+    std::cout << "}" << std::endl;
+    std::cout << "size = " << size_ << std::endl;
+    std::cout << "maxNodeSize = " << maxNodeSize_ << std::endl;
+  }
+
+  //! Obtain the grid view that the basis is defined on
+  const GridView& gridView () const
+  {
+    return gridView_;
+  }
+
+  //! Update the stored grid view, to be called if the grid has changed
+  void update (const GridView& gv)
+  {
+    gridView_ = gv;
+  }
+
+  //! Create tree node
+  Node makeNode () const
+  {
+    assert(ready_);
+    return Node{[&](auto const& e) { return orders_; }, gridView_.indexSet()};
+  }
+
+  //! Same as size(prefix) with empty prefix
+  size_type size () const
+  {
+    assert(ready_);
+    return size_;
+  }
+
+  //! Return number of possible values for next position in multi index
+  size_type size (const SizePrefix prefix) const
+  {
+    assert(prefix.size() == 0 || prefix.size() == 1);
+    return (prefix.size() == 0) ? size() : 0;
+  }
+
+  //! Get the total dimension of the space spanned by this basis
+  size_type dimension () const
+  {
+    return size();
+  }
+
+  //! Get the maximal number of DOFs associated to node for any element
+  size_type maxNodeSize () const
+  {
+    assert(ready_);
+    return maxNodeSize_;
+  }
+
+  //! Collect the local indices on a leaf-basis node.
+  template<typename It>
+  It indices (const Node& node, It it) const
+  {
+    assert(ready_);
+    const auto& gridIndexSet = gridView().indexSet();
+    const auto& localFE = node.finiteElement();
+    const auto& localCoefficients = localFE.localCoefficients();
+    auto refElem = referenceElement(node.element());
+
+    for (size_type i = 0, end = localFE.size() ; i < end ; ++it, ++i)
+    {
+      Dune::LocalKey localKey = localCoefficients.localKey(i);
+      size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
+      size_type entityDofs = orders_.size(refElem.type(), localKey.subEntity(), localKey.codim());
+      GeometryType t = refElem.type(localKey.subEntity(), localKey.codim());
+
+      *it = {{ offsets_.at(t) + entityDofs * idx + localKey.index() }};
+    }
+    return it;
+  }
+
+protected:
+  GridView gridView_;
+  Orders orders_;
+  std::map<GeometryType, size_type> offsets_;
+  size_type size_;
+  size_type maxNodeSize_;
+
+  bool ready_ = false;
+};
+
 
 
 template<typename GV, typename R, typename Orders>
@@ -249,11 +404,9 @@ public:
 
   //! Constructor gets the vector or order information that is accessed in the bind method to
   //! build the corresponding local finite-element
-  LobattoNode (const std::vector<Orders>& orders, const IndexSet& indexSet)
-    : orders_(&orders)
+  LobattoNode (std::function<Orders(const Element&)> orders, const IndexSet& indexSet)
+    : orders_(std::move(orders))
     , indexSet_(&indexSet)
-    , finiteElement_(std::nullopt)
-    , element_(nullptr)
   {}
 
   //! Return current element, throw if unbound
@@ -275,16 +428,16 @@ public:
   void bind (const Element& e)
   {
     element_ = &e;
-    finiteElement_.emplace((*orders_)[indexSet_->index(e)]);
+    finiteElement_.emplace(orders_(e), Orientation<dim>{*element_, *indexSet_});
     this->setSize(finiteElement_->size());
   }
 
 protected:
-  const std::vector<Orders>* orders_ = nullptr;
+  std::function<Orders(const Element&)> orders_;
   const IndexSet* indexSet_ = nullptr;
 
-  std::optional<FiniteElement> finiteElement_ = std::nullopt;
   const Element* element_ = nullptr;
+  std::optional<FiniteElement> finiteElement_ = std::nullopt;
 };
 
 

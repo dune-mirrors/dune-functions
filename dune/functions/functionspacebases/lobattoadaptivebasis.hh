@@ -31,6 +31,12 @@ namespace Functions {
  * the polynomial degree on sub-entities shared by some entities is a most the minimum of the
  * polynomial degrees of the entities.
  *
+ * The implementation is based on the local `Lobatto[Cube]LocalFiniteElement` implementing the
+ * functions from
+ *
+ *   "Higher-Order Finite Element Methods", P. Soling, K, Segeth, I. Dolezel,
+ *   2004, Chapman & Hall/CRC
+ *
  * \tparam GV  The grid view that the FE basis is defined on
  * \tparam MI  Type to be used for multi-indices
  * \tparam R   Range type used for shape function values

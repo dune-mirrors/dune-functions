@@ -16,6 +16,8 @@ dune_add_test(SOURCES lagrangebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES lagrangedgbasistest.cc LABELS quick)
 
+dune_add_test(SOURCES lobattoadaptivebasistest.cc LABELS quick)
+
 dune_add_test(SOURCES lobattobasistest.cc LABELS quick)
 
 dune_add_test(SOURCES nedelecbasistest.cc LABELS quick)

@@ -21,7 +21,26 @@ namespace Functions {
 template<typename GV, typename R, typename Orders>
 class LobattoNode;
 
-
+/**
+ * \brief A pre-basis for a Lobatto basis
+ *
+ * \ingroup FunctionSpaceBasesImplementations
+ *
+ * A Lobatto basis is a set of continuous basis functions of local Lobatto shape functions
+ * of arbitrary high order.
+ *
+ * The implementation is based on the local `Lobatto[Cube]LocalFiniteElement` implementing the
+ * functions from
+ *
+ *   "Higher-Order Finite Element Methods", P. Soling, K, Segeth, I. Dolezel,
+ *   2004, Chapman & Hall/CRC
+ *
+ * See \ref LobattoAdaptivePreBasis for an implementation with variable local polynomial degree.
+ *
+ * \tparam GV  The grid view that the FE basis is defined on
+ * \tparam MI  Type to be used for multi-indices
+ * \tparam R   Range type used for shape function values
+ */
 template<typename GV, typename MI, typename R, typename Orders>
 class LobattoPreBasis
 {

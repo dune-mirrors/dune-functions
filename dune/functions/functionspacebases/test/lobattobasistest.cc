@@ -90,8 +90,47 @@ void test (Dune::TestSuite& testSuite)
     testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
   }
 
+  for (unsigned int pb = 1; pb < 6; ++pb) {
+    for (unsigned int pf = 1; pf <= pb; ++pf) {
+      for (unsigned int pe = 1; pe <= pf; ++pe) {
+        auto basis = makeBasis(gridView, lobatto([pb,pf,pe]{
+          if constexpr(dim == 1)
+            return LobattoOrders<1>{GeometryTypes::cube(dim), pb};
+          else if constexpr(dim == 2)
+            return LobattoOrders<2>{GeometryTypes::cube(dim), pb, pf};
+          else if constexpr(dim == 3)
+            return LobattoOrders<3>{GeometryTypes::cube(dim), pb, pf, pe};
+        }() ));
+        testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
+      }
+    }
+  }
+}
+
+
+void test2d (Dune::TestSuite& testSuite)
+{
+  const int dim = 2;
+  using Grid = Dune::UGGrid<dim>;
+
+  Dune::GridFactory<Grid> factory;
+  factory.insertVertex({0.0,0.0});
+  factory.insertVertex({1.0,0.0});
+  factory.insertVertex({2.0,0.0});
+  factory.insertVertex({0.0,1.0});
+  factory.insertVertex({1.0,1.0});
+  factory.insertVertex({2.0,1.0});
+
+  factory.insertElement(GeometryTypes::cube(2), {0u,1u,3u,4u});
+  factory.insertElement(GeometryTypes::cube(2), {4u,5u,1u,2u}); // flipped in y-direction
+
+  auto gridPtr = factory.createGrid();
+  auto gridView = gridPtr->leafGridView();
+
+  using namespace Dune::Functions::BasisFactory;
+
   for (unsigned int p = 1; p < 6; ++p) {
-    auto basis = makeBasis(gridView, lobatto(LobattoOrders<dim>{GeometryTypes::cube(dim), p}));
+    auto basis = makeBasis(gridView, lobatto(p));
     testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
   }
 }
@@ -105,6 +144,8 @@ int main (int argc, char* argv[])
   test<1>(testSuite);
   test<2>(testSuite);
   test<3>(testSuite);
+
+  test2d(testSuite);
 
   return testSuite.exit();
 }

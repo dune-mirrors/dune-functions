@@ -19,6 +19,7 @@ install(FILES
         interpolate.hh
         lagrangebasis.hh
         lagrangedgbasis.hh
+        lobattoadaptivebasis.hh
         lobattobasis.hh
         nedelecbasis.hh
         periodicbasis.hh

@@ -55,7 +55,7 @@ int main (int argc, char* argv[])
   Dune::TestSuite testSuite;
   test<1>(testSuite);
   test<2>(testSuite);
-  // test<3>(testSuite);
+  test<3>(testSuite);
 
   return testSuite.exit();
 }

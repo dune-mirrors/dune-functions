@@ -23,6 +23,14 @@ namespace Functions {
  *
  * \ingroup FunctionSpaceBasesImplementations
  *
+ * An adaptive Lobatto basis is a set of basis functions of local Lobatto shape functions
+ * that allows to have different polynomial orders on each element. It even allows to have
+ * different orders on sub-entities and thus opens the possibility for p-adaptivity.
+ *
+ * Note, for a stable discretization you need to fulfill a minimum-rule that essentially means that
+ * the polynomial degree on sub-entities shared by some entities is a most the minimum of the
+ * polynomial degrees of the entities.
+ *
  * \tparam GV  The grid view that the FE basis is defined on
  * \tparam MI  Type to be used for multi-indices
  * \tparam R   Range type used for shape function values

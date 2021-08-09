@@ -41,7 +41,7 @@ namespace Functions {
  * \tparam MI  Type to be used for multi-indices
  * \tparam R   Range type used for shape function values
  */
-template<typename GV, typename MI, typename R, typename Orders>
+template<typename GV, typename MI, typename R>
 class LobattoAdaptivePreBasis
 {
   static const int dim = GV::dimension;
@@ -54,7 +54,7 @@ public:
   using size_type = std::size_t;
 
   //! Template mapping root tree path to type of created tree node
-  using Node = LobattoNode<GV, R, Orders>;
+  using Node = LobattoNode<GV, R, LobattoOrders<dim>>;
 
   //! Type used for global numbering of the basis vectors
   using MultiIndex = MI;
@@ -62,23 +62,35 @@ public:
   //! Type used for prefixes handed to the size() method
   using SizePrefix = Dune::ReservedVector<size_type, 1>;
 
-  //! Constructor for a given grid view object and run-time order
-  explicit LobattoAdaptivePreBasis (const GridView& gv, unsigned int p = 1)
+  //! Constructor for a given grid view object and order vectors
+  /**
+   * \param gv      GridView to associate the basis to
+   * \param orders  For each codim a vector associating each entity a polynomial degree
+   **/
+  LobattoAdaptivePreBasis (const GridView& gv,
+                           std::array<std::vector<std::uint8_t>, dim> const* orders)
     : gridView_(gv)
-    , orders_(gv.size(0))
-  {
-    auto const& indexSet = gv.indexSet();
-    for (auto const& e : elements(gv))
-      orders_[indexSet.index(e)] = Orders{e.type(), p};
-  }
+    , orders_(orders)
+  {}
 
-  LobattoAdaptivePreBasis (const GridView& gv, const Orders& orders)
-    : gridView_(gv)
-    , orders_(gv.size(0))
+  //! Construct an order container on the element, by collecting polynomial orders on
+  //! all its subentities from the global vectors
+  template <class Entity>
+  LobattoOrders<dim> getOrder (const Entity& e) const
   {
-    auto const& indexSet = gv.indexSet();
-    for (auto const& e : elements(gv))
-      orders_[indexSet.index(e)] = Orders{e.type(), orders};
+    LobattoOrders<dim> order{e.type(),1};
+
+    auto const& indexSet = gridView_.indexSet();
+    auto refElem = referenceElement(e);
+    for (int c = 0; c < dim; ++c) {
+      for (int i = 0; i < refElem.size(c); ++i) {
+        unsigned int p = (*orders_)[c].empty() ? 0u : (*orders_)[c][indexSet.subIndex(e,i,c)];
+        for (int k = 0; k < dim-c; ++k)
+          order.set(i,c,k, p); // TODO: distinguish directions
+      }
+    }
+
+    return order;
   }
 
   //! Initialize the global indices
@@ -95,15 +107,13 @@ public:
     maxNodeSize_ = 0;
     auto const& indexSet = gridView_.indexSet();
     for (auto const& e : elements(gridView_)) {
-      auto const& orders = orders_[indexSet.index(e)];
-      maxNodeSize_ = std::max(maxNodeSize_, size_type(orders.size()));
+      LobattoOrders<dim> order = getOrder(e);
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(order.size()));
 
       auto refElem = referenceElement(e);
-      for (int c = 0; c < dim; ++c) {
-        for (int i = 0; i < refElem.size(c); ++i) {
-          entityDofs[c][indexSet.subIndex(e,i,c)] = orders.size(i,c);
-        }
-      }
+      for (int c = 0; c < dim; ++c)
+        for (int i = 0; i < refElem.size(c); ++i)
+          entityDofs[c][indexSet.subIndex(e,i,c)] = order.size(i,c);
     }
 
     // create partial sums of the DOF counts to obtain the offsets
@@ -124,11 +134,6 @@ public:
 
   void debug () const
   {
-    std::cout << "orders = {" << std::endl;
-    for (std::size_t i = 0; i < orders_.size(); ++i)
-      std::cout << "  " << i << ": " << orders_[i] << std::endl;
-    std::cout << "}" << std::endl;
-
     std::cout << "offsets = {" << std::endl;
     for (int c = 0; c < dim; ++c) {
       std::cout << "  codim " << c << ":" << std::endl;
@@ -151,22 +156,13 @@ public:
   void update (const GridView& gv)
   {
     gridView_ = gv;
-
-    // TODO: find a better way update the orders vector
-    if (orders_.size() != std::size_t(gridView_.size(0))) {
-      orders_.resize(gridView_.size(0));
-      auto const& indexSet = gv.indexSet();
-      for (auto const& e : elements(gv))
-        orders_[indexSet.index(e)] = Orders{e.type(), 1};
-    }
   }
 
   //! Create tree node
   Node makeNode () const
   {
     assert(ready_);
-    return Node{[&](auto const& e) { return orders_[gridView_.indexSet().index(e)]; },
-                gridView_.indexSet()};
+    return Node{[&](auto const& e) { return this->getOrder(e); }, gridView_.indexSet()};
   }
 
   //! Same as size(prefix) with empty prefix
@@ -215,44 +211,6 @@ public:
     return it;
   }
 
-  //! Set new set of polynomial orders for the given entity.
-  // NOTE: Must call initializeIndices() afterwards.
-  template<typename Entity>
-  void setOrders (const Entity& entity, const Orders& orders)
-  {
-    const auto& indexSet = gridView().indexSet();
-    orders_[indexSet.index(entity)] = orders;
-    ready_ = false;
-  }
-
-  //! Enforce that the polynomial degree on entities shared by two elements is the minimum of the
-  //! polynomial degrees of the element interiors.
-  void enforceMinimumRule ()
-  {
-    const int dim = GridView::dimension;
-    if constexpr(dim > 1) {
-      const auto& indexSet = gridView().indexSet();
-      for (auto const& e : elements(gridView())) {
-        auto& inside = orders_[indexSet.index(e)];
-        for (auto const& is : intersections(gridView(), e))
-        {
-          if (is.neighbor()) {
-            auto& outside = orders_[indexSet.index(is.outside())];
-            std::uint8_t min_p = std::min(inside(0,0,0), outside(0,0,0));
-
-            for (int k = 0; k < dim-1; ++k) {
-              outside.set(is.indexInOutside(),1,k,
-                std::min(min_p, outside(is.indexInOutside(),1,k)));
-              inside.set(is.indexInInside(),1,k,
-                std::min(min_p, inside(is.indexInInside(),1,k)));
-            }
-            // TODO: set polynomial degree also for sub-entities of intersections
-          }
-        }
-      }
-      ready_ = false;
-    }
-  }
 
 private:
   size_type offset (unsigned int codim, size_type idx) const
@@ -262,7 +220,7 @@ private:
 
 protected:
   GridView gridView_;
-  std::vector<Orders> orders_;
+  const std::array<std::vector<std::uint8_t>, dim>* orders_;
   std::array<std::vector<size_type>, dim> offsets_;
   size_type size_;
   size_type maxNodeSize_;
@@ -274,28 +232,23 @@ protected:
 namespace BasisFactory {
 namespace Imp {
 
-template <typename R, typename Orders>
+template <typename R, std::size_t dim>
 class LobattoAdaptivePreBasisFactory
 {
 public:
   static const std::size_t requiredMultiIndexSize = 1;
 
-  LobattoAdaptivePreBasisFactory (const Orders& orders)
+  LobattoAdaptivePreBasisFactory (const std::array<std::vector<std::uint8_t>, dim>* orders)
     : orders_(orders)
   {}
 
   template <typename MultiIndex, typename GridView>
   auto makePreBasis (const GridView& gridView) const
   {
-    if constexpr(!std::is_integral_v<Orders>)
-      return LobattoAdaptivePreBasis<GridView, MultiIndex, R, Orders>(gridView, orders_);
-    else {
-      using O = LobattoHomogeneousOrders<GridView::dimension>;
-      return LobattoAdaptivePreBasis<GridView, MultiIndex, R, O>(gridView, orders_);
-    }
+    return LobattoAdaptivePreBasis<GridView, MultiIndex, R>(gridView, orders_);
   }
 
-  Orders orders_;
+  const std::array<std::vector<std::uint8_t>, dim>* orders_;
 };
 
 } // end namespace BasisFactory::Imp
@@ -306,34 +259,17 @@ public:
  *
  * \ingroup FunctionSpaceBasesImplementations
  *
- * \tparam R   The range type of the local basis
- * \param  p   Polynomial order on the elements
+ * \tparam R       The range type of the local basis
+ * \param  orders  Vector or polynomial orders for each codimension
  */
-template<typename R=double>
-auto lobattoAdaptive (unsigned int p = 1)
+template<typename R=double, std::size_t dim>
+auto lobatto (const std::array<std::vector<std::uint8_t>, dim>& orders)
 {
-  return Imp::LobattoAdaptivePreBasisFactory<R,unsigned int>{p};
+  return Imp::LobattoAdaptivePreBasisFactory<R,dim>{&orders};
 }
 
-/**
- * \brief Create a pre-basis factory that can create an adaptive Lobatto pre-basis
- *
- * \ingroup FunctionSpaceBasesImplementations
- *
- * \tparam R        The range type of the local basis
- * \param  orders   Polynomial orders on the elements
- */
-template<typename R=double, int dim>
-auto lobattoAdaptive (const LobattoOrders<dim>& orders)
-{
-  return Imp::LobattoAdaptivePreBasisFactory<R,LobattoOrders<dim>>{orders};
-}
-
-template<typename R=double, int dim>
-auto lobattoAdaptive (const LobattoHomogeneousOrders<dim>& orders)
-{
-  return Imp::LobattoAdaptivePreBasisFactory<R,LobattoHomogeneousOrders<dim>>{orders};
-}
+template<typename R=double, std::size_t dim>
+void lobatto (const std::array<std::vector<std::uint8_t>, dim>&& orders) = delete;
 
 } // end namespace BasisFactory
 
@@ -347,10 +283,9 @@ auto lobattoAdaptive (const LobattoHomogeneousOrders<dim>& orders)
  *
  * \tparam GV The GridView that the space is defined on
  * \tparam R The range type of the local basis
- * \tparam Orders Type encoding the polynomial orders of the local shape functions
  */
-template<typename GV, typename R=double, typename Orders=LobattoOrders<GV::dimension>>
-using LobattoAdaptiveBasis = DefaultGlobalBasis<LobattoAdaptivePreBasis<GV, FlatMultiIndex<std::size_t>, R, Orders> >;
+template<typename GV, typename R=double>
+using LobattoAdaptiveBasis = DefaultGlobalBasis<LobattoAdaptivePreBasis<GV, FlatMultiIndex<std::size_t>, R> >;
 
 } // end namespace Functions
 } // end namespace Dune

@@ -21,6 +21,11 @@ dune_target_enable_all_packages("stokes-taylorhood")
 set_property(TARGET stokes-taylorhood PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples stokes-taylorhood)
 
+add_executable("stokes-mini" stokes-mini.cc)
+dune_target_enable_all_packages("stokes-mini")
+set_property(TARGET stokes-mini PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples stokes-mini)
+
 add_executable("poisson-mfem" poisson-mfem.cc)
 dune_target_enable_all_packages("poisson-mfem")
 set_property(TARGET poisson-mfem PROPERTY EXCLUDE_FROM_ALL 1)

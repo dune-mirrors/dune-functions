@@ -220,6 +220,7 @@ private:
 
 protected:
   GridView gridView_;
+  // TODO: generalize to mixed elementtypes
   const std::array<std::vector<std::uint8_t>, dim>* orders_;
   std::array<std::vector<size_type>, dim> offsets_;
   size_type size_;

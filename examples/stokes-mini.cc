@@ -311,7 +311,7 @@ int main (int argc, char *argv[]) try
   FieldVector<double,dim> upperRight = {1, 1};
   std::array<int,dim> elements = {{4, 4}};
   GridType grid(upperRight,elements);
-  grid.globalRefine(4);
+  grid.globalRefine(2);
 
   using GridView = typename GridType::LeafGridView;
   GridView gridView = grid.leafGridView();

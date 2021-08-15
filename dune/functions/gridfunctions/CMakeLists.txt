@@ -3,6 +3,7 @@ add_subdirectory("test")
 install(FILES
         analyticgridviewfunction.hh
         discreteglobalbasisfunction.hh
+        globalbasisfunctions.hh
         gridfunction.hh
         gridfunction_imp.hh
         gridviewentityset.hh

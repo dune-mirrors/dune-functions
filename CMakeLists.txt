@@ -15,7 +15,7 @@ list(APPEND CMAKE_MODULE_PATH ${dune-common_MODULE_PATH})
 include(DuneMacros)
 
 # start a dune project with information from dune.module
-dune_project()
+dune_project(dunefunctions)
 
 add_subdirectory("dune")
 add_subdirectory("doc")

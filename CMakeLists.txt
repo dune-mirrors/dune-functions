@@ -11,7 +11,7 @@ endif()
 find_package(dune-common REQUIRED)
 
 # start a dune project with information from dune.module
-dune_project(dunefunctions)
+dune_project(dune-functions INTERFACE)
 
 add_subdirectory("dune")
 add_subdirectory("doc")

@@ -80,13 +80,14 @@ public:
   template <class Entity>
   LobattoOrders<dim> getOrder (const Entity& e) const
   {
+    assert(!!orders_);
     LobattoOrders<dim> order{e.type(),1};
 
     auto const& indexSet = gridView_.indexSet();
     auto refElem = referenceElement(e);
     for (int c = 0; c < dim; ++c) {
       for (int i = 0; i < refElem.size(c); ++i) {
-        unsigned int p = (*orders_)[c].empty() ? 0u : (*orders_)[c][indexSet.subIndex(e,i,c)];
+        unsigned int p = (*orders_)[c].empty() ? 1u : (*orders_)[c][indexSet.subIndex(e,i,c)];
         for (int k = 0; k < dim-c; ++k)
           order.set(i,c,k, p); // TODO: distinguish directions
       }
@@ -99,8 +100,10 @@ public:
   void initializeIndices ()
   {
     maxOrder_ = 1;
-    for (int c = 0; c < dim; ++c)
-      maxOrder_ = std::max(maxOrder_, *std::max_element((*orders_)[c].begin(), (*orders_)[c].end()));
+    for (int c = 0; c < dim; ++c) {
+      if (!(*orders_)[c].empty())
+        maxOrder_ = std::max(maxOrder_, *std::max_element((*orders_)[c].begin(), (*orders_)[c].end()));
+    }
 
     offsets_.resize(maxOrder_ + 1);
     for (std::uint8_t p = 0; p <= maxOrder_; ++p)
@@ -109,7 +112,7 @@ public:
 
     for (int c = 0; c < dim; ++c)
       for (std::uint8_t p : (*orders_)[c])
-        offsets_[p][c]+= power(p-1, dim-c);
+        offsets_[p][c]+= power(p-1, dim-c); // TODO: generalize to arbitrary element types
 
     // for (int p = 0; p <= maxOrder_; ++p) {
     //   std::cout << "p = " << p << std::endl;
@@ -128,8 +131,13 @@ public:
     }
 
     maxNodeSize_ = 0;
-    for (auto t : gridView_.indexSet().types(0))
-      maxNodeSize_ = std::max(maxNodeSize_, size_type(LobattoOrders<dim>{t,maxOrder_}.size()));
+    auto const& indexSet = gridView_.indexSet();
+    auto const& geometryTypes = indexSet.types(0);
+    for (auto const& t : geometryTypes) {
+      std::cout << t << std::endl;
+      LobattoOrders<dim> maxOrders{t,maxOrder_};
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(maxOrders.size()));
+    }
 
     size_ = offset;
 
@@ -241,12 +249,15 @@ public:
     const auto& localFE = node.finiteElement();
     const auto& localCoefficients = localFE.localCoefficients();
 
+    std::cout << "element [" << gridIndexSet.index(node.element()) << "]" << std::endl;
     for (size_type i = 0, end = localFE.size() ; i < end ; ++it, ++i)
     {
       Dune::LocalKey localKey = localCoefficients.localKey(i);
       size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
 
-      *it = {{ offset(localKey.codim(), idx) + localKey.index() }};
+      size_type globalIndex = offset(localKey.codim(), idx) + localKey.index();
+      std::cout << "  " << i << " => " << globalIndex << std::endl;
+      *it = {{ globalIndex }};
     }
     return it;
   }
@@ -256,10 +267,21 @@ private:
   {
     if (codim < dim) {
       std::uint8_t p = (*orders_)[codim][idx];
-      return offsets_[p][codim] + idx;
+      return offsets_[p][codim] + idx * power(p-1, dim-codim);
      } else {
        return idx;
      }
+  }
+
+public:
+  const std::array<std::vector<std::uint8_t>, dim>* orders () const
+  {
+    return orders_;
+  }
+
+  std::uint8_t maxOrder () const
+  {
+    return maxOrder_;
   }
 
 protected:

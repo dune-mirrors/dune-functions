@@ -46,6 +46,9 @@ class LobattoPreBasis
 {
   static const int dim = GV::dimension;
 
+  template <typename,typename,typename,typename>
+  friend class LobattoPreBasis;
+
 public:
   //! The grid view that the FE basis is defined on
   using GridView = GV;
@@ -77,6 +80,12 @@ public:
     for (auto type : gv.indexSet().types(0))
       orders_[type] = Orders{type, orders};
   }
+
+  template <class MI_, class R_>
+  LobattoPreBasis (const LobattoPreBasis<GV,MI_,R_,Orders>& other)
+    : gridView_(other.gridView_)
+    , orders_(other.orders_)
+  {}
 
   //! Initialize the global indices
   void initializeIndices ()
@@ -215,7 +224,7 @@ public:
   using FiniteElement = LobattoCubeLocalFiniteElement<typename GV::ctype, R, dim, Orders>;
 
   //! Default construction
-  LobattoNode () = default;
+  // LobattoNode () = default;
 
   //! Constructor gets the vector or order information that is accessed in the bind method to
   //! build the corresponding local finite-element
@@ -242,9 +251,14 @@ public:
   //! Bind to element.
   void bind (const Element& e)
   {
+    assert(!!indexSet_);
+
     element_ = &e;
     assert(e.type().isCube()); // currently only implemented for cubes.
-    finiteElement_.emplace(orders_(e), Orientation<dim>{*element_, *indexSet_});
+
+    Orders order{orders_(e)};
+    Orientation<dim> orientation{e, *indexSet_};
+    finiteElement_.emplace(order, orientation);
     this->setSize(finiteElement_->size());
   }
 

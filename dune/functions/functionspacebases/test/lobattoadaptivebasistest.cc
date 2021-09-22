@@ -89,6 +89,7 @@ void test (Dune::TestSuite& testSuite)
       orders[0][gridView.indexSet().index(e)] = p; // set interior order to p
     // enforceMinimumRule(orders);
     basis.preBasis().initializeIndices();
+    basis.preBasis().debug();
     std::cout << "  p=" << p << " => basis.dimension=" << basis.dimension() << std::endl;
 
     testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));

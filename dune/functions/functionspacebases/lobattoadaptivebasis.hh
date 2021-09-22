@@ -68,9 +68,11 @@ public:
    * \param orders  For each codim a vector associating each entity a polynomial degree
    **/
   LobattoAdaptivePreBasis (const GridView& gv,
-                           std::array<std::vector<std::uint8_t>, dim> const* orders)
+                           std::array<std::vector<std::uint8_t>, dim> const* orders,
+                           std::uint8_t maxOrder = 0)
     : gridView_(gv)
     , orders_(orders)
+    , maxOrder_(maxOrder)
   {}
 
   //! Construct an order container on the element, by collecting polynomial orders on
@@ -96,6 +98,42 @@ public:
   //! Initialize the global indices
   void initializeIndices ()
   {
+    maxOrder_ = 1;
+    for (int c = 0; c < dim; ++c)
+      maxOrder_ = std::max(maxOrder_, *std::max_element((*orders_)[c].begin(), (*orders_)[c].end()));
+
+    offsets_.resize(maxOrder_ + 1);
+    for (std::uint8_t p = 0; p <= maxOrder_; ++p)
+      for (int c = 0; c < dim; ++c)
+        offsets_[p][c] = 0;
+
+    for (int c = 0; c < dim; ++c)
+      for (std::uint8_t p : (*orders_)[c])
+        offsets_[p][c]+= power(p-1, dim-c);
+
+    // for (int p = 0; p <= maxOrder_; ++p) {
+    //   std::cout << "p = " << p << std::endl;
+    //   for (int c = 0; c < dim; ++c)
+    //     std::cout << "  c = " << c << " => " << offsets_[p][c] << std::endl;
+    // }
+
+    size_type offset = gridView_.size(dim); // number of vertices
+    for (int d = 1; d <= dim; ++d) {
+      int c = dim-d;
+      for (std::uint8_t p = 2; p <= maxOrder_; ++p) {
+        auto size = offsets_[p][c];
+        offsets_[p][c] = offset;
+        offset += size;
+      }
+    }
+
+    maxNodeSize_ = 0;
+    for (auto t : gridView_.indexSet().types(0))
+      maxNodeSize_ = std::max(maxNodeSize_, size_type(LobattoOrders<dim>{t,maxOrder_}.size()));
+
+    size_ = offset;
+
+#if 0
     // number of DOFs per entity
     std::array<std::vector<size_type>, dim> entityDofs;
 
@@ -128,6 +166,7 @@ public:
         size_ += d;
       }
     }
+#endif
 
     ready_ = true;
   }
@@ -135,14 +174,15 @@ public:
   void debug () const
   {
     std::cout << "offsets = {" << std::endl;
-    for (int c = 0; c < dim; ++c) {
-      std::cout << "  codim " << c << ":" << std::endl;
-      for (std::size_t i = 0; i < offsets_[c].size(); ++i)
-        std::cout << "    " << i << ": " << offsets_[c][i] << std::endl;
+    for (int p = 1; p <= int(maxOrder_); ++p) {
+      std::cout << "  p " << p << ":" << std::endl;
+      for (int c = 0; c < dim; ++c)
+        std::cout << "    codim " << c << ": " << offsets_[p][c] << std::endl;
     }
     std::cout << "}" << std::endl;
 
     std::cout << "size = " << size_ << std::endl;
+    std::cout << "maxOrder = " << int(maxOrder_) << std::endl;
     std::cout << "maxNodeSize = " << maxNodeSize_ << std::endl;
   }
 
@@ -211,18 +251,26 @@ public:
     return it;
   }
 
-
 private:
   size_type offset (unsigned int codim, size_type idx) const
   {
-    return codim < dim ? offsets_[codim][idx] : idx;
+    if (codim < dim) {
+      std::uint8_t p = (*orders_)[codim][idx];
+      return offsets_[p][codim] + idx;
+     } else {
+       return idx;
+     }
   }
 
 protected:
   GridView gridView_;
   // TODO: generalize to mixed elementtypes
   const std::array<std::vector<std::uint8_t>, dim>* orders_;
-  std::array<std::vector<size_type>, dim> offsets_;
+  // std::array<std::vector<size_type>, dim> offsets_;
+
+  std::uint8_t maxOrder_;
+  std::vector< std::array<size_type,dim> > offsets_;   // [p][codim]
+
   size_type size_;
   size_type maxNodeSize_;
 

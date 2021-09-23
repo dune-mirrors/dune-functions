@@ -68,11 +68,9 @@ public:
    * \param orders  For each codim a vector associating each entity a polynomial degree
    **/
   LobattoAdaptivePreBasis (const GridView& gv,
-                           std::array<std::vector<std::uint8_t>, dim> const* orders,
-                           std::uint8_t maxOrder = 0)
+                           std::array<std::vector<std::uint8_t>, dim> const* orders)
     : gridView_(gv)
     , orders_(orders)
-    , maxOrder_(maxOrder)
   {}
 
   //! Construct an order container on the element, by collecting polynomial orders on
@@ -99,34 +97,53 @@ public:
   //! Initialize the global indices
   void initializeIndices ()
   {
-    maxOrder_ = 1;
+    std::uint8_t maxOrder = 1;
+    std::vector< std::array<size_type,dim> > sizes;   // [p][codim]
+
     for (int c = 0; c < dim; ++c) {
       if (!(*orders_)[c].empty())
-        maxOrder_ = std::max(maxOrder_, *std::max_element((*orders_)[c].begin(), (*orders_)[c].end()));
+        maxOrder = std::max(maxOrder, *std::max_element((*orders_)[c].begin(), (*orders_)[c].end()));
     }
 
-    offsets_.resize(maxOrder_ + 1);
-    for (std::uint8_t p = 0; p <= maxOrder_; ++p)
+    sizes.resize(maxOrder + 1);
+    for (std::uint8_t p = 0; p <= maxOrder; ++p)
       for (int c = 0; c < dim; ++c)
-        offsets_[p][c] = 0;
+        sizes[p][c] = 0;
 
     for (int c = 0; c < dim; ++c)
       for (std::uint8_t p : (*orders_)[c])
-        offsets_[p][c]+= power(p-1, dim-c); // TODO: generalize to arbitrary element types
+        sizes[p][c]+= power(p-1, dim-c); // TODO: generalize to arbitrary element types
 
-    // for (int p = 0; p <= maxOrder_; ++p) {
+    // std::cout << "sizes:" << std::endl;
+    // for (int p = 0; p <= maxOrder; ++p) {
     //   std::cout << "p = " << p << std::endl;
     //   for (int c = 0; c < dim; ++c)
-    //     std::cout << "  c = " << c << " => " << offsets_[p][c] << std::endl;
+    //     std::cout << "  c = " << c << " => " << sizes[p][c] << std::endl;
     // }
 
     size_type offset = gridView_.size(dim); // number of vertices
     for (int d = 1; d <= dim; ++d) {
       int c = dim-d;
-      for (std::uint8_t p = 2; p <= maxOrder_; ++p) {
-        auto size = offsets_[p][c];
-        offsets_[p][c] = offset;
+      for (std::uint8_t p = 2; p <= maxOrder; ++p) {
+        auto size = sizes[p][c];
+        sizes[p][c] = offset;
         offset += size;
+      }
+    }
+
+    // std::cout << "offsets:" << std::endl;
+    // for (int p = 0; p <= maxOrder; ++p) {
+    //   std::cout << "p = " << p << std::endl;
+    //   for (int c = 0; c < dim; ++c)
+    //     std::cout << "  c = " << c << " => " << sizes[p][c] << std::endl;
+    // }
+
+    for (int c = 0; c < dim; ++c) {
+      offsets_[c].resize(gridView_.size(c));
+      for (std::size_t i = 0; i < gridView_.size(c); ++i) {
+        std::uint8_t p = (*orders_)[c].empty() ? 1 : (*orders_)[c].at(i);
+        offsets_[c][i] = sizes[p][c];
+        sizes[p][c] += power(p-1, dim-c);
       }
     }
 
@@ -135,7 +152,7 @@ public:
     auto const& geometryTypes = indexSet.types(0);
     for (auto const& t : geometryTypes) {
       std::cout << t << std::endl;
-      LobattoOrders<dim> maxOrders{t,maxOrder_};
+      LobattoOrders<dim> maxOrders{t,maxOrder};
       maxNodeSize_ = std::max(maxNodeSize_, size_type(maxOrders.size()));
     }
 
@@ -182,15 +199,14 @@ public:
   void debug () const
   {
     std::cout << "offsets = {" << std::endl;
-    for (int p = 1; p <= int(maxOrder_); ++p) {
-      std::cout << "  p " << p << ":" << std::endl;
-      for (int c = 0; c < dim; ++c)
-        std::cout << "    codim " << c << ": " << offsets_[p][c] << std::endl;
+    for (int c = 0; c < dim; ++c) {
+      std::cout << "  codim " << c << ": " << std::endl;
+      for (size_type o : offsets_[c])
+        std::cout << "    " << o << std::endl;
     }
     std::cout << "}" << std::endl;
 
     std::cout << "size = " << size_ << std::endl;
-    std::cout << "maxOrder = " << int(maxOrder_) << std::endl;
     std::cout << "maxNodeSize = " << maxNodeSize_ << std::endl;
   }
 
@@ -249,14 +265,14 @@ public:
     const auto& localFE = node.finiteElement();
     const auto& localCoefficients = localFE.localCoefficients();
 
-    std::cout << "element [" << gridIndexSet.index(node.element()) << "]" << std::endl;
+    // std::cout << "element [" << gridIndexSet.index(node.element()) << "]" << std::endl;
     for (size_type i = 0, end = localFE.size() ; i < end ; ++it, ++i)
     {
       Dune::LocalKey localKey = localCoefficients.localKey(i);
       size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
 
       size_type globalIndex = offset(localKey.codim(), idx) + localKey.index();
-      std::cout << "  " << i << " => " << globalIndex << std::endl;
+      // std::cout << "  " << i << " => " << globalIndex << std::endl;
       *it = {{ globalIndex }};
     }
     return it;
@@ -265,12 +281,7 @@ public:
 private:
   size_type offset (unsigned int codim, size_type idx) const
   {
-    if (codim < dim) {
-      std::uint8_t p = (*orders_)[codim][idx];
-      return offsets_[p][codim] + idx * power(p-1, dim-codim);
-     } else {
-       return idx;
-     }
+    return codim < dim ? offsets_[codim][idx] : idx;
   }
 
 public:
@@ -279,19 +290,11 @@ public:
     return orders_;
   }
 
-  std::uint8_t maxOrder () const
-  {
-    return maxOrder_;
-  }
-
 protected:
   GridView gridView_;
   // TODO: generalize to mixed elementtypes
   const std::array<std::vector<std::uint8_t>, dim>* orders_;
-  // std::array<std::vector<size_type>, dim> offsets_;
-
-  std::uint8_t maxOrder_;
-  std::vector< std::array<size_type,dim> > offsets_;   // [p][codim]
+  std::array<std::vector<size_type>, dim> offsets_;
 
   size_type size_;
   size_type maxNodeSize_;

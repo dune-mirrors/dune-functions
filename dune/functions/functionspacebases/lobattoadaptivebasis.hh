@@ -18,6 +18,111 @@
 namespace Dune {
 namespace Functions {
 
+// For each GeometryType the association of polynomial degree to entity index
+template<typename GridView>
+class LobattoEntityOrders
+{
+  using IndexSet = typename GridView::IndexSet;
+  using IndexType = typename IndexSet::IndexType;
+
+public:
+  /// Store a pointer to the indexSet of the given GridView
+  LobattoEntityOrders (const GridView& gridView)
+  {
+    update(gridView);
+  }
+
+  /// On grid changes update the GridView and indexSet. Resets all stored polynomial degrees
+  void update (const GridView& gridView)
+  {
+    indexSet_ = &gridView.indexSet();
+    clear();
+  }
+
+  /// Resets all stored polynomial degrees
+  void clear ()
+  {
+    orders_.clear();
+    maxOrders_.clear();
+    maxOrder_ = 1;
+  }
+
+  /// Set the polynomial degree of the given `entity` to `p`
+  template<typename Entity>
+  void set (const Entity& entity, std::uint8_t p)
+  {
+    set(entity.type(), indexSet_->index(entity), p);
+  }
+
+  /// Set the polynomial degree of the given entity with GeometryType `t` and index `idx` to `p`
+  void set (GeometryType t, IndexType idx, std::uint8_t p)
+  {
+    if (!contains(t))
+      orders_[t].resize(indexSet_->size(t), 1u);
+
+    orders_[t][idx] = p;
+    maxOrders_[t] = std::max(maxOrders_[t], p);
+    maxOrder_ = std::max(maxOrder_, p);
+  }
+
+  /// Set the polynomial degree of all entities with GeometryType `t` to `p`
+  void set (GeometryType t, std::uint8_t p)
+  {
+    orders_[t].clear();
+    orders_[t].resize(indexSet_->size(t), p);
+    maxOrders_[t] = std::max(maxOrders_[t], p);
+    maxOrder_ = std::max(maxOrder_, p);
+  }
+
+  /// Return the polynomial degree for the given `entity`
+  template<typename Entity>
+  std::uint8_t get (const Entity& entity) const
+  {
+    return get(entity.type(), indexSet_->index(entity));
+  }
+
+  /// Return the polynomial degree for the given entity with GeometryType `t` and index `idx`
+  /**
+   * The polynomial degree is always >= 1. Thus, if no other polynomial degree is stored
+   * for the given GeometryType and index, return the value `1`.
+   **/
+  std::uint8_t get (GeometryType t, IndexType idx) const
+  {
+    return contains(t) ? orders_.at(t).at(idx) : 1u;
+  }
+
+  /// Return the maximal polynomial order over all entities
+  std::uint8_t max () const
+  {
+    return maxOrder_;
+  }
+
+  /// Return the maximal polynomial order over all entities of GeometryType `t`
+  std::uint8_t max (GeometryType t) const
+  {
+    return maxOrders_.at(t);
+  }
+
+  /// Check whether a polynomial degree is stored for GeometryType `t`
+  bool contains (GeometryType t) const
+  {
+    return orders_.count(t) > 0;
+  }
+
+  /// Begin-iterator over all orders
+  auto begin () const { return orders_.begin(); }
+
+  /// End-iterator over all orders
+  auto end () const { return orders_.end(); }
+
+private:
+  const IndexSet* indexSet_ = nullptr;
+  std::map<GeometryType, std::vector<std::uint8_t>> orders_;
+  std::map<GeometryType, std::uint8_t> maxOrders_;
+  std::uint8_t maxOrder_ = 1;
+};
+
+
 /**
  * \brief A pre-basis for an adaptive Lobatto basis
  *
@@ -65,17 +170,23 @@ public:
   //! Constructor for a given grid view object and order vectors
   /**
    * \param gv      GridView to associate the basis to
-   * \param orders  For each codim a vector associating each entity a polynomial degree
+   * \param orders  For each GeometryType a vector associating each entity a polynomial degree
    **/
-  LobattoAdaptivePreBasis (const GridView& gv,
-                           std::array<std::vector<std::uint8_t>, dim> const* orders)
+  LobattoAdaptivePreBasis (const GridView& gv, const LobattoEntityOrders<GV>* orders)
     : gridView_(gv)
     , orders_(orders)
   {}
 
+  // converting constructor
+  template<typename MI_, typename R_>
+  LobattoAdaptivePreBasis (const LobattoAdaptivePreBasis<GV,MI_,R_>& other)
+    : gridView_(other.gridView_)
+    , orders_(other.orders_)
+  {}
+
   //! Construct an order container on the element, by collecting polynomial orders on
   //! all its subentities from the global vectors
-  template <class Entity>
+  template<typename Entity>
   LobattoOrders<dim> getOrder (const Entity& e) const
   {
     assert(!!orders_);
@@ -85,9 +196,12 @@ public:
     auto refElem = referenceElement(e);
     for (int c = 0; c < dim; ++c) {
       for (int i = 0; i < refElem.size(c); ++i) {
-        unsigned int p = (*orders_)[c].empty() ? 1u : (*orders_)[c][indexSet.subIndex(e,i,c)];
-        for (int k = 0; k < dim-c; ++k)
-          order.set(i,c,k, p); // TODO: distinguish directions
+        const auto type = refElem.type(i,c);
+        if (orders_->contains(type)) {
+          unsigned int p =  orders_->get(type, indexSet.subIndex(e,i,c));
+          for (int k = 0; k < dim-c; ++k)
+            order.set(i,c,k, p); // TODO: distinguish directions
+        }
       }
     }
 
@@ -97,112 +211,63 @@ public:
   //! Initialize the global indices
   void initializeIndices ()
   {
-    std::uint8_t maxOrder = 1;
-    std::vector< std::array<size_type,dim> > sizes;   // [p][codim]
+    std::map<GeometryType, std::map<std::uint8_t, size_type>> sizes; // [GeometryType][p]
 
-    for (int c = 0; c < dim; ++c) {
-      if (!(*orders_)[c].empty())
-        maxOrder = std::max(maxOrder, *std::max_element((*orders_)[c].begin(), (*orders_)[c].end()));
-    }
+    // count the total number of DOFs of associated to entity of codim c and polynomial degree p
+    for (auto const& o : *orders_)
+      for (std::uint8_t p : o.second)
+      sizes[o.first][p] += LobattoGeometry::size(o.first,p);
 
-    sizes.resize(maxOrder + 1);
-    for (std::uint8_t p = 0; p <= maxOrder; ++p)
-      for (int c = 0; c < dim; ++c)
-        sizes[p][c] = 0;
-
-    for (int c = 0; c < dim; ++c)
-      for (std::uint8_t p : (*orders_)[c])
-        sizes[p][c]+= power(p-1, dim-c); // TODO: generalize to arbitrary element types
-
-    // std::cout << "sizes:" << std::endl;
-    // for (int p = 0; p <= maxOrder; ++p) {
-    //   std::cout << "p = " << p << std::endl;
-    //   for (int c = 0; c < dim; ++c)
-    //     std::cout << "  c = " << c << " => " << sizes[p][c] << std::endl;
-    // }
-
+    // transform sizes into entity offsets
     size_type offset = gridView_.size(dim); // number of vertices
-    for (int d = 1; d <= dim; ++d) {
-      int c = dim-d;
-      for (std::uint8_t p = 2; p <= maxOrder; ++p) {
-        auto size = sizes[p][c];
-        sizes[p][c] = offset;
+    for (auto& st : sizes) {
+      for (auto& stp : st.second) {
+        auto size = stp.second;
+        stp.second = offset;
         offset += size;
       }
     }
 
-    // std::cout << "offsets:" << std::endl;
-    // for (int p = 0; p <= maxOrder; ++p) {
-    //   std::cout << "p = " << p << std::endl;
-    //   for (int c = 0; c < dim; ++c)
-    //     std::cout << "  c = " << c << " => " << sizes[p][c] << std::endl;
-    // }
-
-    for (int c = 0; c < dim; ++c) {
-      offsets_[c].resize(gridView_.size(c));
-      for (std::size_t i = 0; i < gridView_.size(c); ++i) {
-        std::uint8_t p = (*orders_)[c].empty() ? 1 : (*orders_)[c].at(i);
-        offsets_[c][i] = sizes[p][c];
-        sizes[p][c] += power(p-1, dim-c);
+    // copmute global offsets
+    for (auto const& o : *orders_) {
+      GeometryType t = o.first;
+      offsets_[t].resize(gridView_.size(t));
+      for (std::size_t i = 0; i < std::size_t(gridView_.size(t)); ++i) {
+        std::uint8_t p = orders_->get(t,i);
+        offsets_[t][i] = sizes[t][p];
+        sizes[t][p] += LobattoGeometry::size(t,p);
       }
     }
 
+    // compute upper bound for node size
     maxNodeSize_ = 0;
-    auto const& indexSet = gridView_.indexSet();
-    auto const& geometryTypes = indexSet.types(0);
-    for (auto const& t : geometryTypes) {
-      std::cout << t << std::endl;
-      LobattoOrders<dim> maxOrders{t,maxOrder};
+    for (auto const& t : gridView_.indexSet().types(0)) {
+      LobattoOrders<dim> maxOrders{t,1};
+      auto refElem = referenceElement<double,dim>(t);
+      for (int c = 0; c < dim; ++c) {
+        for (int i = 0; i < refElem.size(c); ++i) {
+          const auto type = refElem.type(i,c);
+          if (orders_->contains(type)) {
+            unsigned int p =  orders_->max(type);
+            for (int k = 0; k < dim-c; ++k)
+              maxOrders.set(i,c,k, p); // TODO: distinguish directions
+          }
+        }
+      }
       maxNodeSize_ = std::max(maxNodeSize_, size_type(maxOrders.size()));
     }
 
     size_ = offset;
-
-#if 0
-    // number of DOFs per entity
-    std::array<std::vector<size_type>, dim> entityDofs;
-
-    // resize the vectors to number of entities and set number of DOFs to zero
-    for (int c = 0; c < dim; ++c)
-      entityDofs[c].resize(gridView_.size(c), 0);
-
-    // traverse all elements and extract the local number of DOFs
-    maxNodeSize_ = 0;
-    auto const& indexSet = gridView_.indexSet();
-    for (auto const& e : elements(gridView_)) {
-      LobattoOrders<dim> order = getOrder(e);
-      maxNodeSize_ = std::max(maxNodeSize_, size_type(order.size()));
-
-      auto refElem = referenceElement(e);
-      for (int c = 0; c < dim; ++c)
-        for (int i = 0; i < refElem.size(c); ++i)
-          entityDofs[c][indexSet.subIndex(e,i,c)] = order.size(i,c);
-    }
-
-    // create partial sums of the DOF counts to obtain the offsets
-    size_ = gridView_.size(dim);
-    for (int d = 1; d <= dim; ++d) {
-      int c = dim-d;
-      offsets_[c].resize(gridView_.size(c));
-
-      auto it = offsets_[c].begin();
-      for (auto const& d : entityDofs[c]) {
-        *it++ = size_;
-        size_ += d;
-      }
-    }
-#endif
-
     ready_ = true;
   }
 
   void debug () const
   {
     std::cout << "offsets = {" << std::endl;
-    for (int c = 0; c < dim; ++c) {
-      std::cout << "  codim " << c << ": " << std::endl;
-      for (size_type o : offsets_[c])
-        std::cout << "    " << o << std::endl;
+    for (auto const& st : offsets_) {
+      std::cout << "  type " << st.first << ": " << std::endl;
+      for (auto const& idx : st.second)
+        std::cout << "    " << idx << std::endl;
     }
     std::cout << "}" << std::endl;
 
@@ -265,40 +330,39 @@ public:
     const auto& localFE = node.finiteElement();
     const auto& localCoefficients = localFE.localCoefficients();
 
-    // std::cout << "element [" << gridIndexSet.index(node.element()) << "]" << std::endl;
+    const auto refElem = referenceElement(node.element());
+
     for (size_type i = 0, end = localFE.size() ; i < end ; ++it, ++i)
     {
       Dune::LocalKey localKey = localCoefficients.localKey(i);
       size_type idx = gridIndexSet.subIndex(node.element(),localKey.subEntity(),localKey.codim());
 
-      size_type globalIndex = offset(localKey.codim(), idx) + localKey.index();
-      // std::cout << "  " << i << " => " << globalIndex << std::endl;
-      *it = {{ globalIndex }};
+      const auto type = refElem.type(localKey.subEntity(),localKey.codim());
+      *it = {{ offset(type, idx) + localKey.index() }};
     }
+
     return it;
   }
 
 private:
-  size_type offset (unsigned int codim, size_type idx) const
+  size_type offset (GeometryType t, size_type idx) const
   {
-    return codim < dim ? offsets_[codim][idx] : idx;
+    return t.isVertex() ? idx : offsets_.at(t)[idx];
   }
 
 public:
-  const std::array<std::vector<std::uint8_t>, dim>* orders () const
+  const LobattoEntityOrders<GV>* orders () const
   {
     return orders_;
   }
 
 protected:
   GridView gridView_;
-  // TODO: generalize to mixed elementtypes
-  const std::array<std::vector<std::uint8_t>, dim>* orders_;
-  std::array<std::vector<size_type>, dim> offsets_;
+  const LobattoEntityOrders<GV>* orders_;
 
-  size_type size_;
-  size_type maxNodeSize_;
-
+  std::map<GeometryType, std::vector<size_type>> offsets_;
+  size_type size_ = 0;
+  size_type maxNodeSize_ = 0;
   bool ready_ = false;
 };
 
@@ -306,23 +370,23 @@ protected:
 namespace BasisFactory {
 namespace Imp {
 
-template <typename R, std::size_t dim>
+template<typename R, typename GV>
 class LobattoAdaptivePreBasisFactory
 {
 public:
   static const std::size_t requiredMultiIndexSize = 1;
 
-  LobattoAdaptivePreBasisFactory (const std::array<std::vector<std::uint8_t>, dim>* orders)
+  LobattoAdaptivePreBasisFactory (const LobattoEntityOrders<GV>* orders)
     : orders_(orders)
   {}
 
-  template <typename MultiIndex, typename GridView>
-  auto makePreBasis (const GridView& gridView) const
+  template<typename MultiIndex>
+  auto makePreBasis (const GV& gridView) const
   {
-    return LobattoAdaptivePreBasis<GridView, MultiIndex, R>(gridView, orders_);
+    return LobattoAdaptivePreBasis<GV, MultiIndex, R>(gridView, orders_);
   }
 
-  const std::array<std::vector<std::uint8_t>, dim>* orders_;
+  const LobattoEntityOrders<GV>* orders_;
 };
 
 } // end namespace BasisFactory::Imp
@@ -336,14 +400,14 @@ public:
  * \tparam R       The range type of the local basis
  * \param  orders  Vector or polynomial orders for each codimension
  */
-template<typename R=double, std::size_t dim>
-auto lobatto (const std::array<std::vector<std::uint8_t>, dim>& orders)
+template<typename R=double, typename GV>
+auto lobatto (const LobattoEntityOrders<GV>& orders)
 {
-  return Imp::LobattoAdaptivePreBasisFactory<R,dim>{&orders};
+  return Imp::LobattoAdaptivePreBasisFactory<R,GV>{&orders};
 }
 
-template<typename R=double, std::size_t dim>
-void lobatto (const std::array<std::vector<std::uint8_t>, dim>&& orders) = delete;
+template<typename R=double, typename GV>
+void lobatto (const LobattoEntityOrders<GV>&& orders) = delete;
 
 } // end namespace BasisFactory
 
@@ -359,7 +423,8 @@ void lobatto (const std::array<std::vector<std::uint8_t>, dim>&& orders) = delet
  * \tparam R The range type of the local basis
  */
 template<typename GV, typename R=double>
-using LobattoAdaptiveBasis = DefaultGlobalBasis<LobattoAdaptivePreBasis<GV, FlatMultiIndex<std::size_t>, R> >;
+using LobattoAdaptiveBasis
+  = DefaultGlobalBasis<LobattoAdaptivePreBasis<GV, FlatMultiIndex<std::size_t>, R> >;
 
 } // end namespace Functions
 } // end namespace Dune

@@ -216,7 +216,7 @@ public:
     // count the total number of DOFs of associated to entity of codim c and polynomial degree p
     for (auto const& o : *orders_)
       for (std::uint8_t p : o.second)
-      sizes[o.first][p] += LobattoGeometry::size(o.first,p);
+      sizes[o.first][p] += LobattoGeometry::size(o.first,p,p,p);
 
     // transform sizes into entity offsets
     size_type offset = gridView_.size(dim); // number of vertices
@@ -235,7 +235,7 @@ public:
       for (std::size_t i = 0; i < std::size_t(gridView_.size(t)); ++i) {
         std::uint8_t p = orders_->get(t,i);
         offsets_[t][i] = sizes[t][p];
-        sizes[t][p] += LobattoGeometry::size(t,p);
+        sizes[t][p] += LobattoGeometry::size(t,p,p,p);
       }
     }
 

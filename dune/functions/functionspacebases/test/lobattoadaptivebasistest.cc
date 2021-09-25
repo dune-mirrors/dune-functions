@@ -80,14 +80,14 @@ void test (Dune::TestSuite& testSuite)
 
   using namespace Dune::Functions::BasisFactory;
 
-  std::array<std::vector<std::uint8_t>, dim> orders{};
-  orders[0].resize(gridView.size(0), 1u);
+  LobattoEntityOrders orders{gridView};
 
   auto basis = makeBasis(gridView, lobatto(orders));
   for (unsigned int p = 1; p < 6; ++p) {
+    orders.clear();
     for (auto const& e : elements(gridView))
-      orders[0][gridView.indexSet().index(e)] = p; // set interior order to p
-    // enforceMinimumRule(orders);
+      orders.set(e, p); // set interior order to p
+
     basis.preBasis().initializeIndices();
     basis.preBasis().debug();
     std::cout << "  p=" << p << " => basis.dimension=" << basis.dimension() << std::endl;
@@ -120,21 +120,18 @@ void test2d (Dune::TestSuite& testSuite)
 
   using namespace Dune::Functions::BasisFactory;
 
-  std::array<std::vector<std::uint8_t>, 2> orders{};
-  orders[0].resize(gridView.size(0), 1u);
-  orders[1].resize(gridView.size(1), 1u);
-
+  LobattoEntityOrders orders{gridView};
   auto basis = makeBasis(gridView, lobatto(orders));
 
   for (unsigned int pb = 1; pb < 6; ++pb) {
     for (auto const& e : elements(gridView))
-      orders[0][gridView.indexSet().index(e)] = pb; // set interior order to p
+      orders.set(e, pb);
 
     for (unsigned int pe = 1; pe <= pb; ++pe) {
       for (auto const& e : elements(gridView)) {
         auto refElem = referenceElement(e);
         for (int i = 0; i < refElem.size(1); ++i)
-          orders[1][gridView.indexSet().subIndex(e,i,1)] = pe;
+          orders.set(e.subEntity<1>(i), pe);
       }
 
       basis.preBasis().initializeIndices();

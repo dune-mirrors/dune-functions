@@ -11,6 +11,11 @@ dune_target_enable_all_packages("interpolation")
 set_property(TARGET interpolation PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples interpolation)
 
+add_executable("parallel-poisson-pq3" parallel-poisson-pq3.cc)
+dune_target_enable_all_packages(parallel-poisson-pq3)
+set_property(TARGET parallel-poisson-pq3 PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples parallel-poisson-pq3)
+
 add_executable("poisson-pq2" poisson-pq2.cc)
 dune_target_enable_all_packages(poisson-pq2)
 set_property(TARGET poisson-pq2 PROPERTY EXCLUDE_FROM_ALL 1)

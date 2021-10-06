@@ -140,7 +140,7 @@ public:
 
     for (int c = 0; c < dim; ++c) {
       offsets_[c].resize(gridView_.size(c));
-      for (std::size_t i = 0; i < gridView_.size(c); ++i) {
+      for (std::size_t i = 0; i < std::size_t(gridView_.size(c)); ++i) {
         std::uint8_t p = (*orders_)[c].empty() ? 1 : (*orders_)[c].at(i);
         offsets_[c][i] = sizes[p][c];
         sizes[p][c] += power(p-1, dim-c);

@@ -66,7 +66,7 @@ public:
   }
 
   /// Set the polynomial degree of all entities with GeometryType `t` to `p`
-  void set (GeometryType t, std::uint8_t p)
+  void setAll (GeometryType t, std::uint8_t p)
   {
     orders_[t].clear();
     orders_[t].resize(indexSet_->size(t), p);

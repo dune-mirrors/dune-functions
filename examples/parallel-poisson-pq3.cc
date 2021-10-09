@@ -19,15 +19,21 @@
 #include <dune/istl/matrix.hh>
 #include <dune/istl/bcrsmatrix.hh>
 #include <dune/istl/matrixindexset.hh>
+#include <dune/istl/operators.hh>
 #include <dune/istl/preconditioners.hh>
+#include <dune/istl/scalarproducts.hh>
+#include <dune/istl/solvercategory.hh>
 #include <dune/istl/solvers.hh>
+#include <dune/istl/schwarz.hh>
 
+#include <dune/functions/backends/istlcommunication.hh>
 #include <dune/functions/functionspacebases/interpolate.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/boundarydofs.hh>
-#include <dune/functions/functionspacebases/globalgridview.hh>
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
 #include <dune/functions/gridfunctions/gridviewfunction.hh>
+#include <dune/functions/parallel/globalgridview.hh>
+
 
 using namespace Dune;
 
@@ -308,34 +314,12 @@ int main (int argc, char *argv[]) try
   std::cout << "localFE.dimension = " << localFeBasis.dimension() << std::endl;
   std::cout << "globalFeBasis.dimension = " << globalFeBasis.dimension() << std::endl;
 
-  using LocalIndex = Dune::ParallelLocalIndex<Attributes>;
-  Dune::ParallelIndexSet<std::size_t, LocalIndex> parallelIndexSet;
-  std::vector<bool> visited(localFeBasis.dimension(), false);
+  // assume flat indices
+  using ISTLComm = Dune::Functions::ISTLCommunication<std::size_t, std::size_t>;
+  ISTLComm istlComm{localFeBasis, globalFeBasis, mpiHelper.getCommunicator(), Dune::SolverCategory::overlapping};
 
-  auto localLocalView = localFeBasis.localView();
-  auto globalLocalView = globalFeBasis.localView();
-
-  parallelIndexSet.beginResize();
-  for (auto const& e : elements(localGridView))
-  {
-    localLocalView.bind(e);
-    globalLocalView.bind(e);
-
-    for (std::size_t i = 0; i < localLocalView.size(); ++i) {
-      std::size_t localIndex = localLocalView.index(i);
-      if (!visited[localIndex]) {
-        visited[localIndex] = true;
-        parallelIndexSet.add(globalLocalView.index(i), LocalIndex{localIndex, Attributes::owner, true});
-      }
-    }
-  }
-  parallelIndexSet.endResize();
-
-  Dune::RemoteIndices remoteIndices{parallelIndexSet, parallelIndexSet, mpiHelper.getCommunicator()};
-
-
-
-/*
+  auto const& comm = istlComm.get();
+  using Comm = std::decay_t<decltype(comm)>;
 
   /////////////////////////////////////////////////////////
   //   Stiffness matrix and right hand side vector
@@ -351,23 +335,23 @@ int main (int argc, char *argv[]) try
   //  Assemble the system
   /////////////////////////////////////////////////////////
 
-  std::cout << "Number of DOFs is " << feBasis.dimension() << std::endl;
+  std::cout << "Number of DOFs is " << localFeBasis.dimension() << std::endl;
 
   auto rightHandSide = [] (const auto& x) { return 10;};
 
   Dune::Timer timer;
-  assembleLaplaceMatrix(feBasis, stiffnessMatrix, rhs, rightHandSide);
+  assembleLaplaceMatrix(localFeBasis, stiffnessMatrix, rhs, rightHandSide);
   std::cout << "Assembling the problem took " << timer.elapsed() << "s" << std::endl;
 
   /////////////////////////////////////////////////
   //   Choose an initial iterate
   /////////////////////////////////////////////////
-  VectorType x(feBasis.size());
+  VectorType x(localFeBasis.size());
   x = 0;
 
   // Determine Dirichlet dofs
   std::vector<char> dirichletNodes;
-  boundaryTreatment(feBasis, dirichletNodes);
+  boundaryTreatment(localFeBasis, dirichletNodes);
 
 
 
@@ -376,7 +360,7 @@ int main (int argc, char *argv[]) try
   auto dirichletValueFunction = [pi](const auto& x){ return std::sin(2*pi*x[0]); };
 
   // Interpolate dirichlet values at the boundary nodes
-  interpolate(feBasis, x, dirichletValueFunction, dirichletNodes);
+  interpolate(localFeBasis, x, dirichletValueFunction, dirichletNodes);
 
   //////////////////////////////////////////////////////
   //   Incorporate dirichlet values in a symmetric way
@@ -411,17 +395,24 @@ int main (int argc, char *argv[]) try
   //   Compute solution
   ////////////////////////////
 
-  // Technicality:  turn the matrix into a linear operator
-  MatrixAdapter<MatrixType,VectorType,VectorType> op(stiffnessMatrix);
 
-  // Sequential incomplete LU decomposition as the preconditioner
-  SeqILDL<MatrixType,VectorType,VectorType> ildl(stiffnessMatrix,1.0);
+  // A linear operator
+  Dune::OverlappingSchwarzOperator<MatrixType,VectorType,VectorType,Comm> op{stiffnessMatrix, comm};
+
+  // A scalar product
+  Dune::OverlappingSchwarzScalarProduct<VectorType,Comm> sp{comm};
+
+  // A sequential proconditioner
+  // Dune::SeqILDL<MatrixType,VectorType,VectorType> seqPrecon{stiffnessMatrix, 1.0};
+  Dune::Richardson<VectorType,VectorType> seqPrecon;
+
+  // A parallel preconditioner
+  Dune::BlockPreconditioner<VectorType,VectorType,Comm> precon{seqPrecon, comm};
 
   // Preconditioned conjugate-gradient solver
-  CGSolver<VectorType> cg(op,
-                          ildl, // preconditioner
+  Dune::CGSolver<VectorType> cg(op, sp, precon,
                           1e-4, // desired residual reduction factor
-                          100,   // maximum number of iterations
+                          1000,   // maximum number of iterations
                           2);   // verbosity of the solver
 
   // Object storing some statistics about the solving process
@@ -434,17 +425,15 @@ int main (int argc, char *argv[]) try
   //  Make a discrete function from the FE basis and the coefficient vector
   ////////////////////////////////////////////////////////////////////////////
 
-  auto xFunction = Functions::makeDiscreteGlobalBasisFunction<double>(feBasis, x);
+  auto xFunction = Functions::makeDiscreteGlobalBasisFunction<double>(localFeBasis, x);
 
   //////////////////////////////////////////////////////////////////////////////////////////////
   //  Write result to VTK file
   //  We need to subsample, because VTK cannot natively display real second-order functions
   //////////////////////////////////////////////////////////////////////////////////////////////
-  SubsamplingVTKWriter<GridView> vtkWriter(gridView, Dune::refinementLevels(2));
+  SubsamplingVTKWriter vtkWriter{localFeBasis.gridView(), Dune::refinementLevels(2)};
   vtkWriter.addVertexData(xFunction, VTK::FieldInfo("x", VTK::FieldInfo::Type::scalar, 1));
   vtkWriter.write("poisson-pq2");
-
-*/
 
  }
 // Error handling

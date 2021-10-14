@@ -9,6 +9,7 @@
 
 #include <dune/common/exceptions.hh>
 #include <dune/localfunctions/lobatto.hh>
+#include <dune/localfunctions/common/localfiniteelementvariant.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/flatmultiindex.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
@@ -29,8 +30,8 @@ class LobattoNode;
  * A Lobatto basis is a set of continuous basis functions of local Lobatto shape functions
  * of arbitrary high order.
  *
- * The implementation is based on the local `Lobatto[Cube]LocalFiniteElement` implementing the
- * functions from
+ * The implementation is based on the local `Lobatto[Cube|Simplex]LocalFiniteElement` implementing
+ * the functions from
  *
  *   "Higher-Order Finite Element Methods", P. Soling, K, Segeth, I. Dolezel,
  *   2004, Chapman & Hall/CRC
@@ -216,15 +217,22 @@ class LobattoNode
   static constexpr int dim = GV::dimension;
   using IndexSet = typename GV::IndexSet;
 
+  using CubeLFE = LobattoCubeLocalFiniteElement<typename GV::ctype, R, dim, Orders>;
+  using SimplexLFE = LobattoSimplexLocalFiniteElement<typename GV::ctype, R, dim, Orders>;
+
+  using SGT = Dune::Capabilities::hasSingleGeometryType<typename GV::Grid>;
+  using SingleGeometryTypeLFE
+    = std::conditional_t<GeometryType{SGT::topologyId,dim}.isCube(), CubeLFE, SimplexLFE>;
+
+  using CubeLFE_t = std::conditional_t<SGT::v, SingleGeometryTypeLFE, CubeLFE>;
+  using SimplexLFE_t = std::conditional_t<SGT::v, SingleGeometryTypeLFE, SimplexLFE>;
+
 public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
 
-  // TODO: use a GeometryType factory
-  using FiniteElement = LobattoCubeLocalFiniteElement<typename GV::ctype, R, dim, Orders>;
-
-  //! Default construction
-  // LobattoNode () = default;
+  using FiniteElement = std::conditional_t<SGT::v,
+    SingleGeometryTypeLFE, LocalFiniteElementVariant<CubeLFE,SimplexLFE> >;
 
   //! Constructor gets the vector or order information that is accessed in the bind method to
   //! build the corresponding local finite-element
@@ -252,13 +260,19 @@ public:
   void bind (const Element& e)
   {
     assert(!!indexSet_);
-
     element_ = &e;
-    assert(e.type().isCube()); // currently only implemented for cubes.
 
     Orders order{orders_(e)};
     Orientation<dim> orientation{e, *indexSet_};
-    finiteElement_.emplace(order, orientation);
+    if (e.type().isCube())
+      finiteElement_.emplace(CubeLFE_t{order, orientation});
+    else if (e.type().isSimplex())
+      finiteElement_.emplace(SimplexLFE_t{order, orientation});
+    else {
+      DUNE_THROW(Dune::NotImplemented,
+        "LobattoLocalFiniteElement not implemented for GeometryType " << e.type());
+    }
+
     this->setSize(finiteElement_->size());
   }
 

@@ -11,8 +11,14 @@
 
 #include <dune/geometry/quadraturerules.hh>
 
+#if HAVE_DUNE_UGGRID
+#include <dune/grid/uggrid.hh>
+#else
 #include <dune/grid/yaspgrid.hh>
+#endif
+
 #include <dune/grid/io/file/vtk/subsamplingvtkwriter.hh>
+#include <dune/grid/utility/structuredgridfactory.hh>
 
 #include <dune/istl/matrix.hh>
 #include <dune/istl/bcrsmatrix.hh>
@@ -307,10 +313,23 @@ int main (int argc, char *argv[]) try
 
   // { grid_setup_begin }
   const int dim = 2;
-  using GridType = YaspGrid<dim>;
-  FieldVector<double,dim> upperRight = {1, 1};
-  std::array<int,dim> elements = {{4, 4}};
-  GridType grid(upperRight,elements);
+#if HAVE_DUNE_UGGRID
+  using GridType = Dune::UGGrid<2>;
+#else
+  using GridType = Dune::YaspGrid<2>;
+#endif
+
+  using Factory = Dune::StructuredGridFactory<GridType>;
+
+#if HAVE_DUNE_UGGRID
+  // auto gridPtr = Factory::createCubeGrid({0.0,0.0}, {1.0,1.0}, {4u,4u});
+  auto gridPtr = Factory::createSimplexGrid({0.0,0.0}, {1.0,1.0}, {4u,4u});
+#else
+  auto gridPtr = Factory::createCubeGrid({0.0,0.0}, {1.0,1.0}, {4u,4u});
+#endif
+
+  auto& grid = *gridPtr;
+
   grid.globalRefine(2);
 
   using GridView = typename GridType::LeafGridView;
@@ -321,7 +340,7 @@ int main (int argc, char *argv[]) try
   //   Choose a finite element space
   /////////////////////////////////////////////////////////
 
-  LobattoOrders<2> bubble{GeometryTypes::cube(2), 2,1};
+  LobattoOrders<2> bubble{GeometryTypes::none(2), 2,1};
 
 #if BLOCKEDBASIS
   // { function_space_basis_begin }

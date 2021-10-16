@@ -377,6 +377,8 @@ auto forwardCapture(T&& t)
 
 namespace Impl {
 
+  // This passes, if the type has a static member `value` and an instance of T can be implicitly
+  // converted to the type of that member.
   template <class T, decltype(T::value) = T{}>
   constexpr std::true_type isIntegralConstant(T const&, Dune::PriorityTag<2>)
   {
@@ -406,12 +408,12 @@ constexpr auto isIntegralConstant(T const& value)
 }
 
 
-/// Overlaoding of \ref conjunction for zero arguments.
-std::bool_constant<true> conjunction() { return {}; }
+/// Overloading of \ref conjunction for zero arguments.
+constexpr std::true_type conjunction() { return {}; }
 
 /// Overloading of \ref conjunction for one argument
 template<class B>
-auto conjunction(B value) { return value; }
+constexpr auto conjunction(B value) { return value; }
 
 /**
  * \brief Logical conjunction of two boolean objects either as integral_constant or value.
@@ -420,7 +422,7 @@ auto conjunction(B value) { return value; }
  * return an `integral_constant` otherwise, return a boolean value.
  **/
 template<class B1, class B2>
-auto conjunction(B1 value1, B2 value2)
+constexpr auto conjunction(B1 value1, B2 value2)
 {
   if constexpr(isIntegralConstant(value1) && isIntegralConstant(value2))
     return std::conjunction<B1,B2>{};
@@ -430,7 +432,7 @@ auto conjunction(B1 value1, B2 value2)
 
 /// Overloading of \ref conjunction computing the pairwise conjunction or variadic arguments.
 template<class B1, class... B>
-auto conjunction(B1 value1, B... values)
+constexpr auto conjunction(B1 value1, B... values)
 {
   return conjunction(value1, conjunction(values...));
 }

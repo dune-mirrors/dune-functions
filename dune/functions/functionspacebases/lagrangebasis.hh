@@ -174,8 +174,9 @@ public:
     return (prefix.size() == 0) ? size() : 0;
   }
 
+  //! Return number of possible values for next position in multi index
   template<class... I>
-  auto size(const TypeTree::HybridTreePath<I...>& prefix) const
+  auto size(TypeTree::HybridTreePath<I...> prefix) const
   {
     if constexpr(sizeof...(I) > 0)
       return std::integral_constant<size_type,0>{};
@@ -184,7 +185,7 @@ public:
   }
 
   template<class... I>
-  auto isUniform(const TypeTree::HybridTreePath<I...>& prefix) const
+  auto isUniform(TypeTree::HybridTreePath<I...> prefix) const
   {
     return std::true_type{};
   }

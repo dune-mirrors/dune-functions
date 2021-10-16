@@ -377,52 +377,58 @@ auto forwardCapture(T&& t)
 
 namespace Impl {
 
-// template <class T, T value>
-// constexpr std::bool_constant<true>
-// isStaticConstant(std::integral_constant<T,value>, Dune::PriorityTag<3>)
-// {
-//   return {};
-// }
+  template <class T, decltype(T::value) = T{}>
+  constexpr std::true_type isIntegralConstant(T const&, Dune::PriorityTag<2>)
+  {
+    return {};
+  }
 
-template <class T, class = std::integral_constant<decltype(T::value),T::value>>
-constexpr std::bool_constant<true>
-isStaticConstant(T const&, Dune::PriorityTag<2>)
-{
-  return {};
-}
-
-template <class T>
-constexpr std::bool_constant<false>
-isStaticConstant(T const&, Dune::PriorityTag<1>)
-{
-  return {};
-}
+  template <class T>
+  constexpr std::false_type isIntegralConstant(T const&, Dune::PriorityTag<1>)
+  {
+    return {};
+  }
 
 } // end namespace Impl
 
-
+/**
+ * \brief Check whether a type behaves like a `std::integral_constant`
+ *
+ * This utility checks whether the provided type `T` has a static member `value`
+ * that can be used on a constexpr context, e.g., inside a template parameter.
+ * Additionally, it checks whether an instance of type `T` can be implicitly converted
+ * to the type of `T::value`.
+ */
 template <class T>
-constexpr auto isStaticConstant(T const& value)
+constexpr auto isIntegralConstant(T const& value)
 {
-  return Impl::isStaticConstant(value, Dune::PriorityTag<5>{});
+  return Impl::isIntegralConstant(value, Dune::PriorityTag<5>{});
 }
 
 
-
+/// Overlaoding of \ref conjunction for zero arguments.
 std::bool_constant<true> conjunction() { return {}; }
 
+/// Overloading of \ref conjunction for one argument
 template<class B>
 auto conjunction(B value) { return value; }
 
+/**
+ * \brief Logical conjunction of two boolean objects either as integral_constant or value.
+ *
+ * Compute the logical `&&` of the passed boolean objects. If both are `integral_constants`,
+ * return an `integral_constant` otherwise, return a boolean value.
+ **/
 template<class B1, class B2>
 auto conjunction(B1 value1, B2 value2)
 {
-  if constexpr(isStaticConstant(value1) && isStaticConstant(value2))
+  if constexpr(isIntegralConstant(value1) && isIntegralConstant(value2))
     return std::conjunction<B1,B2>{};
   else
     return value1 && value2;
 }
 
+/// Overloading of \ref conjunction computing the pairwise conjunction or variadic arguments.
 template<class B1, class... B>
 auto conjunction(B1 value1, B... values)
 {
@@ -430,11 +436,16 @@ auto conjunction(B1 value1, B... values)
 }
 
 
-template <class B0, class... B>
-struct isAllSame : std::conjunction<std::is_same<B0,B>...> {};
+/**
+ * \brief Check whether all types are the same.
+ **/
+template <class T0, class... T>
+struct IsAllSame : std::conjunction<std::is_same<T0,T>...> {};
 
-template <class B0>
-struct isAllSame<B0> : std::true_type {};
+/// Specialization for a single type
+template <class T>
+struct IsAllSame<T> : std::true_type {};
+
 
 } // namespace Dune::Functions
 } // namespace Dune

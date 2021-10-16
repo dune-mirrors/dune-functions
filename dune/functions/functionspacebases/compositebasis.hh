@@ -167,6 +167,7 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
+  //! Return whether the multi-indices have the same shape for the given prefix
   template<class SizePrefix>
   auto isUniform(const SizePrefix& prefix) const
   {
@@ -192,33 +193,33 @@ private:
     });
   }
 
-  auto size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::BlockedLexicographic) const
+  auto size(TypeTree::HybridTreePath<> prefix, BasisFactory::BlockedLexicographic) const
   {
     return std::integral_constant<size_type,children>{};
   }
 
   template<class I0, class... I>
-  auto size(const TypeTree::HybridTreePath<I0,I...>& prefix, BasisFactory::BlockedLexicographic) const
+  auto size(TypeTree::HybridTreePath<I0,I...> prefix, BasisFactory::BlockedLexicographic) const
   {
-    static_assert(isStaticConstant(I0{}));
+    static_assert(isIntegralConstant(I0{}));
     return subPreBasis(front(prefix)).size(pop_front(prefix));
   }
 
-  auto isUniform(const TypeTree::HybridTreePath<>& prefix, BasisFactory::BlockedLexicographic) const
+  auto isUniform(TypeTree::HybridTreePath<> prefix, BasisFactory::BlockedLexicographic) const
   {
-    return std::false_type{};
+    return std::bool_constant<(children <= 1)>{};
     // return unpackIntegerSequence([&](auto... ii) {
     //   return conjunction(
     //     conjunction(subPreBasis(ii).isUniform(TypeTree::hybridTreePath(ii))...),
-    //     isAllSame<decltype(subPreBasis(ii).size(TypeTree::hybridTreePath(ii)))...>{}
+    //     IsAllSame<decltype(subPreBasis(ii).size(TypeTree::hybridTreePath(ii)))...>::value
     //   );
     // }, ChildIndices{});
   }
 
   template<class I0, class... I>
-  auto isUniform(const TypeTree::HybridTreePath<I0,I...>& prefix, BasisFactory::BlockedLexicographic) const
+  auto isUniform(TypeTree::HybridTreePath<I0,I...> prefix, BasisFactory::BlockedLexicographic) const
   {
-    static_assert(isStaticConstant(I0{}));
+    static_assert(isIntegralConstant(I0{}));
     return subPreBasis(front(prefix)).isUniform(pop_front(prefix));
   }
 
@@ -250,19 +251,19 @@ private:
     return result;
   }
 
-  size_type size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::FlatLexicographic) const
+  size_type size(TypeTree::HybridTreePath<> prefix, BasisFactory::FlatLexicographic) const
   {
     size_type result = 0;
     Hybrid::forEach(ChildIndices{}, [&](auto i) {
-      result += this->subPreBasis(i).size();
+      result += this->subPreBasis(i).size(); // Could this be static size?
     });
     return result;
   }
 
   template<class... I>
-  auto size(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatLexicographic) const
+  auto size(TypeTree::HybridTreePath<I...> prefix, BasisFactory::FlatLexicographic) const
   {
-    return subPreBasis(front(prefix)).size(prefix);
+    return subPreBasis(front(prefix)).size(prefix); // NOTE: This might not yet be correct
 
     // size_type result = 0;
     // size_type shiftedFirstDigit = front(prefix);
@@ -280,7 +281,7 @@ private:
   }
 
   template<class... I>
-  auto isUniform(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatLexicographic) const
+  auto isUniform(TypeTree::HybridTreePath<I...> prefix, BasisFactory::FlatLexicographic) const
   {
     return std::true_type{};
   }

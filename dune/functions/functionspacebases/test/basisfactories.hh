@@ -1,12 +1,13 @@
 #pragma once
 
+#include <array>
+#include <tuple>
 #include <type_traits>
+#include <vector>
 
 #include <dune/common/indices.hh>
 #include <dune/common/fvector.hh>
 #include <dune/grid/yaspgrid.hh>
-#include <dune/istl/bvector.hh>
-#include <dune/istl/multitypeblockvector.hh>
 #include <dune/functions/common/utility.hh>
 #include <dune/functions/functionspacebases/powerbasis.hh>
 #include <dune/functions/functionspacebases/compositebasis.hh>
@@ -14,38 +15,20 @@
 
 namespace Dune {
 
-struct ISTLTraits
+struct StdTraits
 {
   template <class T>
-  using DynamicVector = BlockVector<T>;
+  using DynamicVector = std::vector<T>;
 
   template <class B, std::size_t N>
-  using PowerVector = BlockVector<B>;
-
-  template <bool same, class... Rows>
-  struct CompositeVectorImpl;
+  using PowerVector = std::array<B,N>;
 
   template <class... Rows>
-  struct CompositeVectorImpl<false, Rows...>
-  {
-    using type = MultiTypeBlockVector<Rows...>;
-  };
-
-  template <class Row0, class... Rows>
-  struct CompositeVectorImpl<true, Row0, Rows...>
-  {
-    using type = PowerVector<Row0, (sizeof...(Rows)+1)>;
-  };
-
-  // if all components are the same, using a PowerVector otherwise a MultiTypeVector
-  template <class... Rows>
-  using CompositeVector
-    = typename CompositeVectorImpl<Dune::Functions::isAllSame<Rows...>::value, Rows...>::type;
+  using CompositeVector = std::tuple<Rows...>;
 
   template <class T, std::size_t N>
-  using LeafBlockVector = BlockVector<FieldVector<T,int(N)>>;
+  using LeafBlockVector = std::vector<FieldVector<T,int(N)>>;
 };
-
 
 namespace Functions {
 
@@ -56,7 +39,7 @@ class BasisFactories
 
 public:
   static const std::size_t K = 1;
-  static const std::size_t num_bases = 10;
+  static const std::size_t num_bases = 11;
   static const std::size_t num_false_bases = 1;
 
   BasisFactories()
@@ -69,8 +52,7 @@ public:
   auto basis(index_constant<0>) const // Root: blockedLexicographic, Velocity: flatLexicographic
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<dim>(
           lagrange<K+1>(),
@@ -83,17 +65,16 @@ public:
   template <class T>
   auto vector(index_constant<0>) const
   {
-    return ISTLTraits::CompositeVector<
-      ISTLTraits::DynamicVector<T>,
-      ISTLTraits::DynamicVector<T>
+    return StdTraits::CompositeVector<
+      StdTraits::DynamicVector<T>,
+      StdTraits::DynamicVector<T>
       >{};
   }
 
   auto basis(index_constant<1>) const // Root: blockedLexicographic, Velocity: flatInterleaved
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<dim>(
           lagrange<K+1>(),
@@ -106,17 +87,16 @@ public:
   template <class T>
   auto vector(index_constant<1>) const
   {
-    return ISTLTraits::CompositeVector<
-      ISTLTraits::DynamicVector<T>,
-      ISTLTraits::DynamicVector<T>
+    return StdTraits::CompositeVector<
+      StdTraits::DynamicVector<T>,
+      StdTraits::DynamicVector<T>
       >{};
   }
 
   auto basis(index_constant<2>) const // Root: blockedLexicographic, Velocity: blockedLexicographic
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<dim>(
           lagrange<K+1>(),
@@ -129,9 +109,9 @@ public:
   template <class T>
   auto vector(index_constant<2>) const
   {
-    using Vector = ISTLTraits::CompositeVector<
-      ISTLTraits::PowerVector<ISTLTraits::DynamicVector<T>, dim>,
-      ISTLTraits::DynamicVector<T>
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>,
+      StdTraits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -139,8 +119,7 @@ public:
   auto basis(index_constant<3>) const // Root: blockedLexicographic, Velocity: blockedInterleaved
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<dim>(
           lagrange<K+1>(),
@@ -153,9 +132,9 @@ public:
   template <class T>
   auto vector(index_constant<3>) const
   {
-    using Vector = ISTLTraits::CompositeVector<
-      ISTLTraits::LeafBlockVector<T, dim>,
-      ISTLTraits::DynamicVector<T>
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::LeafBlockVector<T, dim>,
+      StdTraits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -163,8 +142,7 @@ public:
   auto basis(index_constant<4>) const // Root: flatLexicographic, Velocity/Pressure: flatLexicographic
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<dim>(
           lagrange<K+1>(),
@@ -179,15 +157,14 @@ public:
   template <class T>
   auto vector(index_constant<4>) const
   {
-    using Vector = ISTLTraits::DynamicVector<T>;
+    using Vector = StdTraits::DynamicVector<T>;
     return Vector{};
   }
 
   auto basis(index_constant<5>) const // Root: blockedLexicographic, Velocity/Pressure: blockedLexicographic
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<dim>(
           lagrange<K+1>(),
@@ -202,9 +179,9 @@ public:
   template <class T>
   auto vector(index_constant<5>) const
   {
-    using Vector = ISTLTraits::CompositeVector<
-      ISTLTraits::PowerVector<ISTLTraits::DynamicVector<T>, dim>,
-      ISTLTraits::PowerVector<ISTLTraits::DynamicVector<T>, 1>
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>,
+      StdTraits::PowerVector<StdTraits::DynamicVector<T>, 1>
       >;
     return Vector{};
   }
@@ -212,8 +189,7 @@ public:
   auto basis(index_constant<6>) const // Root: blockedLexicographic, Velocity/Pressure: on the same level
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         lagrange<K+1>(),
         lagrange<K+1>(),
@@ -225,10 +201,10 @@ public:
   template <class T>
   auto vector(index_constant<6>) const
   {
-    using Vector = ISTLTraits::CompositeVector<
-      ISTLTraits::DynamicVector<T>,
-      ISTLTraits::DynamicVector<T>,
-      ISTLTraits::DynamicVector<T>
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::DynamicVector<T>,
+      StdTraits::DynamicVector<T>,
+      StdTraits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -236,8 +212,7 @@ public:
   auto basis(index_constant<7>) const
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<1>(
           power<dim>(
@@ -252,9 +227,9 @@ public:
   template <class T>
   auto vector(index_constant<7>) const
   {
-    using Vector = ISTLTraits::CompositeVector<
-      ISTLTraits::PowerVector<ISTLTraits::PowerVector<ISTLTraits::DynamicVector<T>, dim>, 1>,
-      ISTLTraits::DynamicVector<T>
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::PowerVector<StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>, 1>,
+      StdTraits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -262,8 +237,7 @@ public:
   auto basis(index_constant<8>) const
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
         power<1>(
           power<dim>(
@@ -280,21 +254,20 @@ public:
   template <class T>
   auto vector(index_constant<8>) const
   {
-    using Vector = ISTLTraits::CompositeVector<
-      ISTLTraits::PowerVector<ISTLTraits::PowerVector<ISTLTraits::DynamicVector<T>, dim>, 1>,
-      ISTLTraits::PowerVector<ISTLTraits::DynamicVector<T>, 1>
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::PowerVector<StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>, 1>,
+      StdTraits::PowerVector<StdTraits::DynamicVector<T>, 1>
       >;
     return Vector{};
   }
 
-  auto basis(index_constant<9>) const // Root: blockedLexicographic, Velocity: blockedInterleaved
+  auto basis(index_constant<9>) const
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
       composite(
-        power<2>(lagrange<K+1>()),  // cahn-hilliard basis
-        composite(                  // stokes basis
+        power<2>(lagrange<K+1>()),  // Cahn-Hilliard equation
+        composite(                  // Stokes equation
           power<dim>(
             lagrange<K+1>()
           ),
@@ -306,21 +279,55 @@ public:
   template <class T>
   auto vector(index_constant<9>) const
   {
-    using Vector = ISTLTraits::CompositeVector<
-      ISTLTraits::LeafBlockVector<T, 2>,
-      ISTLTraits::CompositeVector<
-        ISTLTraits::LeafBlockVector<T, dim>,
-        ISTLTraits::DynamicVector<T>
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::LeafBlockVector<T, 2>,
+      StdTraits::CompositeVector<
+        StdTraits::LeafBlockVector<T, dim>,
+        StdTraits::DynamicVector<T>
         >
       >;
     return Vector{};
   }
 
-  auto false_basis(index_constant<0>) const // Root: flatLexicographic, Velocity/Pressure: blockedLexicographic
+  auto basis(index_constant<10>) const
   {
     using namespace Dune::Functions::BasisFactory;
-    return makeBasis(
-      gridView(),
+    return makeBasis(gridView(),
+      composite(
+        lagrange<K+1>(),            // Diffusion equation
+        power<2>(                   // Cahn-Hilliard equation
+          lagrange<K+1>(),
+          blockedLexicographic()),
+        composite(                  // Stokes equation
+          power<dim>(
+            lagrange<K+1>(),
+            blockedLexicographic()
+          ),
+          lagrange<K>(),
+          blockedLexicographic()
+        ),
+        blockedLexicographic()
+    ));
+  }
+
+  template <class T>
+  auto vector(index_constant<10>) const
+  {
+    using Vector = StdTraits::CompositeVector<
+      StdTraits::DynamicVector<T>,
+      StdTraits::PowerVector<StdTraits::DynamicVector<T>, 2>,
+      StdTraits::CompositeVector<
+        StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>,
+        StdTraits::DynamicVector<T>
+        >
+      >;
+    return Vector{};
+  }
+
+  auto false_basis(index_constant<0>) const
+  {
+    using namespace Dune::Functions::BasisFactory;
+    return makeBasis(gridView(),
       composite(
         power<dim>(
           lagrange<K+1>(),

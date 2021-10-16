@@ -21,9 +21,9 @@ void printInfo(const PreBasis preBasis, const Prefix& prefix)
   auto isUniform = preBasis.isUniform(prefix);
 
   std::cout << "  size(" << prefix << ")=" << size
-            << " (static=" << Dune::Functions::isStaticConstant(size) << ")" << std::endl;
+            << " (static=" << Dune::Functions::isIntegralConstant(size) << ")" << std::endl;
   std::cout << "  isUniform(" << prefix << ")=" << isUniform
-            << " (static=" << Dune::Functions::isStaticConstant(isUniform) << ")" << std::endl;
+            << " (static=" << Dune::Functions::isIntegralConstant(isUniform) << ")" << std::endl;
 }
 
 template <class Tester, std::size_t I>
@@ -32,20 +32,8 @@ void test(Tester const& tester, index_constant<I> ii)
   auto basis = tester.basis(ii);
   auto const& preBasis = basis.preBasis();
 
+  std::cout << ii << ":" << std::endl;
   printType<decltype(basis)>();
-  printInfo(preBasis, TypeTree::hybridTreePath());
-}
-
-
-
-template <class Tester>
-void test2(Tester const& tester)
-{
-  using namespace Dune::Indices;
-  auto basis = tester.basis(index_constant<3>{});
-  auto const& preBasis = basis.preBasis();
-
-  printType<decltype(preBasis)>();
   printInfo(preBasis, TypeTree::hybridTreePath());
   printInfo(preBasis, TypeTree::hybridTreePath(_0));
   printInfo(preBasis, TypeTree::hybridTreePath(_0,_0));
@@ -54,6 +42,7 @@ void test2(Tester const& tester)
   printInfo(preBasis, TypeTree::hybridTreePath(_1,_0));
   printInfo(preBasis, TypeTree::hybridTreePath(_1,_0,_0));
   printInfo(preBasis, TypeTree::hybridTreePath(_1,_1));
+  std::cout << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -66,6 +55,4 @@ int main(int argc, char** argv)
     [&tester](auto ii) {
       test(tester, ii);
     });
-
-  test2(tester);
 }

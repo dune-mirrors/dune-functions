@@ -125,11 +125,11 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
-
+  //! Return whether the multi-indices have the same shape for the given prefix
   template<class SizePrefix>
   auto isUniform(const SizePrefix& /*prefix*/) const
   {
-    return std::bool_constant<true>{};
+    return std::true_type{};
   }
 
 private:
@@ -155,13 +155,13 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
-  size_type size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::FlatInterleaved) const
+  size_type size(TypeTree::HybridTreePath<> prefix, BasisFactory::FlatInterleaved) const
   {
     return children*subPreBasis_.size();
   }
 
   template <class I0,class... I>
-  auto size(const TypeTree::HybridTreePath<I0,I...>& prefix, BasisFactory::FlatInterleaved) const
+  auto size(TypeTree::HybridTreePath<I0,I...> prefix, BasisFactory::FlatInterleaved) const
   {
     return subPreBasis_.size(push_front(pop_front(prefix), prefix[0] / children));
   }
@@ -187,13 +187,13 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
-  size_type size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::FlatLexicographic) const
+  size_type size(TypeTree::HybridTreePath<> prefix, BasisFactory::FlatLexicographic) const
   {
     return children*subPreBasis_.size();
   }
 
   template <class I0,class... I>
-  auto size(const TypeTree::HybridTreePath<I0,I...>& prefix, BasisFactory::FlatLexicographic) const
+  auto size(TypeTree::HybridTreePath<I0,I...> prefix, BasisFactory::FlatLexicographic) const
   {
     return subPreBasis_.size(push_front(pop_front(prefix), prefix[0] % children));
   }
@@ -209,13 +209,13 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
-  auto size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::BlockedLexicographic) const
+  auto size(TypeTree::HybridTreePath<> prefix, BasisFactory::BlockedLexicographic) const
   {
     return std::integral_constant<size_type,children>{};
   }
 
   template<class... I>
-  auto size(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedLexicographic) const
+  auto size(TypeTree::HybridTreePath<I...> prefix, BasisFactory::BlockedLexicographic) const
   {
     return subPreBasis_.size(pop_front(prefix));
   }
@@ -240,19 +240,20 @@ private:
     return r;
   }
 
-  auto size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::BlockedInterleaved) const
+  auto size(TypeTree::HybridTreePath<> prefix, BasisFactory::BlockedInterleaved) const
   {
     return subPreBasis_.size(prefix);
   }
 
   template<class... I>
-  auto size(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedInterleaved) const
+  auto size(TypeTree::HybridTreePath<I...> prefix, BasisFactory::BlockedInterleaved) const
   {
+    // NOTE: The implementation is slightly different from above. Maybe not yet correct.
     auto r1 = subPreBasis_.size(pop_back(prefix));
-    if constexpr(isStaticConstant(r1) && r1 == 0) return r1;
+    if constexpr(isIntegralConstant(r1) && r1 == 0) return r1;
     else {
       auto r2 = subPreBasis_.size(prefix);
-      if constexpr(isStaticConstant(r2)) {
+      if constexpr(isIntegralConstant(r2)) {
         if constexpr(r2 == 0) return std::integral_constant<size_type,children>{};
         else                  return r2;
       } else {

@@ -3,6 +3,8 @@
 
 #include <dune/common/hybridutilities.hh>
 #include <dune/common/test/testsuite.hh>
+#include <dune/istl/bvector.hh>
+#include <dune/istl/multitypeblockvector.hh>
 
 #include <dune/typetree/treepath.hh>
 
@@ -16,30 +18,28 @@ void printType()
   std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
-template <class T = double, class Traits = ISTLTraits, class PreBasis,
+template <class T = double, class Traits = Dune::StdTraits, class PreBasis,
           class Prefix = Dune::TypeTree::HybridTreePath<>>
 auto vectorGenerator(PreBasis const& preBasis, Prefix prefix = {})
 {
-  using namespace Dune::Indices;
-
   const auto size = preBasis.size(prefix);
 
   // the coefficient type
-  if constexpr(Dune::Functions::isStaticConstant(size) && size == 0) { return T{}; }
+  if constexpr(Dune::Functions::isIntegralConstant(size) && size == 0) { return T{}; }
   else {
     const auto isUniform = preBasis.isUniform(prefix);
-    if constexpr(Dune::Functions::isStaticConstant(isUniform)) {
+    if constexpr(Dune::Functions::isIntegralConstant(isUniform)) {
       if constexpr(isUniform) {
-        if constexpr(Dune::Functions::isStaticConstant(size)) {
+        auto subPrefix = push_back(prefix, Dune::Indices::_0);
+        if constexpr(Dune::Functions::isIntegralConstant(size)) {
           // fixed-size vector type
-          using V = decltype(vectorGenerator<T,Traits>(preBasis, push_back(prefix, _0)));
+          using V = decltype(vectorGenerator<T,Traits>(preBasis, subPrefix));
           return typename Traits::template PowerVector<V, std::size_t(size)>{};
         }
         else {
           // dynamic-size vector type
-          auto subPrefix = push_back(prefix, _0);
           auto subSize = preBasis.size(subPrefix);
-          if constexpr (Dune::Functions::isStaticConstant(subSize)) {
+          if constexpr (Dune::Functions::isIntegralConstant(subSize)) {
             if constexpr(subSize == 0)
               // scalar coefficients
               return typename Traits::template DynamicVector<T>{};
@@ -55,7 +55,7 @@ auto vectorGenerator(PreBasis const& preBasis, Prefix prefix = {})
         }
       }
       else {
-        if constexpr(Dune::Functions::isStaticConstant(size)) {
+        if constexpr(Dune::Functions::isIntegralConstant(size)) {
           // multi-type vector type
           return Dune::unpackIntegerSequence([&](auto... i) {
             return typename Traits::template CompositeVector<
@@ -63,17 +63,50 @@ auto vectorGenerator(PreBasis const& preBasis, Prefix prefix = {})
           }, std::make_index_sequence<std::size_t(size)>{});
         }
         else {
-          DUNE_THROW(Dune::NotImplemented, "!isUniform && !isStaticConstant(size) not supported");
+          DUNE_THROW(Dune::NotImplemented, "!isUniform && !isIntegralConstant(size) not supported");
           return 0;
         }
       }
     }
     else {
-      DUNE_THROW(Dune::NotImplemented, "!isStaticConstant(isUniform) not supported");
+      DUNE_THROW(Dune::NotImplemented, "!isIntegralConstant(isUniform) not supported");
       return 0;
     }
   }
 }
+
+
+struct ISTLTraits
+{
+  template <class T>
+  using DynamicVector = BlockVector<T>;
+
+  template <class B, std::size_t N>
+  using PowerVector = BlockVector<B>;
+
+  template <bool same, class... Rows>
+  struct CompositeVectorImpl;
+
+  template <class... Rows>
+  struct CompositeVectorImpl<false, Rows...>
+  {
+    using type = MultiTypeBlockVector<Rows...>;
+  };
+
+  template <class Row0, class... Rows>
+  struct CompositeVectorImpl<true, Row0, Rows...>
+  {
+    using type = PowerVector<Row0, (sizeof...(Rows)+1)>;
+  };
+
+  // if all components are the same, using a PowerVector otherwise a MultiTypeVector
+  template <class... Rows>
+  using CompositeVector
+    = typename CompositeVectorImpl<Dune::Functions::IsAllSame<Rows...>::value, Rows...>::type;
+
+  template <class T, std::size_t N>
+  using LeafBlockVector = BlockVector<FieldVector<T,int(N)>>;
+};
 
 
 template <class Factory, std::size_t I>

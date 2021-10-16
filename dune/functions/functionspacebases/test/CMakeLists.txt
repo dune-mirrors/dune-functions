@@ -34,6 +34,10 @@ dune_add_test(SOURCES makebasistest.cc)
 
 dune_add_test(SOURCES hierarchicallagrangebasistest.cc)
 
+dune_add_test(SOURCES blockingtest.cc)
+
+dune_add_test(SOURCES vectorgeneratortest.cc)
+
 install(
   FILES
   basistest.hh

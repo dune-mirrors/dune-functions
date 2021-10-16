@@ -113,17 +113,23 @@ public:
   }
 
   //! Same as size(prefix) with empty prefix
-  size_type size() const
+  auto size() const
   {
     return size(Dune::ReservedVector<size_type, multiIndexBufferSize>{});
   }
 
   //! Return number of possible values for next position in multi index
-
   template<class SizePrefix>
-  size_type size(const SizePrefix& prefix) const
+  auto size(const SizePrefix& prefix) const
   {
     return size(prefix, IndexMergingStrategy{});
+  }
+
+
+  template<class SizePrefix>
+  auto isUniform(const SizePrefix& /*prefix*/) const
+  {
+    return std::bool_constant<true>{};
   }
 
 private:
@@ -149,6 +155,17 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
+  size_type size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::FlatInterleaved) const
+  {
+    return children*subPreBasis_.size();
+  }
+
+  template <class I0,class... I>
+  auto size(const TypeTree::HybridTreePath<I0,I...>& prefix, BasisFactory::FlatInterleaved) const
+  {
+    return subPreBasis_.size(push_front(pop_front(prefix), prefix[0] / children));
+  }
+
   template<class SizePrefix>
   size_type size(const SizePrefix& prefix, BasisFactory::FlatLexicographic) const
   {
@@ -170,6 +187,17 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
+  size_type size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::FlatLexicographic) const
+  {
+    return children*subPreBasis_.size();
+  }
+
+  template <class I0,class... I>
+  auto size(const TypeTree::HybridTreePath<I0,I...>& prefix, BasisFactory::FlatLexicographic) const
+  {
+    return subPreBasis_.size(push_front(pop_front(prefix), prefix[0] % children));
+  }
+
   template<class SizePrefix>
   size_type size(const SizePrefix& prefix, BasisFactory::BlockedLexicographic) const
   {
@@ -179,6 +207,17 @@ private:
     for(std::size_t i=1; i<prefix.size(); ++i)
       subPrefix.push_back(prefix[i]);
     return subPreBasis_.size(subPrefix);
+  }
+
+  auto size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::BlockedLexicographic) const
+  {
+    return std::integral_constant<size_type,children>{};
+  }
+
+  template<class... I>
+  auto size(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedLexicographic) const
+  {
+    return subPreBasis_.size(pop_front(prefix));
   }
 
   template<class SizePrefix>
@@ -199,6 +238,27 @@ private:
     if (r==0)
       return children;
     return r;
+  }
+
+  auto size(const TypeTree::HybridTreePath<>& prefix, BasisFactory::BlockedInterleaved) const
+  {
+    return subPreBasis_.size(prefix);
+  }
+
+  template<class... I>
+  auto size(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedInterleaved) const
+  {
+    auto r1 = subPreBasis_.size(pop_back(prefix));
+    if constexpr(isStaticConstant(r1) && r1 == 0) return r1;
+    else {
+      auto r2 = subPreBasis_.size(prefix);
+      if constexpr(isStaticConstant(r2)) {
+        if constexpr(r2 == 0) return std::integral_constant<size_type,children>{};
+        else                  return r2;
+      } else {
+        return (r2 == 0) ? children : r2;
+      }
+    }
   }
 
 public:

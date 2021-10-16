@@ -174,6 +174,21 @@ public:
     return (prefix.size() == 0) ? size() : 0;
   }
 
+  template<class... I>
+  auto size(const TypeTree::HybridTreePath<I...>& prefix) const
+  {
+    if constexpr(sizeof...(I) > 0)
+      return std::integral_constant<size_type,0>{};
+    else
+      return size();
+  }
+
+  template<class... I>
+  auto isUniform(const TypeTree::HybridTreePath<I...>& prefix) const
+  {
+    return std::true_type{};
+  }
+
   //! Get the total dimension of the space spanned by this basis
   size_type dimension() const
   {

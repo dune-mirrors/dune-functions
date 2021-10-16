@@ -375,6 +375,66 @@ auto forwardCapture(T&& t)
 }
 
 
+namespace Impl {
+
+// template <class T, T value>
+// constexpr std::bool_constant<true>
+// isStaticConstant(std::integral_constant<T,value>, Dune::PriorityTag<3>)
+// {
+//   return {};
+// }
+
+template <class T, class = std::integral_constant<decltype(T::value),T::value>>
+constexpr std::bool_constant<true>
+isStaticConstant(T const&, Dune::PriorityTag<2>)
+{
+  return {};
+}
+
+template <class T>
+constexpr std::bool_constant<false>
+isStaticConstant(T const&, Dune::PriorityTag<1>)
+{
+  return {};
+}
+
+} // end namespace Impl
+
+
+template <class T>
+constexpr auto isStaticConstant(T const& value)
+{
+  return Impl::isStaticConstant(value, Dune::PriorityTag<5>{});
+}
+
+
+
+std::bool_constant<true> conjunction() { return {}; }
+
+template<class B>
+auto conjunction(B value) { return value; }
+
+template<class B1, class B2>
+auto conjunction(B1 value1, B2 value2)
+{
+  if constexpr(isStaticConstant(value1) && isStaticConstant(value2))
+    return std::conjunction<B1,B2>{};
+  else
+    return value1 && value2;
+}
+
+template<class B1, class... B>
+auto conjunction(B1 value1, B... values)
+{
+  return conjunction(value1, conjunction(values...));
+}
+
+
+template <class B0, class... B>
+struct isAllSame : std::conjunction<std::is_same<B0,B>...> {};
+
+template <class B0>
+struct isAllSame<B0> : std::true_type {};
 
 } // namespace Dune::Functions
 } // namespace Dune

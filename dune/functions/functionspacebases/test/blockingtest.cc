@@ -29,6 +29,7 @@ void printInfo(const PreBasis preBasis, const Prefix& prefix)
 template <class Tester, std::size_t I>
 void test(Tester const& tester, index_constant<I> ii)
 {
+  using namespace Dune::Indices;
   auto basis = tester.basis(ii);
   auto const& preBasis = basis.preBasis();
 

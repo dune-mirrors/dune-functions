@@ -20,6 +20,7 @@
 #include <dune/geometry/type.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/leafprebasis.hh>
 
 namespace Dune
 {
@@ -495,7 +496,8 @@ class BSplineNode;
  * in a larger basis for the construction of product spaces.
  */
 template<typename GV>
-class BSplinePreBasis
+class BSplinePreBasis :
+  public LeafPreBasis< BSplinePreBasis<GV> >
 {
   static const int dim = GV::dimension;
 
@@ -561,10 +563,6 @@ public:
   using size_type = std::size_t;
 
   using Node = BSplineNode<GV>;
-
-  static constexpr size_type maxMultiIndexSize = 1;
-  static constexpr size_type minMultiIndexSize = 1;
-  static constexpr size_type multiIndexBufferSize = 1;
 
   // Type used for function values
   using R = double;
@@ -696,31 +694,6 @@ public:
     return Node{this};
   }
 
-  // Ideally this method should be implemented as
-  //
-  //   template<class SizePrefix>
-  //   size_type size(const SizePrefix& prefix) const
-  //
-  // But leads to ambiguity with the other size method:
-  //
-  //   unsigned int size (size_t d) const
-  //
-  // Once the latter is removed, this implementation should be changed.
-
-  //! Return number of possible values for next position in multi index
-  template<class ST, int i>
-  size_type size(const Dune::ReservedVector<ST, i>& prefix) const
-  {
-    assert(prefix.size() == 0 || prefix.size() == 1);
-    return (prefix.size() == 0) ? size() : 0;
-  }
-
-  //! Get the total dimension of the space spanned by this basis
-  size_type dimension() const
-  {
-    return size();
-  }
-
   //! Get the maximal number of DOFs associated to node for any element
   size_type maxNodeSize() const
   {
@@ -754,7 +727,7 @@ public:
         size_type globalIdx = globalIJK[dim-1];
 
         for (int i=dim-2; i>=0; i--)
-          globalIdx = globalIdx * size(i) + globalIJK[i];
+          globalIdx = globalIdx * numShapeFunction(i) + globalIJK[i];
 
         *it = {{globalIdx}};
       }
@@ -762,16 +735,16 @@ public:
   }
 
   //! \brief Total number of B-spline basis functions
-  unsigned int size () const
+  unsigned int dimension () const
   {
     unsigned int result = 1;
     for (size_t i=0; i<dim; i++)
-      result *= size(i);
+      result *= numShapeFunction(i);
     return result;
   }
 
   //! \brief Number of shape functions in one direction
-  unsigned int size (size_t d) const
+  unsigned int numShapeFunction (size_t d) const
   {
     return knotVectors_[d].size() - order_[d] - 1;
   }

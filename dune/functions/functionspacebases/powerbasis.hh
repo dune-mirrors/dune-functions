@@ -155,7 +155,7 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
-  size_type size(TypeTree::HybridTreePath<> prefix, BasisFactory::FlatInterleaved) const
+  size_type size(TypeTree::HybridTreePath<> /*prefix*/, BasisFactory::FlatInterleaved) const
   {
     return children*subPreBasis_.size();
   }
@@ -187,7 +187,7 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
-  size_type size(TypeTree::HybridTreePath<> prefix, BasisFactory::FlatLexicographic) const
+  size_type size(TypeTree::HybridTreePath<> /*prefix*/, BasisFactory::FlatLexicographic) const
   {
     return children*subPreBasis_.size();
   }
@@ -209,7 +209,7 @@ private:
     return subPreBasis_.size(subPrefix);
   }
 
-  auto size(TypeTree::HybridTreePath<> prefix, BasisFactory::BlockedLexicographic) const
+  auto size(TypeTree::HybridTreePath<> /*prefix*/, BasisFactory::BlockedLexicographic) const
   {
     return std::integral_constant<size_type,children>{};
   }

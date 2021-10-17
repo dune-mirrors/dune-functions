@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include <dune/common/hybridutilities.hh>
+#include <dune/common/test/testsuite.hh>
 #include <dune/typetree/treepath.hh>
 
 #include "basisfactories.hh"
@@ -9,7 +10,7 @@
 using namespace Dune;
 
 template <class T>
-void printType()
+void printType(const T&)
 {
   std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
@@ -26,23 +27,39 @@ void printInfo(const PreBasis preBasis, const Prefix& prefix)
             << " (static=" << Dune::Functions::isIntegralConstant(isUniform) << ")" << std::endl;
 }
 
-template <class Tester, std::size_t I>
-void test(Tester const& tester, index_constant<I> ii)
+template <class Factory, std::size_t I>
+void test(Dune::TestSuite& testSuite, Factory const& factory, index_constant<I> ii)
 {
   using namespace Dune::Indices;
-  auto basis = tester.basis(ii);
-  auto const& preBasis = basis.preBasis();
+  using namespace Dune::TypeTree;
+
+  auto basis = factory.basis(ii);
+  using Basis = decltype(basis);
+  using SizePrefix = typename Basis::SizePrefix;
+  using S = typename SizePrefix::value_type;
+
+  auto const& pb = basis.preBasis();
 
   std::cout << ii << ":" << std::endl;
-  printType<decltype(basis)>();
-  printInfo(preBasis, TypeTree::hybridTreePath());
-  printInfo(preBasis, TypeTree::hybridTreePath(_0));
-  printInfo(preBasis, TypeTree::hybridTreePath(_0,_0));
-  printInfo(preBasis, TypeTree::hybridTreePath(_0,_0,_0));
-  printInfo(preBasis, TypeTree::hybridTreePath(_0,_1));
-  printInfo(preBasis, TypeTree::hybridTreePath(_1,_0));
-  printInfo(preBasis, TypeTree::hybridTreePath(_1,_0,_0));
-  printInfo(preBasis, TypeTree::hybridTreePath(_1,_1));
+  printType(pb);
+
+  // check whether size functions are consistent
+  testSuite.check(S(pb.size(hybridTreePath())) == pb.size(SizePrefix{}), "{}");
+  if constexpr(SizePrefix::capacity() > 0)
+    testSuite.check(S(pb.size(hybridTreePath(_0))) == pb.size(SizePrefix{0}), "{0}");
+  if constexpr(SizePrefix::capacity() > 1)
+    testSuite.check(S(pb.size(hybridTreePath(_0,_0))) == pb.size(SizePrefix{0,0}), "{0,0}");
+  if constexpr(SizePrefix::capacity() > 2)
+    testSuite.check(S(pb.size(hybridTreePath(_0,_0,_0))) == pb.size(SizePrefix{0,0,0}), "{0,0,0}");
+  if constexpr(SizePrefix::capacity() > 1)
+    testSuite.check(S(pb.size(hybridTreePath(_0,_1))) == pb.size(SizePrefix{0,1}), "{0,1}");
+  if constexpr(SizePrefix::capacity() > 1)
+    testSuite.check(S(pb.size(hybridTreePath(_1,_0))) == pb.size(SizePrefix{1,0}), "{1,0}");
+  if constexpr(SizePrefix::capacity() > 2)
+    testSuite.check(S(pb.size(hybridTreePath(_1,_0,_0))) == pb.size(SizePrefix{1,0,0}), "{1,0,0}");
+  if constexpr(SizePrefix::capacity() > 1)
+    testSuite.check(S(pb.size(hybridTreePath(_1,_1))) == pb.size(SizePrefix{1,1}), "{1,1}");
+
   std::cout << std::endl;
 }
 
@@ -50,10 +67,16 @@ int main(int argc, char** argv)
 {
   MPIHelper::instance(argc, argv);
 
-  using Tester = Dune::Functions::BasisFactories<2>;
-  Tester tester{};
-  Hybrid::forEach(range(index_constant<Tester::num_bases>{}),
-    [&tester](auto ii) {
-      test(tester, ii);
+  Dune::TestSuite testSuite;
+
+  using Factory = Dune::Functions::BasisFactories<2>;
+  Factory factory{};
+  Hybrid::forEach(range(index_constant<Factory::num_bases>{}),
+    [&](auto ii) {
+      Dune::TestSuite subTestSuite("basis " + std::to_string(std::size_t(ii)));
+      test(subTestSuite, factory, ii);
+      testSuite.subTest(subTestSuite);
     });
+
+  return testSuite.exit();
 }

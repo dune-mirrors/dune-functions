@@ -36,9 +36,9 @@ template <int dim>
 class BasisFactories
 {
   using GridType = YaspGrid<dim>;
+  using Traits = StdTraits;
 
 public:
-  static const std::size_t K = 1;
   static const std::size_t num_bases = 11;
   static const std::size_t num_false_bases = 1;
 
@@ -55,9 +55,9 @@ public:
     return makeBasis(gridView(),
       composite(
         power<dim>(
-          lagrange<K+1>(),
+          lagrange<2>(),
           flatLexicographic()),
-        lagrange<K>(),
+        lagrange<1>(),
         blockedLexicographic()
       ));
   }
@@ -65,9 +65,9 @@ public:
   template <class T>
   auto vector(index_constant<0>) const
   {
-    return StdTraits::CompositeVector<
-      StdTraits::DynamicVector<T>,
-      StdTraits::DynamicVector<T>
+    return Traits::CompositeVector<
+      Traits::DynamicVector<T>,
+      Traits::DynamicVector<T>
       >{};
   }
 
@@ -77,9 +77,9 @@ public:
     return makeBasis(gridView(),
       composite(
         power<dim>(
-          lagrange<K+1>(),
+          lagrange<2>(),
           flatInterleaved()),
-        lagrange<K>(),
+        lagrange<1>(),
         blockedLexicographic()
       ));
   }
@@ -87,9 +87,9 @@ public:
   template <class T>
   auto vector(index_constant<1>) const
   {
-    return StdTraits::CompositeVector<
-      StdTraits::DynamicVector<T>,
-      StdTraits::DynamicVector<T>
+    return Traits::CompositeVector<
+      Traits::DynamicVector<T>,
+      Traits::DynamicVector<T>
       >{};
   }
 
@@ -99,9 +99,9 @@ public:
     return makeBasis(gridView(),
       composite(
         power<dim>(
-          lagrange<K+1>(),
+          lagrange<2>(),
           blockedLexicographic()),
-        lagrange<K>(),
+        lagrange<1>(),
         blockedLexicographic()
       ));
   }
@@ -109,9 +109,9 @@ public:
   template <class T>
   auto vector(index_constant<2>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>,
-      StdTraits::DynamicVector<T>
+    using Vector = Traits::CompositeVector<
+      Traits::PowerVector<Traits::DynamicVector<T>, dim>,
+      Traits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -122,9 +122,9 @@ public:
     return makeBasis(gridView(),
       composite(
         power<dim>(
-          lagrange<K+1>(),
+          lagrange<2>(),
           blockedInterleaved()),
-        lagrange<K>(),
+        lagrange<1>(),
         blockedLexicographic()
       ));
   }
@@ -132,9 +132,9 @@ public:
   template <class T>
   auto vector(index_constant<3>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::LeafBlockVector<T, dim>,
-      StdTraits::DynamicVector<T>
+    using Vector = Traits::CompositeVector<
+      Traits::LeafBlockVector<T, dim>,
+      Traits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -145,10 +145,10 @@ public:
     return makeBasis(gridView(),
       composite(
         power<dim>(
-          lagrange<K+1>(),
+          lagrange<2>(),
           flatLexicographic()),
         power<1>(
-          lagrange<K>(),
+          lagrange<1>(),
           flatLexicographic()),
         flatLexicographic()
       ));
@@ -157,7 +157,7 @@ public:
   template <class T>
   auto vector(index_constant<4>) const
   {
-    using Vector = StdTraits::DynamicVector<T>;
+    using Vector = Traits::DynamicVector<T>;
     return Vector{};
   }
 
@@ -167,10 +167,10 @@ public:
     return makeBasis(gridView(),
       composite(
         power<dim>(
-          lagrange<K+1>(),
+          lagrange<2>(),
           blockedLexicographic()),
         power<1>(
-          lagrange<K>(),
+          lagrange<1>(),
           blockedLexicographic()),
         blockedLexicographic()
       ));
@@ -179,9 +179,9 @@ public:
   template <class T>
   auto vector(index_constant<5>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>,
-      StdTraits::PowerVector<StdTraits::DynamicVector<T>, 1>
+    using Vector = Traits::CompositeVector<
+      Traits::PowerVector<Traits::DynamicVector<T>, dim>,
+      Traits::PowerVector<Traits::DynamicVector<T>, 1>
       >;
     return Vector{};
   }
@@ -191,9 +191,9 @@ public:
     using namespace Dune::Functions::BasisFactory;
     return makeBasis(gridView(),
       composite(
-        lagrange<K+1>(),
-        lagrange<K+1>(),
-        lagrange<K>(),
+        lagrange<2>(),
+        lagrange<2>(),
+        lagrange<1>(),
         blockedLexicographic()
       ));
   }
@@ -201,10 +201,10 @@ public:
   template <class T>
   auto vector(index_constant<6>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::DynamicVector<T>,
-      StdTraits::DynamicVector<T>,
-      StdTraits::DynamicVector<T>
+    using Vector = Traits::CompositeVector<
+      Traits::DynamicVector<T>,
+      Traits::DynamicVector<T>,
+      Traits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -216,10 +216,10 @@ public:
       composite(
         power<1>(
           power<dim>(
-            lagrange<K+1>(),
+            lagrange<2>(),
             blockedLexicographic() ),
           blockedLexicographic() ),
-        lagrange<K>(),
+        lagrange<1>(),
         blockedLexicographic()
       ));
   }
@@ -227,9 +227,9 @@ public:
   template <class T>
   auto vector(index_constant<7>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::PowerVector<StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>, 1>,
-      StdTraits::DynamicVector<T>
+    using Vector = Traits::CompositeVector<
+      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, dim>, 1>,
+      Traits::DynamicVector<T>
       >;
     return Vector{};
   }
@@ -241,11 +241,11 @@ public:
       composite(
         power<1>(
           power<dim>(
-            lagrange<K+1>(),
+            lagrange<2>(),
             blockedLexicographic() ),
           blockedLexicographic() ),
         power<1>(
-          lagrange<K>(),
+          lagrange<1>(),
           blockedLexicographic() ),
         blockedLexicographic()
       ));
@@ -254,9 +254,9 @@ public:
   template <class T>
   auto vector(index_constant<8>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::PowerVector<StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>, 1>,
-      StdTraits::PowerVector<StdTraits::DynamicVector<T>, 1>
+    using Vector = Traits::CompositeVector<
+      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, dim>, 1>,
+      Traits::PowerVector<Traits::DynamicVector<T>, 1>
       >;
     return Vector{};
   }
@@ -266,12 +266,12 @@ public:
     using namespace Dune::Functions::BasisFactory;
     return makeBasis(gridView(),
       composite(
-        power<2>(lagrange<K+1>()),  // Cahn-Hilliard equation
+        power<2>(lagrange<2>()),  // Cahn-Hilliard equation
         composite(                  // Stokes equation
           power<dim>(
-            lagrange<K+1>()
+            lagrange<2>()
           ),
-          lagrange<K>()
+          lagrange<1>()
         )
     ));
   }
@@ -279,11 +279,11 @@ public:
   template <class T>
   auto vector(index_constant<9>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::LeafBlockVector<T, 2>,
-      StdTraits::CompositeVector<
-        StdTraits::LeafBlockVector<T, dim>,
-        StdTraits::DynamicVector<T>
+    using Vector = Traits::CompositeVector<
+      Traits::LeafBlockVector<T, 2>,
+      Traits::CompositeVector<
+        Traits::LeafBlockVector<T, dim>,
+        Traits::DynamicVector<T>
         >
       >;
     return Vector{};
@@ -294,16 +294,16 @@ public:
     using namespace Dune::Functions::BasisFactory;
     return makeBasis(gridView(),
       composite(
-        lagrange<K+1>(),            // Diffusion equation
+        lagrange<2>(),              // Diffusion equation
         power<2>(                   // Cahn-Hilliard equation
-          lagrange<K+1>(),
+          lagrange<2>(),
           blockedLexicographic()),
         composite(                  // Stokes equation
           power<dim>(
-            lagrange<K+1>(),
+            lagrange<2>(),
             blockedLexicographic()
           ),
-          lagrange<K>(),
+          lagrange<1>(),
           blockedLexicographic()
         ),
         blockedLexicographic()
@@ -313,12 +313,12 @@ public:
   template <class T>
   auto vector(index_constant<10>) const
   {
-    using Vector = StdTraits::CompositeVector<
-      StdTraits::DynamicVector<T>,
-      StdTraits::PowerVector<StdTraits::DynamicVector<T>, 2>,
-      StdTraits::CompositeVector<
-        StdTraits::PowerVector<StdTraits::DynamicVector<T>, dim>,
-        StdTraits::DynamicVector<T>
+    using Vector = Traits::CompositeVector<
+      Traits::DynamicVector<T>,
+      Traits::PowerVector<Traits::DynamicVector<T>, 2>,
+      Traits::CompositeVector<
+        Traits::PowerVector<Traits::DynamicVector<T>, dim>,
+        Traits::DynamicVector<T>
         >
       >;
     return Vector{};
@@ -330,10 +330,10 @@ public:
     return makeBasis(gridView(),
       composite(
         power<dim>(
-          lagrange<K+1>(),
+          lagrange<2>(),
           blockedLexicographic()),
         power<1>(
-          lagrange<K>(),
+          lagrange<1>(),
           blockedLexicographic()),
         flatLexicographic()
       ));

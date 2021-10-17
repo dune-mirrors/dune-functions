@@ -71,6 +71,16 @@ public:
       >{};
   }
 
+  auto prefixes(index_constant<0>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u)
+    };
+  }
+
+
   auto basis(index_constant<1>) const // Root: blockedLexicographic, Velocity: flatInterleaved
   {
     using namespace Dune::Functions::BasisFactory;
@@ -92,6 +102,16 @@ public:
       Traits::DynamicVector<T>
       >{};
   }
+
+  auto prefixes(index_constant<1>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u)
+    };
+  }
+
 
   auto basis(index_constant<2>) const // Root: blockedLexicographic, Velocity: blockedLexicographic
   {
@@ -116,6 +136,17 @@ public:
     return Vector{};
   }
 
+  auto prefixes(index_constant<2>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 1u),
+      hybridTreePath(_0, 0u, 0u), hybridTreePath(_0, 1u, 0u)
+    };
+  }
+
+
   auto basis(index_constant<3>) const // Root: blockedLexicographic, Velocity: blockedInterleaved
   {
     using namespace Dune::Functions::BasisFactory;
@@ -139,6 +170,17 @@ public:
     return Vector{};
   }
 
+  auto prefixes(index_constant<3>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 1u),
+      hybridTreePath(_0, 0u, 0u), hybridTreePath(_0, 0u, 1u)
+    };
+  }
+
+
   auto basis(index_constant<4>) const // Root: flatLexicographic, Velocity/Pressure: flatLexicographic
   {
     using namespace Dune::Functions::BasisFactory;
@@ -160,6 +202,16 @@ public:
     using Vector = Traits::DynamicVector<T>;
     return Vector{};
   }
+
+  auto prefixes(index_constant<4>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(0u)
+    };
+  }
+
 
   auto basis(index_constant<5>) const // Root: blockedLexicographic, Velocity/Pressure: blockedLexicographic
   {
@@ -186,6 +238,18 @@ public:
     return Vector{};
   }
 
+  auto prefixes(index_constant<5>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 1u),
+      hybridTreePath(_1, 0u), hybridTreePath(_0, 0u, 0u), hybridTreePath(_0, 0u, 1u),
+      hybridTreePath(_1, 0u, 0u)
+    };
+  }
+
+
   auto basis(index_constant<6>) const // Root: blockedLexicographic, Velocity/Pressure: on the same level
   {
     using namespace Dune::Functions::BasisFactory;
@@ -208,6 +272,17 @@ public:
       >;
     return Vector{};
   }
+
+  auto prefixes(index_constant<6>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_2), hybridTreePath(_0, 0u),
+      hybridTreePath(_1, 0u), hybridTreePath(_2, 0u)
+    };
+  }
+
 
   auto basis(index_constant<7>) const
   {
@@ -233,6 +308,17 @@ public:
       >;
     return Vector{};
   }
+
+  auto prefixes(index_constant<7>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 0u, 0u),
+      hybridTreePath(_0, 0u, 0u, 0u), hybridTreePath(_1, 0u)
+    };
+  }
+
 
   auto basis(index_constant<8>) const
   {
@@ -261,6 +347,17 @@ public:
     return Vector{};
   }
 
+  auto prefixes(index_constant<8>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 0u, 0u),
+      hybridTreePath(_0, 0u, 0u, 0u), hybridTreePath(_1, 0u), hybridTreePath(_1, 0u, 0u)
+    };
+  }
+
+
   auto basis(index_constant<9>) const
   {
     using namespace Dune::Functions::BasisFactory;
@@ -288,6 +385,18 @@ public:
       >;
     return Vector{};
   }
+
+  auto prefixes(index_constant<9>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 0u, 0u),
+      hybridTreePath(_1, _0), hybridTreePath(_1, _0, 0u), hybridTreePath(_1, _0, 0u, 0u),
+      hybridTreePath(_1, _1), hybridTreePath(_1, _1, 0u)
+    };
+  }
+
 
   auto basis(index_constant<10>) const
   {
@@ -323,6 +432,19 @@ public:
       >;
     return Vector{};
   }
+
+  auto prefixes(index_constant<10>) const
+  {
+    using namespace Dune::Indices;
+    using namespace Dune::TypeTree;
+    return std::tuple{
+      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_2), hybridTreePath(_0, 0u),
+      hybridTreePath(_1, 0u), hybridTreePath(_1, 0u, 0u),
+      hybridTreePath(_2, _0), hybridTreePath(_2, _0, 0u), hybridTreePath(_2, _0, 0u, 0u),
+      hybridTreePath(_2, _1), hybridTreePath(_2, _1, 0u)
+    };
+  }
+
 
   auto false_basis(index_constant<0>) const
   {

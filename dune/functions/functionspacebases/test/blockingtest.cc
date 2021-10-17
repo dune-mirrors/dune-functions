@@ -45,21 +45,12 @@ void test(Dune::TestSuite& testSuite, Factory const& factory, index_constant<I> 
 
   // check whether size functions are consistent
   testSuite.check(S(pb.size(hybridTreePath())) == pb.size(SizePrefix{}), "{}");
-  if constexpr(SizePrefix::capacity() > 0)
-    testSuite.check(S(pb.size(hybridTreePath(_0))) == pb.size(SizePrefix{0}), "{0}");
-  if constexpr(SizePrefix::capacity() > 1)
-    testSuite.check(S(pb.size(hybridTreePath(_0,_0))) == pb.size(SizePrefix{0,0}), "{0,0}");
-  if constexpr(SizePrefix::capacity() > 2)
-    testSuite.check(S(pb.size(hybridTreePath(_0,_0,_0))) == pb.size(SizePrefix{0,0,0}), "{0,0,0}");
-  if constexpr(SizePrefix::capacity() > 1)
-    testSuite.check(S(pb.size(hybridTreePath(_0,_1))) == pb.size(SizePrefix{0,1}), "{0,1}");
-  if constexpr(SizePrefix::capacity() > 1)
-    testSuite.check(S(pb.size(hybridTreePath(_1,_0))) == pb.size(SizePrefix{1,0}), "{1,0}");
-  if constexpr(SizePrefix::capacity() > 2)
-    testSuite.check(S(pb.size(hybridTreePath(_1,_0,_0))) == pb.size(SizePrefix{1,0,0}), "{1,0,0}");
-  if constexpr(SizePrefix::capacity() > 1)
-    testSuite.check(S(pb.size(hybridTreePath(_1,_1))) == pb.size(SizePrefix{1,1}), "{1,1}");
 
+  Dune::Hybrid::forEach(factory.prefixes(ii), [&](auto tp) {
+    auto prefix = std::apply([](auto... jj) { return SizePrefix{S(jj)...}; }, tp._data);
+    auto str = std::apply([](auto... jj) { return ((std::to_string(jj) + " ") +...); }, tp._data);
+    testSuite.check(S(pb.size(tp)) == pb.size(prefix), "{" + str + "}");
+  });
   std::cout << std::endl;
 }
 

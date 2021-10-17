@@ -263,7 +263,8 @@ private:
   template<class... I>
   auto size(TypeTree::HybridTreePath<I...> prefix, BasisFactory::FlatLexicographic) const
   {
-    return subPreBasis(front(prefix)).size(prefix); // NOTE: This might not yet be correct
+    // Note: in a flat composite note, the first prefix index is a runtime index
+    return subPreBasis(Dune::Indices::_0).size(prefix); // NOTE: This might not yet be correct
 
     // size_type result = 0;
     // size_type shiftedFirstDigit = front(prefix);

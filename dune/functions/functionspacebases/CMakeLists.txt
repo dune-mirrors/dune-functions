@@ -20,6 +20,7 @@ install(FILES
         lagrangedgbasis.hh
         nedelecbasis.hh
         periodicbasis.hh
+        persistentgridview.hh
         powerbasis.hh
         rannacherturekbasis.hh
         nodes.hh

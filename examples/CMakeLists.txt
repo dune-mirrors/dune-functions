@@ -25,3 +25,8 @@ add_executable("poisson-mfem" poisson-mfem.cc)
 dune_target_enable_all_packages("poisson-mfem")
 set_property(TARGET poisson-mfem PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples poisson-mfem)
+
+add_executable("adaptivity" adaptivity.cc)
+dune_target_enable_all_packages("adaptivity")
+set_property(TARGET adaptivity PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples adaptivity)

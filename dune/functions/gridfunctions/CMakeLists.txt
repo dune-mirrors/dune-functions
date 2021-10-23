@@ -9,4 +9,5 @@ install(FILES
         gridviewentityset.hh
         gridviewfunction.hh
         localderivativetraits.hh
+        refinedgridfunction.hh
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/gridfunctions)

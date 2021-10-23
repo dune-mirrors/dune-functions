@@ -17,7 +17,8 @@
 #include <dune/functions/functionspacebases/powerbasis.hh>
 #include <dune/functions/functionspacebases/subspacebasis.hh>
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
-#include <dune/functions/gridfunctions/hierarchicgridfunction.hh>
+#include <dune/functions/gridfunctions/coarsenedgridfunction.hh>
+#include <dune/functions/gridfunctions/refinedgridfunction.hh>
 
 #include <dune/functions/gridfunctions/test/gridfunctiontest.hh>
 
@@ -32,7 +33,7 @@ int main (int argc, char* argv[]) try
   TestSuite suite;
 
   // Generate grid for testing
-  Dune::YaspGrid<2> grid({1.0,1.0}, {10,10});
+  Dune::YaspGrid<2> grid({1.0,1.0}, {1,1});
   grid.globalRefine(2);
   auto gridView1 = grid.levelGridView(0);
   auto gridView2 = grid.leafGridView();
@@ -44,15 +45,15 @@ int main (int argc, char* argv[]) try
   using Range = FieldVector<double,1>;
   Dune::BlockVector<Range> coeff1, coeff2;
 
-  {
-    // Inner test function f is a polynomial of degree 2.
-    auto f = [](const auto& x){
-      Range y;
-      for (typename Range::size_type i = 0; i < y.size(); ++i)
-        y[i] = (x[i]+i)*x[i];
-      return y;
-    };
+  // Inner test function f is a polynomial of degree 2.
+  auto f = [](const auto& x){
+    Range y;
+    for (typename Range::size_type i = 0; i < y.size(); ++i)
+      y[i] = (x[i]+i)*x[i];
+    return y;
+  };
 
+  {
     // Interpolate f wrt basis.
     interpolate(basis1, coeff1, f);
     auto gf1 = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis1, coeff1);
@@ -60,7 +61,7 @@ int main (int argc, char* argv[]) try
     // Compute integral (order 4 is sufficient).
     double integral1 = integrateGridViewFunction(gridView1, gf1, 4);
 
-    HierarchicGridFunction hgf{gridView2, gf1};
+    RefinedGridFunction hgf{gridView2, gf1};
     interpolate(basis2, coeff2, hgf);
     auto gf2 = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis2, coeff2);
 
@@ -74,9 +75,34 @@ int main (int argc, char* argv[]) try
 
     // suite.check(
     //     checkGridViewFunction(gridView2, hgf, integral, 4),
-    //     "Check if HierarchicGridFunction has correct integral");
+    //     "Check if RefinedGridFunction has correct integral");
   }
 
+
+  {
+    // Interpolate f wrt basis.
+    interpolate(basis2, coeff2, f);
+    auto gf2 = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis2, coeff2);
+
+    // Compute integral (order 4 is sufficient).
+    double integral2 = integrateGridViewFunction(gridView2, gf2, 4);
+
+    CoarsenedGridFunction hgf{gridView1, gf2};
+    interpolate(basis1, coeff1, hgf);
+    auto gf1 = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis1, coeff1);
+
+    // Compute integral (order 4 is sufficient).
+    double integral1 = integrateGridViewFunction(gridView1, gf1, 4);
+
+    std::cout << "integral1 = " << integral1 << std::endl;
+    std::cout << "integral2 = " << integral2 << std::endl;
+    std::cout << "diff = " << std::abs(integral1 - integral2) << std::endl;
+    suite.check(std::abs(integral1 - integral2) < 4*std::numeric_limits<double>::epsilon());
+
+    // suite.check(
+    //     checkGridViewFunction(gridView2, hgf, integral, 4),
+    //     "Check if RefinedGridFunction has correct integral");
+  }
 
   return suite.exit();
 

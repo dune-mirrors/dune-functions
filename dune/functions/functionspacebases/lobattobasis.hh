@@ -39,15 +39,14 @@ class LobattoNode;
  * See \ref LobattoAdaptivePreBasis for an implementation with variable local polynomial degree.
  *
  * \tparam GV  The grid view that the FE basis is defined on
- * \tparam MI  Type to be used for multi-indices
  * \tparam R   Range type used for shape function values
  */
-template<typename GV, typename MI, typename R, typename Orders>
+template<typename GV, typename R, typename Orders>
 class LobattoPreBasis
 {
   static const int dim = GV::dimension;
 
-  template <typename,typename,typename,typename>
+  template <typename,typename,typename>
   friend class LobattoPreBasis;
 
 public:
@@ -60,11 +59,9 @@ public:
   //! Template mapping root tree path to type of created tree node
   using Node = LobattoNode<GV, R, Orders>;
 
-  //! Type used for global numbering of the basis vectors
-  using MultiIndex = MI;
-
-  //! Type used for prefixes handed to the size() method
-  using SizePrefix = Dune::ReservedVector<size_type, 1>;
+  static constexpr size_type maxMultiIndexSize = 1;
+  static constexpr size_type minMultiIndexSize = 1;
+  static constexpr size_type multiIndexBufferSize = 1;
 
   //! Constructor for a given grid view object and run-time order
   explicit LobattoPreBasis (const GridView& gv, unsigned int p = 1)
@@ -82,8 +79,8 @@ public:
       orders_[type] = Orders{type, orders};
   }
 
-  template <class MI_, class R_>
-  LobattoPreBasis (const LobattoPreBasis<GV,MI_,R_,Orders>& other)
+  template <class R_>
+  LobattoPreBasis (const LobattoPreBasis<GV,R_,Orders>& other)
     : gridView_(other.gridView_)
     , orders_(other.orders_)
   {}
@@ -156,7 +153,8 @@ public:
   }
 
   //! Return number of possible values for next position in multi index
-  size_type size (const SizePrefix prefix) const
+  template <class SizePrefix>
+  size_type size (const SizePrefix& prefix) const
   {
     assert(prefix.size() == 0 || prefix.size() == 1);
     return (prefix.size() == 0) ? size() : 0;
@@ -287,34 +285,6 @@ protected:
 
 
 namespace BasisFactory {
-namespace Imp {
-
-template <typename R, typename Orders>
-class LobattoPreBasisFactory
-{
-public:
-  static const std::size_t requiredMultiIndexSize = 1;
-
-  LobattoPreBasisFactory (const Orders& orders)
-    : orders_(orders)
-  {}
-
-  template <typename MultiIndex, typename GridView>
-  auto makePreBasis (const GridView& gridView) const
-  {
-    if constexpr(!std::is_integral_v<Orders>)
-      return LobattoPreBasis<GridView, MultiIndex, R, Orders>(gridView, orders_);
-    else {
-      using O = LobattoHomogeneousOrders<GridView::dimension>;
-      return LobattoPreBasis<GridView, MultiIndex, R, O>(gridView, orders_);
-    }
-  }
-
-  Orders orders_;
-};
-
-} // end namespace BasisFactory::Imp
-
 
 /**
  * \brief Create a pre-basis factory that can create a  Lobatto pre-basis
@@ -327,7 +297,11 @@ public:
 template<typename R=double>
 auto lobatto (unsigned int p = 1)
 {
-  return Imp::LobattoPreBasisFactory<R,unsigned int>{p};
+  return [&](const auto& gridView) {
+    using GridView = std::decay_t<decltype(gridView)>;
+    using Orders = LobattoHomogeneousOrders<GridView::dimension>;
+    return LobattoPreBasis<GridView, R, Orders>{gridView, p};
+  };
 }
 
 /**
@@ -341,13 +315,21 @@ auto lobatto (unsigned int p = 1)
 template<typename R=double, int dim>
 auto lobatto (const LobattoOrders<dim>& orders)
 {
-  return Imp::LobattoPreBasisFactory<R,LobattoOrders<dim>>{orders};
+  return [&](const auto& gridView) {
+    using GridView = std::decay_t<decltype(gridView)>;
+    using Orders = LobattoOrders<dim>;
+    return LobattoPreBasis<GridView, R, Orders>{gridView, orders};
+  };
 }
 
 template<typename R=double, int dim>
 auto lobatto (const LobattoHomogeneousOrders<dim>& orders)
 {
-  return Imp::LobattoPreBasisFactory<R,LobattoHomogeneousOrders<dim>>{orders};
+  return [&](const auto& gridView) {
+    using GridView = std::decay_t<decltype(gridView)>;
+    using Orders = LobattoHomogeneousOrders<dim>;
+    return LobattoPreBasis<GridView, R, Orders>{gridView, orders};
+  };
 }
 
 } // end namespace BasisFactory
@@ -365,7 +347,7 @@ auto lobatto (const LobattoHomogeneousOrders<dim>& orders)
  * \tparam Orders Type encoding the polynomial orders of the local shape functions
  */
 template<typename GV, typename R=double, typename Orders=LobattoOrders<GV::dimension>>
-using LobattoBasis = DefaultGlobalBasis<LobattoPreBasis<GV, FlatMultiIndex<std::size_t>, R, Orders> >;
+using LobattoBasis = DefaultGlobalBasis<LobattoPreBasis<GV, R, Orders> >;
 
 } // end namespace Functions
 } // end namespace Dune

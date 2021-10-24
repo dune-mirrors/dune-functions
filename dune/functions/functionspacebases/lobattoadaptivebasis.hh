@@ -143,10 +143,9 @@ private:
  *   2004, Chapman & Hall/CRC
  *
  * \tparam GV  The grid view that the FE basis is defined on
- * \tparam MI  Type to be used for multi-indices
  * \tparam R   Range type used for shape function values
  */
-template<typename GV, typename MI, typename R>
+template<typename GV, typename R>
 class LobattoAdaptivePreBasis
 {
   static const int dim = GV::dimension;
@@ -161,25 +160,25 @@ public:
   //! Template mapping root tree path to type of created tree node
   using Node = LobattoNode<GV, R, LobattoOrders<dim>>;
 
-  //! Type used for global numbering of the basis vectors
-  using MultiIndex = MI;
-
-  //! Type used for prefixes handed to the size() method
-  using SizePrefix = Dune::ReservedVector<size_type, 1>;
+  static constexpr size_type maxMultiIndexSize = 1;
+  static constexpr size_type minMultiIndexSize = 1;
+  static constexpr size_type multiIndexBufferSize = 1;
 
   //! Constructor for a given grid view object and order vectors
   /**
    * \param gv      GridView to associate the basis to
    * \param orders  For each GeometryType a vector associating each entity a polynomial degree
    **/
-  LobattoAdaptivePreBasis (const GridView& gv, const LobattoEntityOrders<GV>* orders)
+  LobattoAdaptivePreBasis (const GridView& gv, const LobattoEntityOrders<GV>& orders)
     : gridView_(gv)
-    , orders_(orders)
+    , orders_(&orders)
   {}
 
+  LobattoAdaptivePreBasis (const GridView& gv, LobattoEntityOrders<GV>&& orders) = delete;
+
   // converting constructor
-  template<typename MI_, typename R_>
-  LobattoAdaptivePreBasis (const LobattoAdaptivePreBasis<GV,MI_,R_>& other)
+  template<typename R_>
+  LobattoAdaptivePreBasis (const LobattoAdaptivePreBasis<GV,R_>& other)
     : gridView_(other.gridView_)
     , orders_(other.orders_)
   {}
@@ -302,7 +301,8 @@ public:
   }
 
   //! Return number of possible values for next position in multi index
-  size_type size (const SizePrefix prefix) const
+  template <class SizePrefix>
+  size_type size (const SizePrefix& prefix) const
   {
     assert(prefix.size() == 0 || prefix.size() == 1);
     return (prefix.size() == 0) ? size() : 0;
@@ -368,29 +368,6 @@ protected:
 
 
 namespace BasisFactory {
-namespace Imp {
-
-template<typename R, typename GV>
-class LobattoAdaptivePreBasisFactory
-{
-public:
-  static const std::size_t requiredMultiIndexSize = 1;
-
-  LobattoAdaptivePreBasisFactory (const LobattoEntityOrders<GV>* orders)
-    : orders_(orders)
-  {}
-
-  template<typename MultiIndex>
-  auto makePreBasis (const GV& gridView) const
-  {
-    return LobattoAdaptivePreBasis<GV, MultiIndex, R>(gridView, orders_);
-  }
-
-  const LobattoEntityOrders<GV>* orders_;
-};
-
-} // end namespace BasisFactory::Imp
-
 
 /**
  * \brief Create a pre-basis factory that can create an adaptive Lobatto pre-basis
@@ -400,10 +377,12 @@ public:
  * \tparam R       The range type of the local basis
  * \param  orders  Vector or polynomial orders for each codimension
  */
-template<typename R=double, typename GV>
-auto lobatto (const LobattoEntityOrders<GV>& orders)
+template<typename R=double, typename GridView>
+auto lobatto (const LobattoEntityOrders<GridView>& orders)
 {
-  return Imp::LobattoAdaptivePreBasisFactory<R,GV>{&orders};
+  return [&](const GridView& gridView) {
+    return LobattoAdaptivePreBasis<GridView, R>{gridView, orders};
+  };
 }
 
 template<typename R=double, typename GV>
@@ -424,7 +403,7 @@ void lobatto (const LobattoEntityOrders<GV>&& orders) = delete;
  */
 template<typename GV, typename R=double>
 using LobattoAdaptiveBasis
-  = DefaultGlobalBasis<LobattoAdaptivePreBasis<GV, FlatMultiIndex<std::size_t>, R> >;
+  = DefaultGlobalBasis<LobattoAdaptivePreBasis<GV, R> >;
 
 } // end namespace Functions
 } // end namespace Dune

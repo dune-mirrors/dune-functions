@@ -10,6 +10,7 @@ install(FILES
         defaultglobalbasis.hh
         defaultlocalview.hh
         defaultnodetorangemap.hh
+        flatindexprebasismixin.hh
         flatmultiindex.hh
         flatvectorview.hh
         hierarchicallagrangebasis.hh
@@ -18,7 +19,6 @@ install(FILES
         interpolate.hh
         lagrangebasis.hh
         lagrangedgbasis.hh
-        leafprebasis.hh
         nedelecbasis.hh
         periodicbasis.hh
         powerbasis.hh

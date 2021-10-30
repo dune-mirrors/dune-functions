@@ -23,7 +23,7 @@
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/leafprebasis.hh>
+#include <dune/functions/functionspacebases/flatindexprebasismixin.hh>
 
 namespace Dune {
 namespace Functions {
@@ -190,7 +190,7 @@ class RaviartThomasNode;
 
 template<typename GV, int k>
 class RaviartThomasPreBasis :
-  public LeafPreBasis< RaviartThomasPreBasis<GV,k> >
+  public FlatIndexPreBasisMixin< RaviartThomasPreBasis<GV,k> >
 {
   static const int dim = GV::dimension;
   using FiniteElementMap = typename Impl::RaviartThomasLocalFiniteElementMap<GV, dim, double, k>;

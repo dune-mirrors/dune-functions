@@ -12,7 +12,7 @@
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/leafprebasis.hh>
+#include <dune/functions/functionspacebases/flatindexprebasismixin.hh>
 
 
 namespace Dune {
@@ -53,7 +53,7 @@ class LagrangePreBasis;
  */
 template<typename GV, int k, typename R>
 class LagrangePreBasis :
-  public LeafPreBasis< LagrangePreBasis<GV,k,R> >
+  public FlatIndexPreBasisMixin< LagrangePreBasis<GV,k,R> >
 {
   static const int dim = GV::dimension;
   static const bool useDynamicOrder = (k<0);

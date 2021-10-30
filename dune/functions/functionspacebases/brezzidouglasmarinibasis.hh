@@ -19,7 +19,7 @@
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/leafprebasis.hh>
+#include <dune/functions/functionspacebases/flatindexprebasismixin.hh>
 
 namespace Dune {
 namespace Functions {
@@ -150,7 +150,7 @@ class BrezziDouglasMariniNode;
 
 template<typename GV, int k>
 class BrezziDouglasMariniPreBasis :
-  public LeafPreBasis< BrezziDouglasMariniPreBasis<GV,k> >
+  public FlatIndexPreBasisMixin< BrezziDouglasMariniPreBasis<GV,k> >
 {
   static const int dim = GV::dimension;
   using FiniteElementMap = typename Impl::BDMLocalFiniteElementMap<GV, dim, double, k>;

@@ -14,7 +14,7 @@
 
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
-#include <dune/functions/functionspacebases/leafprebasis.hh>
+#include <dune/functions/functionspacebases/flatindexprebasismixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 
 namespace Dune::Functions
@@ -134,7 +134,7 @@ class NedelecNode;
 
 template<typename GV, typename Range, std::size_t kind, int order>
 class NedelecPreBasis :
-  public LeafPreBasis< NedelecPreBasis<GV,Range,kind,order> >
+  public FlatIndexPreBasisMixin< NedelecPreBasis<GV,Range,kind,order> >
 {
   static const int dim = GV::dimension;
   static_assert(kind==1, "Only the Nedelec basis of the first kind is currently implemented!");

@@ -1,7 +1,7 @@
 // -*- tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
 // vi: set et ts=4 sw=2 sts=2:
-#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_LEAFBASIS_HH
-#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_LEAFBASIS_HH
+#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_FLATINDEXPREBASISMIXIN_HH
+#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_FLATINDEXPREBASISMIXIN_HH
 
 #include <cassert>
 #include <cstddef>
@@ -10,19 +10,19 @@ namespace Dune {
 namespace Functions {
 
 /**
- * \brief CRTP base class for leaf pre-bases
+ * \brief Mixin class for flat (leaf) pre-bases
  *
- * \tparam Derived  The actual implementation of a leaf pre-basis
+ * \tparam Derived  The actual implementation of a pre-basis
  */
 template<class Derived>
-class LeafPreBasis
+class FlatIndexPreBasisMixin
 {
 public:
   //! Type used for indices and size information
   using size_type = std::size_t;
 
-  static constexpr size_type maxMultiIndexSize = 1;
   static constexpr size_type minMultiIndexSize = 1;
+  static constexpr size_type maxMultiIndexSize = 1;
   static constexpr size_type multiIndexBufferSize = 1;
 
   //! Return number of possible values for next position in multi index
@@ -56,4 +56,4 @@ private:
 } // end namespace Dune
 
 
-#endif // DUNE_FUNCTIONS_FUNCTIONSPACEBASES_LEAFBASIS_HH
+#endif // DUNE_FUNCTIONS_FUNCTIONSPACEBASES_FLATINDEXPREBASISMIXIN_HH

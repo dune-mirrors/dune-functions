@@ -20,7 +20,7 @@
 #include <dune/geometry/type.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/leafprebasis.hh>
+#include <dune/functions/functionspacebases/flatindexprebasismixin.hh>
 
 namespace Dune
 {
@@ -497,7 +497,7 @@ class BSplineNode;
  */
 template<typename GV>
 class BSplinePreBasis :
-  public LeafPreBasis< BSplinePreBasis<GV> >
+  public FlatIndexPreBasisMixin< BSplinePreBasis<GV> >
 {
   static const int dim = GV::dimension;
 

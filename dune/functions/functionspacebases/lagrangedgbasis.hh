@@ -9,7 +9,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
-#include <dune/functions/functionspacebases/leafprebasis.hh>
+#include <dune/functions/functionspacebases/flatindexprebasismixin.hh>
 
 
 
@@ -35,7 +35,7 @@ using LagrangeDGNode = LagrangeNode<GV, k>;
 
 template<typename GV, int k>
 class LagrangeDGPreBasis :
-  public LeafPreBasis< LagrangeDGPreBasis<GV,k> >
+  public FlatIndexPreBasisMixin< LagrangeDGPreBasis<GV,k> >
 {
   static const int dim = GV::dimension;
 

@@ -13,7 +13,7 @@
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/leafprebasis.hh>
+#include <dune/functions/functionspacebases/flatindexprebasismixin.hh>
 
 
 namespace Dune {
@@ -50,7 +50,7 @@ class RannacherTurekPreBasis;
  */
 template<typename GV>
 class RannacherTurekPreBasis :
-  public LeafPreBasis< RannacherTurekPreBasis<GV> >
+  public FlatIndexPreBasisMixin< RannacherTurekPreBasis<GV> >
 {
   static const int dim = GV::dimension;
 

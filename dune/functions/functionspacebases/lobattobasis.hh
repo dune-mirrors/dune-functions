@@ -271,6 +271,15 @@ public:
         "LobattoLocalFiniteElement not implemented for GeometryType " << e.type());
     }
 
+    // Provide proper rescaling of the L2-based interpolation
+    if constexpr(SGT::v)
+      finiteElement_->bind(e);
+    else
+      Dune::Impl::visitIf([&](auto& lfe) { lfe.bind(e); }, finiteElement_->variant());
+
+    // std::cout << "element " << indexSet_->index(e) << std::endl;
+    // orientation.debug();
+
     this->setSize(finiteElement_->size());
   }
 
@@ -297,7 +306,7 @@ namespace BasisFactory {
 template<typename R=double>
 auto lobatto (unsigned int p = 1)
 {
-  return [&](const auto& gridView) {
+  return [p](const auto& gridView) {
     using GridView = std::decay_t<decltype(gridView)>;
     using Orders = LobattoHomogeneousOrders<GridView::dimension>;
     return LobattoPreBasis<GridView, R, Orders>{gridView, p};
@@ -315,7 +324,7 @@ auto lobatto (unsigned int p = 1)
 template<typename R=double, int dim>
 auto lobatto (const LobattoOrders<dim>& orders)
 {
-  return [&](const auto& gridView) {
+  return [orders](const auto& gridView) {
     using GridView = std::decay_t<decltype(gridView)>;
     using Orders = LobattoOrders<dim>;
     return LobattoPreBasis<GridView, R, Orders>{gridView, orders};
@@ -325,7 +334,7 @@ auto lobatto (const LobattoOrders<dim>& orders)
 template<typename R=double, int dim>
 auto lobatto (const LobattoHomogeneousOrders<dim>& orders)
 {
-  return [&](const auto& gridView) {
+  return [orders](const auto& gridView) {
     using GridView = std::decay_t<decltype(gridView)>;
     using Orders = LobattoHomogeneousOrders<dim>;
     return LobattoPreBasis<GridView, R, Orders>{gridView, orders};

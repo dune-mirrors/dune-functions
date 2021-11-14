@@ -72,6 +72,7 @@ void printGridView (GridView const& gridView)
 template<int dim>
 void test (Dune::TestSuite& testSuite)
 {
+  std::cout << "test<" << dim << ">()" << std::endl;
   using Grid = Dune::YaspGrid<dim>;
 
   Dune::FieldVector<double,dim> lower; lower = 0.0;
@@ -108,8 +109,9 @@ void test (Dune::TestSuite& testSuite)
 }
 
 
-void test2d (Dune::TestSuite& testSuite)
+void test_quad (Dune::TestSuite& testSuite)
 {
+  std::cout << "test_quad()" << std::endl;
   const int dim = 2;
   using Grid = Dune::UGGrid<dim>;
 
@@ -135,17 +137,47 @@ void test2d (Dune::TestSuite& testSuite)
   }
 }
 
+void test_tri (Dune::TestSuite& testSuite)
+{
+  std::cout << "test_tri()" << std::endl;
+  const int dim = 2;
+  using Grid = Dune::UGGrid<dim>;
+
+  Dune::GridFactory<Grid> factory;
+  factory.insertVertex({0.0,0.0});
+  factory.insertVertex({1.0,0.0});
+  factory.insertVertex({2.0,0.0});
+  factory.insertVertex({0.0,1.0});
+  factory.insertVertex({1.0,1.0});
+  factory.insertVertex({2.0,1.0});
+
+  factory.insertElement(GeometryTypes::simplex(2), {0u,1u,3u});
+  factory.insertElement(GeometryTypes::simplex(2), {1u,3u,4u});
+  factory.insertElement(GeometryTypes::simplex(2), {4u,2u,1u});
+  factory.insertElement(GeometryTypes::simplex(2), {4u,2u,5u});
+
+  auto gridPtr = factory.createGrid();
+  auto gridView = gridPtr->leafGridView();
+
+  using namespace Dune::Functions::BasisFactory;
+
+  for (unsigned int p = 3; p < 4; ++p) {
+    auto basis = makeBasis(gridView, lobatto(p));
+    testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
+  }
+}
 
 int main (int argc, char* argv[])
 {
   Dune::MPIHelper::instance(argc, argv);
 
   Dune::TestSuite testSuite;
-  test<1>(testSuite);
-  test<2>(testSuite);
-  test<3>(testSuite);
+  // test<1>(testSuite);
+  // test<2>(testSuite);
+  // test<3>(testSuite);
 
-  test2d(testSuite);
+  // test_quad(testSuite);
+  test_tri(testSuite);
 
   return testSuite.exit();
 }

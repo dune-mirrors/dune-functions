@@ -23,7 +23,7 @@ namespace Functions {
 
 namespace ImplDoc {
 
-template<typename B, typename V, typename NTRE>
+template<class B, class V, class NTRE>
 class DiscreteGlobalBasisFunctionBase
 {
 public:
@@ -97,7 +97,7 @@ public:
      * local DOFs. Those are copied only if the `other`
      * local-function is bound to an element.
      **/
-    LocalFunctionBase& operator=(const LocalFunctionBase& other)
+    LocalFunctionBase& operator= (const LocalFunctionBase& other)
     {
       data_ = other.data_;
       localView_ = other.localView_;
@@ -181,8 +181,8 @@ public:
   };
 
 protected:
-  DiscreteGlobalBasisFunctionBase(const std::shared_ptr<const Data>& data)
-    : data_(data)
+  DiscreteGlobalBasisFunctionBase(std::shared_ptr<const Data> data)
+    : data_(std::move(data))
   {
     /* Nothing. */
   }
@@ -221,7 +221,7 @@ protected:
 
 
 
-template<typename DGBF>
+template<class DGBF>
 class DiscreteGlobalBasisFunctionDerivative;
 
 /**
@@ -261,9 +261,9 @@ class DiscreteGlobalBasisFunctionDerivative;
  * \tparam NTRE Type of node-to-range-entry-map that associates each leaf node in the local ansatz subtree with an entry in the range type
  * \tparam R Range type of this function
  */
-template<typename B, typename V,
-  typename NTRE = HierarchicNodeToRangeMap,
-  typename R = typename V::value_type>
+template<class B, class V,
+  class NTRE = HierarchicNodeToRangeMap,
+  class R = typename V::value_type>
 class DiscreteGlobalBasisFunction
   : public ImplDoc::DiscreteGlobalBasisFunctionBase<B, V, NTRE>
 {
@@ -319,8 +319,9 @@ public:
      * you have to call bind() again in order to make operator()
      * usable.
      */
-    Range operator()(const Domain& x) const
+    Range operator() (const Domain& x) const
     {
+      assert(bound());
       Range y;
       istlVectorBackend(y) = 0;
 
@@ -355,7 +356,8 @@ public:
     }
 
     //! Local function of the derivative
-    friend typename DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>::LocalFunction derivative(const LocalFunction& lf)
+    friend typename DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>::LocalFunction
+    derivative(const LocalFunction& lf)
     {
       auto dlf = localFunction(DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>(lf.data_));
       if (lf.bound())
@@ -367,18 +369,51 @@ public:
     mutable PerNodeEvaluationBuffer evaluationBuffer_;
   };
 
-  //! Create a grid-function, by wrapping the arguments in `std::shared_ptr`.
-  template<class B_T, class V_T, class NTRE_T>
-  DiscreteGlobalBasisFunction(B_T && basis, V_T && coefficients, NTRE_T&& nodeToRangeEntry)
-    : Base(std::make_shared<Data>(Data{{basis.gridView()}, wrap_or_move(std::forward<B_T>(basis)), wrap_or_move(std::forward<V_T>(coefficients)), wrap_or_move(std::forward<NTRE_T>(nodeToRangeEntry))}))
+  //! Create a grid-function.
+  DiscreteGlobalBasisFunction(std::shared_ptr<const Basis> basis,
+                              std::shared_ptr<const V> coefficients,
+                              std::shared_ptr<const NodeToRangeEntry> nodeToRangeEntry)
+    : Base{std::make_shared<Data>(EntitySet{basis->gridView()},
+        std::move(basis),
+        std::move(coefficients),
+        std::move(nodeToRangeEntry))}
   {}
+
+#ifndef DOXYGEN
+  template<class B_, class V_, class NTRE_>
+    std::enable_if_t<std::is_same_v<B, std::decay_t<B_>>, int> = 0,
+    std::enable_if_t<std::is_same_v<V, std::decay_t<V_>>, int> = 0,
+    std::enable_if_t<std::is_same_v<NodeToRangeEntry, std::decay_t<NTRE_>>, int> = 0>
+  DiscreteGlobalBasisFunction(B_&& basis, V_&& coefficients, NTRE_&& nodeToRangeEntry) :
+    DiscreteGlobalBasisFunction{
+      wrap_or_move(std::forward<B_>(basis)),
+      wrap_or_move(std::forward<V_>(coefficients)),
+      wrap_or_move(std::forward<NTRE_>(nodeToRangeEntry))}
+   {}
+#else
+  //! Create a grid-function, by wrapping the arguments in `std::shared_ptr`.
+  DiscreteGlobalBasisFunction(Basis const&, Vector const&, NodeToRangeEntry const&);
 
   //! Create a grid-function, by moving the arguments in `std::shared_ptr`.
-  DiscreteGlobalBasisFunction(std::shared_ptr<const Basis> basis, std::shared_ptr<const V> coefficients, std::shared_ptr<const typename Base::NodeToRangeEntry> nodeToRangeEntry)
-    : Base(std::make_shared<Data>(Data{{basis->gridView()}, basis, coefficients, nodeToRangeEntry}))
-  {}
+  DiscreteGlobalBasisFunction(Basis&&, Vector&&, NodeToRangeEntry&&);
+#endif
 
-  //! Not implemented.
+  const Basis& basis() const
+  {
+    return *basis_;
+  }
+
+  const V& dofs() const
+  {
+    return *coefficients_;
+  }
+
+  const NodeToRangeEntry& nodeToRangeEntry() const
+  {
+    return *nodeToRangeEntry_;
+  }
+
+  // TODO: Implement this using hierarchic search
   Range operator() (const Domain& x) const
   {
     // TODO: Implement this using hierarchic search
@@ -386,7 +421,8 @@ public:
   }
 
   //! Derivative of the `DiscreteGlobalBasisFunction`
-  friend DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction> derivative(const DiscreteGlobalBasisFunction& f)
+  friend DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>
+  derivative(const DiscreteGlobalBasisFunction& f)
   {
     return DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>(f.data_);
   }
@@ -428,7 +464,7 @@ public:
  *
  * \relatesalso DiscreteGlobalBasisFunction
  **/
-template<typename R, typename B, typename V>
+template<class R, class B, class V>
 auto makeDiscreteGlobalBasisFunction(B&& basis, V&& vector)
 {
   using Basis = std::decay_t<B>;
@@ -466,7 +502,7 @@ auto makeDiscreteGlobalBasisFunction(B&& basis, V&& vector)
  *
  * \tparam DGBF instance of the `DiscreteGlobalBasisFunction` this is a derivative of
  */
-template<typename DGBF>
+template<class DGBF>
 class DiscreteGlobalBasisFunctionDerivative
   : public ImplDoc::DiscreteGlobalBasisFunctionBase<typename DGBF::Basis, typename DGBF::Vector, typename DGBF::NodeToRangeEntry>
 {
@@ -554,7 +590,7 @@ public:
      * coordinates even when the point is given in reference coordinates on
      * an element.
      */
-    Range operator()(const Domain& x) const
+    Range operator() (const Domain& x) const
     {
       Range y;
       istlVectorBackend(y) = 0;
@@ -599,7 +635,8 @@ public:
     }
 
     //! Not implemented
-    friend typename Traits::LocalFunctionTraits::DerivativeInterface derivative(const LocalFunction&)
+    friend typename Traits::LocalFunctionTraits::DerivativeInterface
+    derivative(const LocalFunction&)
     {
       DUNE_THROW(NotImplemented, "derivative of derivative is not implemented");
     }
@@ -615,20 +652,21 @@ public:
    * Please call `derivative(discreteGlobalBasisFunction)` to create an instance
    * of this class.
    */
-  DiscreteGlobalBasisFunctionDerivative(const std::shared_ptr<const Data>& data)
-    : Base(data)
+  DiscreteGlobalBasisFunctionDerivative(std::shared_ptr<const Data> data)
+    : Base{std::move(data)}
   {
     /* Nothing. */
   }
 
   //! Not implemented.
-  Range operator()(const Domain& x) const
+  Range operator() (const Domain& x) const
   {
     // TODO: Implement this using hierarchic search
     DUNE_THROW(NotImplemented,"not implemented");
   }
 
-  friend typename Traits::DerivativeInterface derivative(const DiscreteGlobalBasisFunctionDerivative& f)
+  friend typename Traits::DerivativeInterface
+  derivative(const DiscreteGlobalBasisFunctionDerivative& f)
   {
     DUNE_THROW(NotImplemented, "derivative of derivative is not implemented");
   }

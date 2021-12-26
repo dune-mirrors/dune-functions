@@ -136,6 +136,7 @@ private:
      **/
     const Element& localContext() const
     {
+      static_assert(sizeof...(IF) > 0);
       return std::get<0>(innerLocalFunctions_).localContext();
     }
 
@@ -172,7 +173,9 @@ public:
   //! Evaluation of the composed grid function in coordinates `x`
   Range operator()(const Domain& x) const
   {
-    DUNE_THROW(NotImplemented,"not implemented");
+    return std::apply([&](const auto&... innerFunction) {
+      return outerFunction_(innerFunction(x)...);
+    }, innerFunctions_);
   }
 
   //! Not implemented.
@@ -204,6 +207,7 @@ public:
    **/
   const EntitySet& entitySet() const
   {
+    static_assert(sizeof...(IF) > 0);
     return resolveRef(std::get<0>(innerFunctions_)).entitySet();
   }
 
@@ -220,6 +224,10 @@ protected:
   InnerFunctions innerFunctions_;
 };
 
+// deduction guide
+template<class OF, class... IF>
+ComposedGridFunction(const OF&, const IF&...)
+  -> ComposedGridFunction<OF, IF...>;
 
 
 /**
@@ -248,7 +256,7 @@ template<class OF, class... IF>
 auto makeComposedGridFunction(OF&& outerFunction, IF&&... innerFunction)
 {
   using ComposedGridFunctionType = ComposedGridFunction<std::decay_t<OF>, std::decay_t<IF>...>;
-  return ComposedGridFunctionType(std::forward<OF>(outerFunction), std::forward<IF>(innerFunction)...);
+  return ComposedGridFunctionType{std::forward<OF>(outerFunction), std::forward<IF>(innerFunction)...};
 }
 
 

@@ -21,22 +21,19 @@ namespace Functions {
 
 namespace Imp {
 
-template<class Signature, class GV, class FLocal, template<class> class DerivativeTraits=DefaultDerivativeTraits>
+template<class Signature, class LocalContext, class FLocal, template<class> class DerivativeTraits=DefaultDerivativeTraits>
 class LocalAnalyticGridViewFunction;
 
-template<class Range, class LocalDomain, class GV, class F, template<class> class DerivativeTraits>
-class LocalAnalyticGridViewFunction<Range(LocalDomain), GV, F, DerivativeTraits>
+template<class Range, class LocalDomain, class LC, class F, template<class> class DerivativeTraits>
+class LocalAnalyticGridViewFunction<Range(LocalDomain), LC, F, DerivativeTraits>
 {
 public:
   using Signature = Range(LocalDomain);
   using RawSignature = typename SignatureTraits<Signature>::RawSignature;
   using DerivativeSignature = typename DerivativeTraits<RawSignature>::Range(LocalDomain);
 
-  using GridView = GV;
-  using EntitySet = GridViewEntitySet<GridView, 0>;
-  using Element = typename EntitySet::Element;
-//  using Geometry = typename Element::Geometry;
-  using Geometry = typename std::decay<typename Element::Geometry>::type;
+  using Element = LC;
+  using Geometry = typename Element::Geometry;
 
   // Use the indirection via derivativeIfImplemented to also support
   // function types F that do not implement derivative. In this case
@@ -44,12 +41,12 @@ public:
   // the derivative type
   using DerivativeDummy = DifferentiableFunction<DerivativeSignature>;
   using GlobalRawDerivative = decltype(Imp::derivativeIfImplemented<DerivativeDummy, F>(std::declval<F>()));
-  using LocalDerivative = LocalAnalyticGridViewFunction<DerivativeSignature, GridView, GlobalRawDerivative, DerivativeTraits>;
+  using LocalDerivative = LocalAnalyticGridViewFunction<DerivativeSignature, LC, GlobalRawDerivative, DerivativeTraits>;
 
   //! Create the local-function by storing the mapping `f` by value
-  template<class FT, disableCopyMove<LocalAnalyticGridViewFunction, FT> = 0>
+  template<class F_, disableCopyMove<LocalAnalyticGridViewFunction, F_> = 0>
   LocalAnalyticGridViewFunction(FT&& f) :
-    f_(std::forward<FT>(f))
+    f_(std::forward<F_>(f))
   {}
 
   //! Constructor that copies the state of the passed element and geometry
@@ -134,7 +131,7 @@ private:
 
 
 
-template<class Signature, class GV, class F, template<class> class DerivativeTraits=DefaultDerivativeTraits>
+template<class Signature, class GridView, class F, template<class> class DerivativeTraits=DefaultDerivativeTraits>
 class AnalyticGridViewFunction;
 
 
@@ -154,7 +151,6 @@ public:
   using GridView = GV;
   using EntitySet = GridViewEntitySet<GridView, 0>;
   using Element = typename EntitySet::Element;
-  using Geometry = typename Element::Geometry;
 
   // Use the indirection via derivativeIfImplemented to also support
   // function types F that do not implement derivative. In this case
@@ -165,12 +161,12 @@ public:
   using Derivative = AnalyticGridViewFunction<DerivativeSignature, GridView, GlobalRawDerivative, DerivativeTraits>;
 
   using LocalDomain = typename EntitySet::LocalCoordinate;
-  using LocalFunction = typename Imp::LocalAnalyticGridViewFunction<Range(LocalDomain), GridView, F, LocalDerivativeTraits<EntitySet, DerivativeTraits>::template Traits>;
+  using LocalFunction = typename Imp::LocalAnalyticGridViewFunction<Range(LocalDomain), Element, F, LocalDerivativeTraits<EntitySet, DerivativeTraits>::template Traits>;
 
   //! Create the grid-function by wrapping a function `f` and create a GridViewEntitySet.
-  template<class FT>
-  AnalyticGridViewFunction(FT&& f, const GridView& gridView) :
-    f_(std::forward<FT>(f)),
+  template<class F_>
+  AnalyticGridViewFunction(F_&& f, const GridView& gridView) :
+    f_(std::forward<F_>(f)),
     entitySet_(gridView)
   {}
 
@@ -203,6 +199,13 @@ private:
   EntitySet entitySet_;
 };
 
+// deduction guide
+template<class F, class GridView,
+  class Domain = typename GridView::template Codim<0>::Geometry::GlobalCoordinate,
+  class Range = std::invoke_result_t<F(Domain)> >
+AnalyticGridViewFunction(const F&, const GridView&)
+  -> AnalyticGridViewFunction<Range(Domain), GridView, F>
+
 
 
 /**
@@ -222,18 +225,13 @@ private:
  * \relatesalso AnalyticGridViewFunction
  */
 template<class F, class GridView>
-AnalyticGridViewFunction<
-  typename std::invoke_result<F, typename GridView::template Codim<0>::Geometry::GlobalCoordinate>::type  // Range
-  (typename GridView::template Codim<0>::Geometry::GlobalCoordinate),                                 // Domain
-  GridView,
-  typename std::decay<F>::type >                                                                      // Raw type of F (without & or &&)
-  makeAnalyticGridViewFunction(F&& f, const GridView& gridView)
+auto makeAnalyticGridViewFunction(F&& f, const GridView& gridView)
 {
   using Domain = typename GridView::template Codim<0>::Geometry::GlobalCoordinate;
-  using Range = typename std::invoke_result<F, Domain>::type;
-  using FRaw = typename std::decay<F>::type;
+  using Range = std::invoke_result_t<F(Domain)>;
+  using FRaw = std::decay_t<F>;
 
-  return AnalyticGridViewFunction<Range(Domain), GridView, FRaw>(std::forward<F>(f), gridView);
+  return AnalyticGridViewFunction<Range(Domain), GridView, FRaw>{std::forward<F>(f), gridView};
 }
 
 

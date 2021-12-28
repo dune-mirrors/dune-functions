@@ -17,7 +17,7 @@ namespace Functions {
 
 
 
-template<class Signature, class GridView, template<class> class DerivativeTraits=DefaultDerivativeTraits, size_t bufferSize=56>
+template<class Signature, class GridView, template<class> class DerivativeTraits=DefaultDerivativeTraits, std::size_t bufferSize=56>
 class GridViewFunction
 {};
 
@@ -37,7 +37,7 @@ class GridViewFunction
  * \tparam Domain The domain type used for function arguments
  * \tparam Range The range type used for function values
  */
-template<class Range, class Domain, class GV, template<class> class DerivativeTraits, size_t bufferSize>
+template<class Range, class Domain, class GV, template<class> class DerivativeTraits, std::size_t bufferSize>
 class GridViewFunction<Range(Domain), GV, DerivativeTraits, bufferSize> :
   public GridFunction<Range(Domain), GridViewEntitySet<GV, 0>, DerivativeTraits, bufferSize>
 {

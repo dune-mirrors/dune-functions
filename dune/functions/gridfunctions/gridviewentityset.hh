@@ -3,11 +3,10 @@
 #ifndef DUNE_FUNCTIONS_GRIDFUNCTIONS_GRIDVIEWENTITYSET_HH
 #define DUNE_FUNCTIONS_GRIDFUNCTIONS_GRIDVIEWENTITYSET_HH
 
-#include <memory>
+#include <cstddef>
 
 
 namespace Dune {
-
 namespace Functions {
 
 
@@ -23,25 +22,25 @@ class GridViewEntitySet
 {
 public:
 
-  typedef GV GridView;
+  using GridView = GV;
   enum {
     codim = cd
   };
 
   //! Type of Elements contained in this EntitySet
-  typedef typename GridView::template Codim<codim>::Entity Element;
+  using Element = typename GridView::template Codim<codim>::Entity;
 
   //! Type of local coordinates with respect to the Element
-  typedef typename Element::Geometry::LocalCoordinate LocalCoordinate;
-  typedef typename Element::Geometry::GlobalCoordinate GlobalCoordinate;
+  using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
+  using GlobalCoordinate = typename Element::Geometry::GlobalCoordinate;
 
-  typedef Element value_type;
+  using value_type = Element;
 
   //! A forward iterator
-  typedef typename GridView::template Codim<codim>::Iterator const_iterator;
+  using const_iterator = typename GridView::template Codim<codim>::Iterator;
 
   //! Same as const_iterator
-  typedef const_iterator iterator;
+  using iterator = const_iterator;
 
   //! Construct GridViewEntitySet for a GridView.
   GridViewEntitySet(const GridView& gv) :
@@ -55,7 +54,7 @@ public:
   }
 
   //! Return number of Elements visited by an iterator.
-  size_t size() const
+  std::size_t size() const
   {
     return gv_.size(codim);
   }

@@ -17,36 +17,6 @@
 
 namespace Dune::Functions {
 
-namespace Impl {
-
-// Compute closest face to point
-template<class ReferenceElement, class Coordinate>
-auto closestFaceIndex(const ReferenceElement& re, const Coordinate& x)
-{
-  auto closestFaceIndex = decltype(re.subEntity(0,1,0,1)){};
-  double closestFaceDistance = std::numeric_limits<double>::max();
-  for(auto&& faceIndex : Dune::range(re.size(1)))
-  {
-    // For a face unit outer normal consider the orthogonal projection
-    // Px = x + <c-x,n>*n into the face. Then the distance to the face
-    // is given by |x-Px| = |<c-x,n>||n| = <c-x,n>.
-    auto normal = re.integrationOuterNormal(faceIndex);
-    normal /= normal.two_norm();
-    auto c = re.position(faceIndex,1);
-    c -= x;
-    auto faceDistance = (c*normal);
-    if (faceDistance<closestFaceDistance)
-    {
-      closestFaceDistance = faceDistance;
-      closestFaceIndex = faceIndex;
-    }
-  }
-  return closestFaceIndex;
-}
-
-} // end namespace Impl
-
-
 
 
 /**
@@ -67,7 +37,6 @@ class FaceNormalGridFunction
 public:
   using GridView = GV;
   using EntitySet = GridViewEntitySet<GridView, 0>;
-  using Element = typename EntitySet::Element;
 
   using LocalDomain = typename EntitySet::LocalCoordinate;
   using Domain = typename EntitySet::GlobalCoordinate;
@@ -79,9 +48,12 @@ private:
 
   class LocalFunction
   {
+    using Element = typename EntitySet::Element;
     using Geometry = typename Element::Geometry;
-    static const int dimension = GV::dimension;
+
   public:
+    using Domain = typename FaceNormalGridFunction::LocalDomain;
+    using Range = typename FaceNormalGridFunction::Range;
 
     /**
      * \brief Bind the local-function to the passed element.
@@ -125,7 +97,7 @@ private:
     {
       auto&& re = Dune::referenceElement(*geometry_);
       // Compute reference normal of closest face to given point
-      auto face = Impl::closestFaceIndex(re, x);
+      auto face = closestFaceIndex(re, x);
       auto localNormal = re.integrationOuterNormal(face);
 
       // Transform reference normal into global unit outer normal using
@@ -149,8 +121,34 @@ private:
     }
 
   private:
-    std::optional<Geometry> geometry_;
+    // Compute closest face to point
+    template<class ReferenceElement>
+    auto closestFaceIndex(const ReferenceElement& re, const LocalDomain& x) const
+    {
+      auto closestFaceIndex = re.subEntity(0,1,0,1);
+      double closestFaceDistance = std::numeric_limits<double>::max();
+      for(auto&& faceIndex : Dune::range(re.size(1)))
+      {
+        // For a face unit outer normal consider the orthogonal projection
+        // Px = x + <c-x,n>*n into the face. Then the distance to the face
+        // is given by |x-Px| = |<c-x,n>||n| = <c-x,n>.
+        auto normal = re.integrationOuterNormal(faceIndex);
+        normal /= normal.two_norm();
+        auto c = re.position(faceIndex,1);
+        c -= x;
+        auto faceDistance = (c*normal);
+        if (faceDistance<closestFaceDistance)
+        {
+          closestFaceDistance = faceDistance;
+          closestFaceIndex = faceIndex;
+        }
+      }
+      return closestFaceIndex;
+    }
+
+  private:
     Element element_;
+    std::optional<Geometry> geometry_;
   };
 
 public:

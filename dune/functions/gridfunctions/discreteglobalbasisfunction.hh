@@ -53,7 +53,7 @@ protected:
   {
     EntitySet entitySet;
     std::shared_ptr<const Basis> basis;
-    std::shared_ptr<const Vector> coefficients;
+    std::shared_ptr<const Vector> dofs;
     std::shared_ptr<const NodeToRangeEntry> nodeToRangeEntry;
   };
 
@@ -128,13 +128,13 @@ public:
       // subtract an offset from localIndex(i) on each cache
       // access in operator().
       localDoFs_.resize(localView_.size());
-      const auto& dofs = *data_->coefficients;
+      const auto& dofs = *data_->dofs;
       for (size_type i = 0; i < localView_.tree().size(); ++i)
       {
         // For a subspace basis the index-within-tree i
         // is not the same as the localIndex within the
         // full local view.
-        size_t localIndex = localView_.tree().localIndex(i);
+        std::size_t localIndex = localView_.tree().localIndex(i);
         localDoFs_[localIndex] = dofs[localView_.index(localIndex)];
       }
     }
@@ -198,7 +198,7 @@ public:
   //! Return the coefficients of this discrete function by reference.
   const Vector& dofs() const
   {
-    return *data_->coefficients;
+    return *data_->dofs;
   }
 
   //! Return the stored node-to-range map.
@@ -371,49 +371,24 @@ public:
 
   //! Create a grid-function.
   DiscreteGlobalBasisFunction(std::shared_ptr<const Basis> basis,
-                              std::shared_ptr<const V> coefficients,
+                              std::shared_ptr<const V> dofs,
                               std::shared_ptr<const NodeToRangeEntry> nodeToRangeEntry)
     : Base{std::make_shared<Data>(EntitySet{basis->gridView()},
         std::move(basis),
-        std::move(coefficients),
+        std::move(dofs),
         std::move(nodeToRangeEntry))}
   {}
 
-#ifndef DOXYGEN
+  //! Create a grid-function, by wrapping all arguments into shared_ptr.
   template<class B_, class V_, class NTRE_>
-    std::enable_if_t<std::is_same_v<B, std::decay_t<B_>>, int> = 0,
-    std::enable_if_t<std::is_same_v<V, std::decay_t<V_>>, int> = 0,
-    std::enable_if_t<std::is_same_v<NodeToRangeEntry, std::decay_t<NTRE_>>, int> = 0>
-  DiscreteGlobalBasisFunction(B_&& basis, V_&& coefficients, NTRE_&& nodeToRangeEntry) :
-    DiscreteGlobalBasisFunction{
-      wrap_or_move(std::forward<B_>(basis)),
-      wrap_or_move(std::forward<V_>(coefficients)),
-      wrap_or_move(std::forward<NTRE_>(nodeToRangeEntry))}
-   {}
-#else
-  //! Create a grid-function, by wrapping the arguments in `std::shared_ptr`.
-  DiscreteGlobalBasisFunction(Basis const&, Vector const&, NodeToRangeEntry const&);
+  DiscreteGlobalBasisFunction(B_&& basis, V_&& dofs, NTRE_&& nodeToRangeEntry)
+    : DiscreteGlobalBasisFunction{
+        wrap_or_move(std::forward<B_>(basis)),
+        wrap_or_move(std::forward<V_>(dofs)),
+        wrap_or_move(std::forward<NTRE_>(nodeToRangeEntry))}
+  {}
 
-  //! Create a grid-function, by moving the arguments in `std::shared_ptr`.
-  DiscreteGlobalBasisFunction(Basis&&, Vector&&, NodeToRangeEntry&&);
-#endif
-
-  const Basis& basis() const
-  {
-    return *basis_;
-  }
-
-  const V& dofs() const
-  {
-    return *coefficients_;
-  }
-
-  const NodeToRangeEntry& nodeToRangeEntry() const
-  {
-    return *nodeToRangeEntry_;
-  }
-
-  // TODO: Implement this using hierarchic search
+  //! Not implemented.
   Range operator() (const Domain& x) const
   {
     // TODO: Implement this using hierarchic search
@@ -460,12 +435,12 @@ public:
  *
  * \param basis  The global basis or subspace basis associated with this
  *               grid-function
- * \param vector The coefficient vector to use in combination with the `basis`.
+ * \param dofs   The coefficient vector to use in combination with the `basis`.
  *
  * \relatesalso DiscreteGlobalBasisFunction
  **/
 template<class R, class B, class V>
-auto makeDiscreteGlobalBasisFunction(B&& basis, V&& vector)
+auto makeDiscreteGlobalBasisFunction(B&& basis, V&& dofs)
 {
   using Basis = std::decay_t<B>;
   using NTREM = HierarchicNodeToRangeMap;
@@ -480,10 +455,10 @@ auto makeDiscreteGlobalBasisFunction(B&& basis, V&& vector)
     }
   };
 
-  using Vector = std::decay_t<decltype(toConstVectorBackend(std::forward<V>(vector)))>;
+  using Vector = std::decay_t<decltype(toConstVectorBackend(std::forward<V>(dofs)))>;
   return DiscreteGlobalBasisFunction<Basis, Vector, NTREM, R>(
       std::forward<B>(basis),
-      toConstVectorBackend(std::forward<V>(vector)),
+      toConstVectorBackend(std::forward<V>(dofs)),
       HierarchicNodeToRangeMap());
 }
 
@@ -609,7 +584,7 @@ public:
         // processing the coeffDim linear combinations independently
         // and storing them as entries of an array.
         using RefJacobian = LocalBasisRange< std::decay_t<decltype(node)> >;
-        static constexpr auto coeffDim = decltype(flatVectorView(this->localDoFs_[node.localIndex(0)]).size())::value;
+        constexpr auto coeffDim = decltype(flatVectorView(this->localDoFs_[node.localIndex(0)]).size())::value;
         auto refJacobians = std::array<RefJacobian, coeffDim>{};
         istlVectorBackend(refJacobians) = 0;
         for (size_type i = 0; i < localBasis.size(); ++i)

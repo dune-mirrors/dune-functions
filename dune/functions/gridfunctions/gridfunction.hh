@@ -27,7 +27,7 @@ namespace Functions {
  * The actual implementation is only given if Signature is an type
  * describing a function signature as Range(Domain).
  */
-template<class Signature, class EntitySet, template<class> class DerivativeTraits=DefaultDerivativeTraits, size_t bufferSize=56>
+template<class Signature, class EntitySet, template<class> class DerivativeTraits=DefaultDerivativeTraits, std::size_t bufferSize=56>
 class GridFunction
 {};
 
@@ -37,12 +37,12 @@ namespace Imp
 {
 
   //! Traits class providing type information for DifferentiableFunction
-  template<class S, class ES, template<class> class DerivativeTraits, size_t bufferSize>
+  template<class S, class ES, template<class> class DerivativeTraits, std::size_t bufferSize>
   struct GridFunctionTraits :
     DifferentiableFunctionTraits<S, DerivativeTraits, bufferSize>
   {
   protected:
-    using Base=DifferentiableFunctionTraits<S, DerivativeTraits, bufferSize>;
+    using Base = DifferentiableFunctionTraits<S, DerivativeTraits, bufferSize>;
 
   public:
     //! EntitySet the GridFunction lives on
@@ -92,7 +92,7 @@ namespace Imp
  *
  * This models the \ref Concept::GridFunction<Range(Domain), EntitySet, DerivativeTraits> concept.
  */
-template<class Range, class Domain, class ES, template<class> class DerivativeTraits, size_t bufferSize>
+template<class Range, class Domain, class ES, template<class> class DerivativeTraits, std::size_t bufferSize>
 class GridFunction<Range(Domain), ES, DerivativeTraits, bufferSize> :
   public TypeErasureBase<
     typename Imp::GridFunctionTraits<Range(Domain), ES, DerivativeTraits, bufferSize>::Concept,
@@ -135,7 +135,7 @@ public:
    *
    * Evaluate the wrapped function in global coordinates `x`.
    */
-  Range operator() (const Domain& x) const
+  Range operator()(const Domain& x) const
   {
     return this->asInterface().operator()(x);
   }

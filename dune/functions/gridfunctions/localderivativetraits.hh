@@ -32,7 +32,7 @@ struct LocalDerivativeTraits
   template<class Signature>
   struct Traits
   {
-    typedef InvalidRange Range;
+    using Range = InvalidRange;
   };
 
   template<class R>

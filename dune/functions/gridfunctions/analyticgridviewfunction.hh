@@ -21,7 +21,8 @@ namespace Functions {
 
 namespace Imp {
 
-template<class Signature, class LocalContext, class FLocal, template<class> class DerivativeTraits=DefaultDerivativeTraits>
+template<class Signature, class LocalContext, class FLocal,
+         template<class> class DerivativeTraits=DefaultDerivativeTraits>
 class LocalAnalyticGridViewFunction;
 
 template<class Range, class LocalDomain, class LC, class F, template<class> class DerivativeTraits>
@@ -45,14 +46,14 @@ public:
 
   //! Create the local-function by storing the mapping `f` by value
   template<class F_, disableCopyMove<LocalAnalyticGridViewFunction, F_> = 0>
-  LocalAnalyticGridViewFunction(FT&& f) :
+  LocalAnalyticGridViewFunction(F_&& f) :
     f_(std::forward<F_>(f))
   {}
 
   //! Constructor that copies the state of the passed element and geometry
-  template<class FT>
-  LocalAnalyticGridViewFunction(FT&& f, const Element& element, const std::optional<Geometry>& geometry) :
-    f_(std::forward<FT>(f)),
+  template<class F_>
+  LocalAnalyticGridViewFunction(F_&& f, const Element& element, const std::optional<Geometry>& geometry) :
+    f_(std::forward<F_>(f)),
     element_(element),
     geometry_(geometry)
   {}
@@ -131,12 +132,19 @@ private:
 
 
 
-template<class Signature, class GridView, class F, template<class> class DerivativeTraits=DefaultDerivativeTraits>
+template<class Signature, class GridView, class F,
+         template<class> class DerivativeTraits=DefaultDerivativeTraits>
 class AnalyticGridViewFunction;
 
 
 /**
  * \brief Class wrapping any differentiable function as grid function.
+ *
+ * This grid function is a mapping `gf: Domain -> Range` with signature `Range(Domain)`.
+ * It is defined on a gridview `GV` and wraps a callable `F: Domain -> Range`. If
+ * the function `F` is differentiable, the grid function can fulfill the differentiable
+ * grid function concept, by specifying the corresponding derivative range types in
+ * the `DerivativeTraits` template parameter.
  *
  * \ingroup FunctionImplementations
  */
@@ -202,9 +210,9 @@ private:
 // deduction guide
 template<class F, class GridView,
   class Domain = typename GridView::template Codim<0>::Geometry::GlobalCoordinate,
-  class Range = std::invoke_result_t<F(Domain)> >
+  class Range = std::invoke_result_t<F,Domain> >
 AnalyticGridViewFunction(const F&, const GridView&)
-  -> AnalyticGridViewFunction<Range(Domain), GridView, F>
+  -> AnalyticGridViewFunction<Range(Domain), GridView, F>;
 
 
 
@@ -228,7 +236,7 @@ template<class F, class GridView>
 auto makeAnalyticGridViewFunction(F&& f, const GridView& gridView)
 {
   using Domain = typename GridView::template Codim<0>::Geometry::GlobalCoordinate;
-  using Range = std::invoke_result_t<F(Domain)>;
+  using Range = std::invoke_result_t<F,Domain>;
   using FRaw = std::decay_t<F>;
 
   return AnalyticGridViewFunction<Range(Domain), GridView, FRaw>{std::forward<F>(f), gridView};

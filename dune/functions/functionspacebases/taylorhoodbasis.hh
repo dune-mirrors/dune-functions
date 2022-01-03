@@ -10,7 +10,6 @@
 #include <dune/typetree/powernode.hh>
 #include <dune/typetree/compositenode.hh>
 
-#include <dune/functions/functionspacebases/blockingtags.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 
 #include <dune/functions/functionspacebases/lagrangebasis.hh>

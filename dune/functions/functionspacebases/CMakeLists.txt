@@ -2,7 +2,6 @@ add_subdirectory("test")
 
 install(FILES
         basistags.hh
-        blockingtags.hh
         boundarydofs.hh
         brezzidouglasmarinibasis.hh
         bsplinebasis.hh

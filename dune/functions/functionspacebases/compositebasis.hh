@@ -18,7 +18,6 @@
 #include <dune/functions/common/type_traits.hh>
 #include <dune/functions/common/utility.hh>
 #include <dune/functions/functionspacebases/basistags.hh>
-#include <dune/functions/functionspacebases/blockingtags.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>

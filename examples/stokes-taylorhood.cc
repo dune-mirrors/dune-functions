@@ -351,21 +351,21 @@ int main (int argc, char *argv[]) try
   // the BlockedInterleaved indices of the power pre-basis
   // to FlatInterleaved indices.
   auto transformation = Experimental::indexTransformation(
-      [](auto& multiIndex, const auto& basis) {
+      [dim](auto& multiIndex, const auto& basis) {
         if (multiIndex[0] == 0)
         {
           multiIndex[1] = multiIndex[1]*dim + multiIndex[2];
           multiIndex.resize(2);
         }
       },
-      [](const auto& prefix, const auto& basis) -> std::size_t {
+      [dim](const auto& prefix, const auto& basis) -> std::size_t {
         if (prefix.size()>1)
           return 0;
         if ((prefix.size()==1) and (prefix[0]==0))
           return basis.size(prefix) * dim;
         return basis.size(prefix);
       },
-      [](const auto& basis) {
+      [dim](const auto& basis) {
         using namespace Dune::Functions;
         return StaticNonUniformSizeTree<DynamicFlatSizeTree,2>{
           DynamicFlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{0}) * dim},

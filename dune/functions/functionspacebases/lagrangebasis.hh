@@ -189,17 +189,6 @@ public:
     return power(order()+1, (unsigned int)GV::dimension);
   }
 
-  //! Return the associated size-tree
-  template<class... I>
-  auto sizeTree(TypeTree::HybridTreePath<I...>) const
-  {
-    static_assert(sizeof...(I) <= 1);
-    if constexpr(sizeof...(I) == 0)
-      return DynamicFlatSizeTree{dimension()};
-    else
-      return StaticFlatSizeTree<0>{};
-  }
-
   template<typename It>
   It indices(const Node& node, It it) const
   {

@@ -22,6 +22,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/sizetree.hh>
 
 
 namespace Dune {
@@ -169,10 +170,23 @@ public:
   }
 
   //! Return the associated size-tree
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix) const
+  auto sizeTree() const
   {
-    return sizeTree(prefix, IndexMergingStrategy{});
+    using namespace Dune::Functions::BasisFactory;
+    if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
+    {
+      return std::apply([&](auto const&... spb) {
+        return NonUniformSizeTree<decltype(spb.sizeTree())...>{spb.sizeTree()...};
+      }, subPreBases_);
+    }
+    else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
+    {
+      return std::apply([&](auto const&... spb) {
+        return sumNonUniformSubTrees(spb.sizeTree()...);
+      }, subPreBases_);
+    }
+    else
+      return UnknownSizeTree{};
   }
 
 
@@ -220,31 +234,6 @@ private:
         });
     }
     return result;
-  }
-
-
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedLexicographic) const
-  {
-    if constexpr(sizeof...(I) == 0) {
-      return std::apply([&](auto const&... spb) {
-        return NonUniformSizeTree<decltype(spb.sizeTree(prefix))...>{spb.sizeTree(prefix)...};
-      }, subPreBases_);
-    } else {
-      return subPreBasis(front(prefix)).sizeTree(pop_front(prefix));
-    }
-  }
-
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatLexicographic) const
-  {
-    if constexpr(sizeof...(I) == 0) {
-      return std::apply([&](auto const&... spb) {
-        return mergeSizeTrees(spb.sizeTree(prefix)...);
-      }, subPreBases_);
-    } else {
-      return UnknownSizeTree{};
-    }
   }
 
 public:

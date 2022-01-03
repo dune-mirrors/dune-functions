@@ -31,6 +31,7 @@
 #include <dune/functions/functionspacebases/subspacebasis.hh>
 #include <dune/functions/functionspacebases/boundarydofs.hh>
 #include <dune/functions/functionspacebases/transformedindexbasis.hh>
+#include <dune/functions/functionspacebases/sizetree.hh>
 
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
 #include <dune/functions/gridfunctions/gridviewfunction.hh>
@@ -364,21 +365,12 @@ int main (int argc, char *argv[]) try
           return basis.size(prefix) * dim;
         return basis.size(prefix);
       },
-      [](const auto& prefix, const auto& basis) {
-        if constexpr(prefix.size() == 0) {
-          return StaticNonUniformSizeTree<DynamicFlatSizeTree,2>{
-            DynamicFlatSizeTree{basis.size({0}) * dim},
-            DynamicFlatSizeTree{basis.size({1})}
-            };
-        }
-        else if constexpr(prefix.size() == 1) {
-          return (prefix[0] == 0)
-            ? DynamicFlatSizeTree{basis.size({0}) * dim}
-            : DynamicFlatSizeTree{basis.size({1})};
-        }
-        else {
-          return StaticFlatSizeTree<0>{};
-        }
+      [](const auto& basis) {
+        using namespace Dune::Functions;
+        return StaticNonUniformSizeTree<DynamicFlatSizeTree,2>{
+          DynamicFlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{0}) * dim},
+          DynamicFlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{1})}
+          };
       },
       Dune::Indices::_2, Dune::Indices::_3);
 
@@ -397,7 +389,7 @@ int main (int argc, char *argv[]) try
 #endif
 
 
-  printType(taylorHoodBasis.sizeTree());
+  printType(taylorHoodBasis.preBasis().sizeTree());
 
 
   /////////////////////////////////////////////////////////

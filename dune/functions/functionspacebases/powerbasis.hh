@@ -14,6 +14,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/sizetree.hh>
 
 
 
@@ -128,10 +129,19 @@ public:
   }
 
   //! Return the associated size-tree
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix) const
+  auto sizeTree() const
   {
-    return sizeTree(prefix, IndexMergingStrategy{});
+    using namespace Dune::Functions::BasisFactory;
+
+    auto subSizeTree = subPreBasis_.sizeTree();
+    if constexpr(std::is_same_v<IMS, FlatInterleaved> || std::is_same_v<IMS, FlatLexicographic>)
+      return sumSizeTrees<children>(std::move(subSizeTree));
+    else if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
+      return UniformSizeTree<decltype(subSizeTree), children>{std::move(subSizeTree)};
+    else if constexpr(std::is_same_v<IMS, BlockedInterleaved>)
+      return appendToSizeTree<children>(std::move(subSizeTree));
+    else
+      return UnknownSizeTree{};
   }
 
 
@@ -209,44 +219,6 @@ private:
       return children;
     return r;
   }
-
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatInterleaved) const
-  {
-    if constexpr(sizeof...(I) == 0)
-      return sumSizeTrees<children>(subPreBasis_.sizeTree(prefix));
-    else
-      return subPreBasis_.sizeTree(push_front(pop_front(prefix), front(prefix) / children));
-  }
-
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatLexicographic) const
-  {
-    if constexpr(sizeof...(I) == 0)
-      return sumSizeTrees<children>(subPreBasis_.sizeTree(prefix));
-    else
-      return subPreBasis_.sizeTree(push_front(pop_front(prefix), front(prefix) % children));
-  }
-
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedLexicographic) const
-  {
-    if constexpr(sizeof...(I) == 0) {
-      auto subSizeTree = subPreBasis_.sizeTree(prefix);
-      return UniformSizeTree<decltype(subSizeTree), children>{subSizeTree};
-    } else
-      return subPreBasis_.sizeTree(pop_front(prefix));
-  }
-
-  template<class... I>
-  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedInterleaved) const
-  {
-    if constexpr(sizeof...(I) == 0)
-      return appendToSizeTree<children>{subPreBasis_.sizeTree(prefix)};
-    else
-      return subPreBasis_.sizeTree(pop_front(prefix));
-  }
-
 
 public:
 

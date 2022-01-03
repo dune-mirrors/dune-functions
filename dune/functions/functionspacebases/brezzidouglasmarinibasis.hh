@@ -224,12 +224,6 @@ public:
     return size();
   }
 
-  //! Return the flat BlockingTag.
-  BlockingTag::Flat blocking() const
-  {
-    return {};
-  }
-
   size_type maxNodeSize() const
   {
     // The implementation currently only supports grids with a single element type.

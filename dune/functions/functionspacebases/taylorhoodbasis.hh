@@ -15,6 +15,7 @@
 
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/sizetree.hh>
 
 namespace Dune {
 namespace Functions {
@@ -134,12 +135,18 @@ public:
     return sizeImp<useHybridIndices>(prefix);
   }
 
-  auto blocking() const
+  auto sizeTree() const
   {
-    return std::conditional_t<useHybridIndices,
-      BlockingTag::Blocked<BlockingTag::LeafBlocked<dim>,BlockingTag::Flat>,
-      BlockingTag::Blocked<BlockingTag::Flat,BlockingTag::Flat>
-      >{};
+    if constexpr(useHybridIndices)
+      return NonUniformSizeTree<DynamicUniformSizeTree<StaticFlatSizeTree<dim>>, DynamicFlatSizeTree>{
+        DynamicUniformSizeTree{pq2PreBasis_.size(), StaticFlatSizeTree<dim>{}},
+        DynamicFlatSizeTree{pq1PreBasis_.size()}
+      };
+    else
+      return StaticNonUniformSizeTree<DynamicFlatSizeTree,2>{
+        DynamicFlatSizeTree{dim * pq2PreBasis_.size()},
+        DynamicFlatSizeTree{pq1PreBasis_.size()}
+      };
   }
 
 private:

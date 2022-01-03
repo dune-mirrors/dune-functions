@@ -25,6 +25,7 @@ install(FILES
         rannacherturekbasis.hh
         nodes.hh
         sizeinfo.hh
+        sizetree.hh
         subentitydofs.hh
         subspacebasis.hh
         subspacelocalview.hh

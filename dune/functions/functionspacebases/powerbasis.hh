@@ -127,11 +127,13 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
-  //! Return the BlockingTag, either Blocked, LeafBlocked, or Flat depending on the IndexMergingStrategy.
-  auto blocking() const
+  //! Return the associated size-tree
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix) const
   {
-    return blocking(IndexMergingStrategy{});
+    return sizeTree(prefix, IndexMergingStrategy{});
   }
+
 
 private:
 
@@ -208,38 +210,43 @@ private:
     return r;
   }
 
-  auto blocking(BasisFactory::FlatInterleaved) const
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatInterleaved) const
   {
-    auto subBlocking = subPreBasis_.blocking();
-    if constexpr (!std::is_same<decltype(subBlocking),BlockingTag::Flat>::value)
-      return BlockingTag::Unknown{};
+    if constexpr(sizeof...(I) == 0)
+      return sumSizeTrees<children>(subPreBasis_.sizeTree(prefix));
     else
-      return BlockingTag::Flat{};
+      return subPreBasis_.sizeTree(push_front(pop_front(prefix), front(prefix) / children));
   }
 
-  auto blocking(BasisFactory::FlatLexicographic) const
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatLexicographic) const
   {
-    auto subBlocking = subPreBasis_.blocking();
-    if constexpr (!std::is_same<decltype(subBlocking),BlockingTag::Flat>::value)
-      return BlockingTag::Unknown{};
+    if constexpr(sizeof...(I) == 0)
+      return sumSizeTrees<children>(subPreBasis_.sizeTree(prefix));
     else
-      return BlockingTag::Flat{};
+      return subPreBasis_.sizeTree(push_front(pop_front(prefix), front(prefix) % children));
   }
 
-  auto blocking(BasisFactory::BlockedLexicographic) const
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedLexicographic) const
   {
-    auto subBlocking = subPreBasis_.blocking();
-    return BlockingTag::PowerBlocked<decltype(subBlocking),C>{};
+    if constexpr(sizeof...(I) == 0) {
+      auto subSizeTree = subPreBasis_.sizeTree(prefix);
+      return UniformSizeTree<decltype(subSizeTree), children>{subSizeTree};
+    } else
+      return subPreBasis_.sizeTree(pop_front(prefix));
   }
 
-  auto blocking(BasisFactory::BlockedInterleaved) const
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedInterleaved) const
   {
-    auto subBlocking = subPreBasis_.blocking();
-    if constexpr (!std::is_same<decltype(subBlocking),BlockingTag::Flat>::value)
-      return BlockingTag::Unknown{};
+    if constexpr(sizeof...(I) == 0)
+      return appendToSizeTree<children>{subPreBasis_.sizeTree(prefix)};
     else
-      return BlockingTag::LeafBlocked<C>{};
+      return subPreBasis_.sizeTree(pop_front(prefix));
   }
+
 
 public:
 

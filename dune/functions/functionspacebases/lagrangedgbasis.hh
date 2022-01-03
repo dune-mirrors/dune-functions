@@ -153,10 +153,15 @@ public:
     return Dune::power(k+1, int(GV::dimension));
   }
 
-  //! Return the Flat BlockingTag.
-  auto blocking() const
+  //! Return the associated size-tree
+  template<class... I>
+  auto sizeTree(TypeTree::HybridTreePath<I...>) const
   {
-    return BlockingTag::Flat{};
+    static_assert(sizeof...(I) <= 1);
+    if constexpr(sizeof...(I) == 0)
+      return DynamicFlatSizeTree{dimension()};
+    else
+      return StaticFlatSizeTree<0>{};
   }
 
   template<typename It>

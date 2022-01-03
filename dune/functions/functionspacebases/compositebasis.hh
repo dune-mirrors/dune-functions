@@ -168,11 +168,13 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
-  //! Return the BlockingTag, either Blocked or Flat depending on the IndexMergingStrategy.
-  auto blocking() const
+  //! Return the associated size-tree
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix) const
   {
-    return blocking(IndexMergingStrategy{});
+    return sizeTree(prefix, IndexMergingStrategy{});
   }
+
 
 private:
 
@@ -221,18 +223,28 @@ private:
   }
 
 
-  auto blocking(BasisFactory::FlatLexicographic) const
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::BlockedLexicographic) const
   {
-    if constexpr (!std::is_same<std::tuple<decltype(std::declval<SPB>().blocking())...,BlockingTag::Flat>,
-                                std::tuple<BlockingTag::Flat,decltype(std::declval<SPB>().blocking())...> >::value)
-      return BlockingTag::Unknown{};
-    else
-      return BlockingTag::Flat{};
+    if constexpr(sizeof...(I) == 0) {
+      return std::apply([&](auto const&... spb) {
+        return NonUniformSizeTree<decltype(spb.sizeTree(prefix))...>{spb.sizeTree(prefix)...};
+      }, subPreBases_);
+    } else {
+      return subPreBasis(front(prefix)).sizeTree(pop_front(prefix));
+    }
   }
 
-  auto blocking(BasisFactory::BlockedLexicographic) const
+  template<class... I>
+  auto sizeTree(const TypeTree::HybridTreePath<I...>& prefix, BasisFactory::FlatLexicographic) const
   {
-    return BlockingTag::Blocked<decltype(std::declval<SPB>().blocking())...>{};
+    if constexpr(sizeof...(I) == 0) {
+      return std::apply([&](auto const&... spb) {
+        return mergeSizeTrees(spb.sizeTree(prefix)...);
+      }, subPreBases_);
+    } else {
+      return UnknownSizeTree{};
+    }
   }
 
 public:

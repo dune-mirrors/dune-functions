@@ -173,7 +173,7 @@ namespace Dune {
 
     class LeafBasisNode :
         public BasisNodeMixin,
-        public TypeTree2::LeafTypeTree
+        public TypeTree2::LeafNode
     {};
 
 
@@ -204,10 +204,10 @@ namespace Dune {
     template<typename... T>
     class CompositeBasisNode :
       public BasisNodeMixin,
-      public TypeTree2::NonUniformTypeTree<T...>
+      public TypeTree2::VariadicNonUniformTypeTree<T...>
     {
 
-      using Node = TypeTree2::NonUniformTypeTree<T...>;
+      using Node = TypeTree2::VariadicNonUniformTypeTree<T...>;
 
     public:
 

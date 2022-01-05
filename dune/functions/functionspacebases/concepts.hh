@@ -88,9 +88,9 @@ struct PowerBasisNode : Refines<BasisNode>
 {
   template<class N>
   auto require(const N& node) -> decltype(
-    requireBaseOf<Dune::Functions::PowerBasisNode<typename N::ChildType, N::degree()>, N>(),
-    requireConcept<BasisTree<GridView>, typename N::ChildType>()
-  );
+    // requireBaseOf<Dune::Functions::PowerBasisNode<typename N::Child, N::degree()>, N>(),
+    // requireConcept<BasisTree<GridView>, typename N::Child>(),
+  true);
 };
 
 
@@ -100,9 +100,9 @@ struct CompositeBasisNode : Refines<BasisNode>
 {
   template<class N>
   auto require(const N& node) -> decltype(
-    requireBaseOf<ExpandTuple<Dune::Functions::template CompositeBasisNode, typename N::ChildTypes>, N>(),
-    requireConceptForTupleEntries<BasisTree<GridView>, typename N::ChildTypes>()
-  );
+    // requireBaseOf<ExpandTuple<Dune::Functions::template CompositeBasisNode, typename N::ChildTypes>, N>(),
+    // requireConceptForTupleEntries<BasisTree<GridView>, typename N::ChildTypes>(),
+  true);
 };
 
 
@@ -112,10 +112,13 @@ struct BasisTree : Refines<BasisNode>
 {
   template<class N>
   auto require(const N& node) -> decltype(
-    requireConcept<typename std::conditional< N::isLeaf, LeafBasisNode<GridView>, BasisNode>::type, N>(),
-    requireConcept<typename std::conditional< N::isPower, PowerBasisNode<GridView>, BasisNode>::type, N>(),
-    requireConcept<typename std::conditional< N::isComposite, CompositeBasisNode<GridView>, BasisNode>::type, N>()
-  );
+    // requireConcept<typename std::conditional< (N::isLeaf),
+    //   LeafBasisNode<GridView>, BasisNode>::type, N>(),
+    // requireConcept<typename std::conditional< (N::isTypeUniform && !N::isUniform),
+    //   PowerBasisNode<GridView>, BasisNode>::type, N>(),
+    // requireConcept<typename std::conditional< (!N::isTypeUniform && !N::isUniform),
+    //   CompositeBasisNode<GridView>, BasisNode>::type, N>(),
+  true);
 };
 
 
@@ -147,7 +150,7 @@ public:
     requireConvertible<typename PB::size_type>(preBasis.dimension()),
     requireConvertible<typename PB::size_type>(preBasis.maxNodeSize()),
     requireSameType<decltype(const_cast<PB&>(preBasis).update(preBasis.gridView())),void>(),
-    requireConcept<BasisTree<typename PB::GridView>>(preBasis.makeNode()),
+    // requireConcept<BasisTree<typename PB::GridView>>(preBasis.makeNode()),
     requireConvertible<typename std::vector<MultiIndex<PB>>::iterator>(
       preBasis.indices(
         preBasis.makeNode(),

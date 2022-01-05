@@ -7,7 +7,7 @@
 
 #include <dune/common/typetraits.hh>
 
-#include <dune/typetree/treecontainer.hh>
+#include <dune/typetree2/treecontainer.hh>
 
 #include <dune/functions/functionspacebases/hierarchicnodetorangemap.hh>
 #include <dune/functions/functionspacebases/flatvectorview.hh>
@@ -100,7 +100,7 @@ public:
     template<class Node>
     using NodeData = typename std::vector<LocalBasisRange<Node>>;
 
-    using PerNodeEvaluationBuffer = typename TypeTree::TreeContainer<NodeData,Tree>;
+    using PerNodeEvaluationBuffer = typename TypeTree2::TreeContainer<NodeData,Tree>;
 
   public:
 

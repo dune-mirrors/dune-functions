@@ -147,11 +147,9 @@ public:
    */
   Node makeNode() const
   {
-    auto node = Node{};
-    Hybrid::forEach(ChildIndices(), [&](auto i) {
-      node.setChild(this->subPreBasis(i).makeNode(), i);
-    });
-    return node;
+    return std::apply([&](auto&&... subPreBasis) {
+      return Node{subPreBasis.makeNode()...};
+    }, subPreBases_);
   }
 
   //! Same as size(prefix) with empty prefix

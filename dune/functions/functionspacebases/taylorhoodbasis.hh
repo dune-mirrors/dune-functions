@@ -37,6 +37,12 @@ class TaylorHoodVelocityTree;
 template<typename GV>
 class TaylorHoodBasisTree;
 
+template<class GV>
+using TaylorHoodVelocityNode = PowerBasisNode<LagrangeNode<GV,2>, GV::dimension>;
+
+template<class GV>
+using TaylorHoodPressureNode = LagrangeNode<GV,1>;
+
 /**
  * \brief Pre-basis for lowest order Taylor-Hood basis
  *
@@ -72,7 +78,7 @@ public:
   using size_type = std::size_t;
 
   //! Template mapping root tree path to type of created tree node
-  using Node = TaylorHoodBasisTree<GV>;
+  using Node = CompositeBasisNode<TaylorHoodVelocityNode<GV>, TaylorHoodPressureNode<GV> >;
 
   static constexpr size_type maxMultiIndexSize = useHybridIndices ? 3 : 2;
   static constexpr size_type minMultiIndexSize = 2;
@@ -117,7 +123,10 @@ public:
    */
   Node makeNode() const
   {
-    return Node{};
+    return Node{
+      TaylorHoodVelocityNode<GV>{},
+      TaylorHoodPressureNode<GV>{}
+    };
   }
 
   //! Same as size(prefix) with empty prefix
@@ -214,8 +223,8 @@ protected:
     using namespace Dune::Indices;
     for(std::size_t child=0; child<dim; ++child)
     {
-      size_type subTreeSize = node.child(_0, 0).size();
-      pq2PreBasis_.indices(node.child(_0, 0), multiIndices);
+      size_type subTreeSize = node.child(_0).child(0).size();
+      pq2PreBasis_.indices(node.child(_0).child(0), multiIndices);
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
         multiIndexPushFront(multiIndices[i], 0);
@@ -238,8 +247,8 @@ protected:
     using namespace Dune::Indices;
     for(std::size_t child=0; child<dim; ++child)
     {
-      size_type subTreeSize = node.child(_0, 0).size();
-      pq2PreBasis_.indices(node.child(_0, 0), multiIndices);
+      size_type subTreeSize = node.child(_0).child(0).size();
+      pq2PreBasis_.indices(node.child(_0).child(0), multiIndices);
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
         multiIndexPushFront(multiIndices[i], 0);
@@ -259,43 +268,6 @@ protected:
 
   PQ1PreBasis pq1PreBasis_;
   PQ2PreBasis pq2PreBasis_;
-};
-
-
-
-template<typename GV>
-class TaylorHoodVelocityTree :
-    public PowerBasisNode<LagrangeNode<GV,2>, GV::dimension>
-{
-  using PQ2Node = LagrangeNode<GV,2>;
-  using Base = PowerBasisNode<PQ2Node, GV::dimension>;
-
-public:
-  TaylorHoodVelocityTree()
-  {
-    for(int i=0; i<GV::dimension; ++i)
-      this->setChild(i, std::make_shared<PQ2Node>());
-  }
-};
-
-template<typename GV>
-class TaylorHoodBasisTree :
-    public CompositeBasisNode<
-      TaylorHoodVelocityTree<GV>,
-      LagrangeNode<GV,1>
-    >
-{
-  using VelocityNode=TaylorHoodVelocityTree<GV>;
-  using PressureNode=LagrangeNode<GV,1>;
-
-  using Base=CompositeBasisNode<VelocityNode, PressureNode>;
-
-public:
-  TaylorHoodBasisTree()
-  {
-    this->template setChild<0>(std::make_shared<VelocityNode>());
-    this->template setChild<1>(std::make_shared<PressureNode>());
-  }
 };
 
 

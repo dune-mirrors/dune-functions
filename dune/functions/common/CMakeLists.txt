@@ -17,7 +17,6 @@ install(FILES
         reserveddeque.hh
         signature.hh
         staticforloop.hh
-        treedata.hh
         type_traits.hh
         typeerasure.hh
         utility.hh

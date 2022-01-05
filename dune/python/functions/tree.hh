@@ -42,7 +42,7 @@ template<typename Tree, std::size_t i>
 auto childAccessor()
 {
   return [](Tree& tree) {
-    return pybind11::cast(tree.template child(index_constant<i>{}));
+    return pybind11::cast(tree.child(index_constant<i>{}));
   };
 }
 

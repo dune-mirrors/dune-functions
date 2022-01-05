@@ -8,15 +8,12 @@
 
 #include <dune/common/indices.hh>
 
-#include <dune/typetree/leafnode.hh>
-#include <dune/typetree/powernode.hh>
-#include <dune/typetree/compositenode.hh>
+#include <dune/typetree2/typetree.hh>
 #include <dune/typetree/traversal.hh>
 #include <dune/typetree/visitor.hh>
 
 namespace Dune {
   namespace Functions {
-
 
     namespace Impl {
 
@@ -127,12 +124,6 @@ namespace Dune {
 
       using size_type = std::size_t;
 
-      BasisNodeMixin() :
-        offset_(0),
-        size_(0),
-        treeIndex_(0)
-      {}
-
       size_type localIndex(size_type i) const
       {
         assert(i < size_);
@@ -173,40 +164,38 @@ namespace Dune {
 
     private:
 
-      size_type offset_;
-      size_type size_;
-      size_type treeIndex_;
+      size_type offset_ = 0;
+      size_type size_ = 0;
+      size_type treeIndex_ = 0;
 
     };
 
 
     class LeafBasisNode :
         public BasisNodeMixin,
-        public TypeTree::LeafNode
+        public TypeTree2::LeafTypeTree
     {};
 
 
     template<typename T, std::size_t n>
     class PowerBasisNode :
       public BasisNodeMixin,
-      public TypeTree::PowerNode<T,n>
+      public TypeTree2::StaticNonUniformTypeTree<T,n>
     {
 
-      using Node = TypeTree::PowerNode<T,n>;
+      using Node = TypeTree2::StaticNonUniformTypeTree<T,n>;
 
     public:
 
       using Element = typename T::Element;
 
-      PowerBasisNode() = default;
-
-      PowerBasisNode(const typename Node::NodeStorage& children) :
-        Node(children)
-      {}
+      using Node::Node;
+      using BasisNodeMixin::size;
+      using size_type = typename BasisNodeMixin::size_type;
 
       const Element& element() const
       {
-        return this->child(Dune::Indices::_0).element();
+        return Node::child(0).element();
       }
 
     };
@@ -215,29 +204,22 @@ namespace Dune {
     template<typename... T>
     class CompositeBasisNode :
       public BasisNodeMixin,
-      public TypeTree::CompositeNode<T...>
+      public TypeTree2::NonUniformTypeTree<T...>
     {
 
-      using Node = TypeTree::CompositeNode<T...>;
+      using Node = TypeTree2::NonUniformTypeTree<T...>;
 
     public:
 
-      using Element = typename Node::template Child<0>::Type::Element;
+      using Element = typename Node::template Child<0>::Element;
 
-      CompositeBasisNode() = default;
-
-      CompositeBasisNode(const typename Node::NodeStorage& children) :
-        Node(children)
-      {}
-
-      template<typename... Children>
-      CompositeBasisNode(const std::shared_ptr<Children>&... children) :
-        Node(children...)
-      {}
+      using Node::Node;
+      using BasisNodeMixin::size;
+      using size_type = typename BasisNodeMixin::size_type;
 
       const Element& element() const
       {
-        return this->child(Dune::Indices::_0).element();
+        return Node::child(Dune::Indices::_0).element();
       }
 
     };

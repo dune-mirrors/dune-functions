@@ -106,10 +106,7 @@ public:
    */
   Node makeNode() const
   {
-    auto node = Node{};
-    for (std::size_t i=0; i<children; ++i)
-      node.setChild(i, subPreBasis_.makeNode());
-    return node;
+    return Node{subPreBasis_.makeNode()};
   }
 
   //! Same as size(prefix) with empty prefix

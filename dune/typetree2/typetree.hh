@@ -14,13 +14,17 @@
 namespace Dune {
 namespace TypeTree2 {
 
+#ifndef DOXYGEN
   template <bool b> struct IsLeaf : std::bool_constant<b> {};
   template <bool b> struct IsUniform : std::bool_constant<b> {};
   template <bool b> struct IsTypeUniform : std::bool_constant<b> {};
   template <bool b> struct IsStatic : std::bool_constant<b> {};
+#endif
 
+#ifndef DOXYGEN
   template<class, class, class, class>
   struct TreeProperties;
+#endif
 
   //! Define basic properties of a tree
   template<bool leaf, bool uniform, bool typeUniform, bool staticSize>
@@ -33,7 +37,7 @@ namespace TypeTree2 {
     //! All nodes of the tree can be represented by one object
     inline static constexpr bool isUniform = uniform;
 
-    //! All node type are identical
+    //! All node types are identical
     inline static constexpr bool isTypeUniform = typeUniform;
 
     //! The tree has static degree
@@ -78,14 +82,14 @@ namespace TypeTree2 {
 
     //! Return a reference to the i'th child of the tree
     template<std::size_t i>
-    auto& child(index_constant<i> ii)
+    Child<i>& child(index_constant<i>)
     {
       return std::get<i>(static_cast<Super&>(*this));
     }
 
     //! Return a const reference to the i'th child of the tree
     template<std::size_t i>
-    auto& child(index_constant<i> ii) const
+    const Child<i>& child(index_constant<i>) const
     {
       return std::get<i>(static_cast<Super const&>(*this));
     }
@@ -95,7 +99,7 @@ namespace TypeTree2 {
   };
 
 
-  //! Non-uniform type-tree with all sub-tree of the same type and static size.
+  //! Non-uniform type-tree with all sub-trees of the same type and static size.
   template<class SubTree, std::size_t n>
   struct StaticNonUniformTypeTree
       : public TreeProperties<IsLeaf<false>,IsUniform<false>,IsTypeUniform<true>,IsStatic<true>>
@@ -129,10 +133,10 @@ namespace TypeTree2 {
     {}
 
     //! Return a reference to the i'th child of the tree
-    auto& child(std::size_t i)       { return Super::operator[](i); }
+    SubTree& child(std::size_t i) { return Super::operator[](i); }
 
     //! Return a const reference to the i'th child of the tree
-    auto& child(std::size_t i) const { return Super::operator[](i); }
+    const SubTree& child(std::size_t i) const { return Super::operator[](i); }
 
     //! Return the number of nodes
     static constexpr index_constant<n> degree() { return {}; }
@@ -154,10 +158,10 @@ namespace TypeTree2 {
     using Super::Super;
 
     //! Return a reference to the i'th child of the tree
-    auto& child(std::size_t i)       { return Super::operator[](i); }
+    SubTree& child(std::size_t i) { return Super::operator[](i); }
 
     //! Return a const reference to the i'th child of the tree
-    auto& child(std::size_t i) const { return Super::operator[](i); }
+    const SubTree& child(std::size_t i) const { return Super::operator[](i); }
 
     //! Return the number of nodes
     std::size_t degree() { return Super::size(); }
@@ -178,7 +182,7 @@ namespace TypeTree2 {
     {}
 
     /**
-     * \brief Return a reference to the i'th child of the tree
+     * \brief Return a reference to the stored `subTree`
      * \param i Any integral constant or index type convertible to `std::size_t`
      **/
     template <class Index>
@@ -189,7 +193,7 @@ namespace TypeTree2 {
     }
 
     /**
-     * \brief Return a const reference to the i'th child of the tree
+     * \brief Return a const reference to the stored `subTree`
      * \param i Any integral constant or index type convertible to `std::size_t`
      **/
     template <class Index>
@@ -222,7 +226,7 @@ namespace TypeTree2 {
     {}
 
     /**
-     * \brief Return a reference to the i'th child of the tree
+     * \brief Return a reference to the stored `subTree`
      * \param i Any integral constant or index type convertible to `std::size_t`
      **/
     template <class Index>
@@ -233,7 +237,7 @@ namespace TypeTree2 {
     }
 
     /**
-     * \brief Return a reference to the i'th child of the tree
+     * \brief Return a reference to the stored `subTree`
      * \param i Any integral constant or index type convertible to `std::size_t`
      **/
     template <class Index>

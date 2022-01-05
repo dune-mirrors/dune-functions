@@ -132,7 +132,7 @@ public:
   {
     using namespace Dune::Functions::BasisFactory;
 
-    auto subSizeTree = subPreBasis_.sizeTree();
+    auto subSizeTree = Dune::Functions::sizeTree(subPreBasis_);
     if constexpr(std::is_same_v<IMS, FlatInterleaved> || std::is_same_v<IMS, FlatLexicographic>)
       return sumSizeTrees<children>(std::move(subSizeTree));
     else if constexpr(std::is_same_v<IMS, BlockedLexicographic>)

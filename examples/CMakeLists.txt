@@ -25,3 +25,9 @@ add_executable("poisson-mfem" poisson-mfem.cc)
 dune_target_enable_all_packages("poisson-mfem")
 set_property(TARGET poisson-mfem PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples poisson-mfem)
+
+
+add_executable("vectorgenerator" vectorgenerator.cc)
+dune_target_enable_all_packages("vectorgenerator")
+set_property(TARGET vectorgenerator PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples vectorgenerator)

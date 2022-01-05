@@ -20,6 +20,31 @@
 namespace Dune {
 namespace Functions {
 
+  //! Define basic properties of a tree
+  template<bool leaf, bool uniform, bool typeUniform, bool staticSize>
+  struct SizeTreePropertiesBase
+  {
+    //! The tree has no children
+    inline static constexpr bool isLeaf = leaf;
+
+    //! All nodes of the tree can be represented by one object
+    inline static constexpr bool isUniform = uniform;
+
+    //! All node types are identical
+    inline static constexpr bool isTypeUniform = typeUniform;
+
+    //! The tree has static degree
+    inline static constexpr bool isStatic = staticSize;
+
+    // for backwards compatibility
+    inline static constexpr bool isPower = !isLeaf && isTypeUniform && !isUniform;
+    inline static constexpr bool isComposite = !isLeaf && !isTypeUniform && !isUniform && isStatic;
+  };
+
+  template<class SizeTree>
+  struct SizeTreeProperties {};
+
+
   //! Nested size-info that cannot be assigned one of the other size-tree types.
   struct UnknownSizeTree {};
 
@@ -33,6 +58,11 @@ namespace Functions {
     static constexpr std::size_t size() { return n; }
   };
 
+  template <std::size_t n>
+  struct SizeTreeProperties<StaticFlatSizeTree<n>>
+      : public SizeTreePropertiesBase<true,true,true,true>
+  {};
+
   //! Leaf size-tree with dynamic size and all sub-trees of size zero
   struct DynamicFlatSizeTree
   {
@@ -44,17 +74,41 @@ namespace Functions {
     std::size_t size_;
   };
 
+  template <>
+  struct SizeTreeProperties<DynamicFlatSizeTree>
+      : public SizeTreePropertiesBase<true,true,true,false>
+  {};
+
+
   //! Non-uniform size-tree with all sub-trees of different type
   template<class... SubTrees>
   using NonUniformSizeTree = Dune::TupleVector<SubTrees...>;
+
+  template<class... SubTrees>
+  struct SizeTreeProperties<NonUniformSizeTree<SubTrees...>>
+      : public SizeTreePropertiesBase<false,false,false,true>
+  {};
+
 
   //! Non-uniform size-tree with all sub-tree of the same type and static size.
   template<class SubTree, std::size_t n>
   using StaticNonUniformSizeTree = std::array<SubTree, n>;
 
+  template<class SubTree, std::size_t n>
+  struct SizeTreeProperties<StaticNonUniformSizeTree<SubTree,n>>
+      : public SizeTreePropertiesBase<false,false,true,true>
+  {};
+
+
   //! Non-uniform size-tree with all sub-trees of the same type and dynamic size.
   template<class SubTree>
   using DynamicNonUniformSizeTree = std::vector<SubTree>;
+
+  template<class SubTree>
+  struct SizeTreeProperties<DynamicNonUniformSizeTree<SubTree>>
+      : public SizeTreePropertiesBase<false,false,true,false>
+  {};
+
 
   //! Uniform size-tree with static size.
   template<class SubTree, std::size_t n>
@@ -67,6 +121,10 @@ namespace Functions {
 
     SubTree subTree_;
 
+    UniformSizeTree(SubTree subTree)
+      : subTree_{std::move(subTree)}
+    {}
+
     UniformSizeTree(std::integral_constant<std::size_t,n>, SubTree subTree)
       : subTree_{std::move(subTree)}
     {}
@@ -74,6 +132,12 @@ namespace Functions {
 
   template<class SubTree, std::size_t n>
   using StaticUniformSizeTree = UniformSizeTree<SubTree,n>;
+
+  template<class SubTree, std::size_t n>
+  struct SizeTreeProperties<StaticUniformSizeTree<SubTree,n>>
+      : public SizeTreePropertiesBase<false,true,true,true>
+  {};
+
 
   //! Uniform size-tree with dynamic size.
   template<class SubTree>
@@ -93,6 +157,11 @@ namespace Functions {
     {}
   };
 
+  template<class SubTree>
+  struct SizeTreeProperties<DynamicUniformSizeTree<SubTree>>
+      : public SizeTreePropertiesBase<false,true,true,false>
+  {};
+
 
   namespace Impl
   {
@@ -103,9 +172,9 @@ namespace Functions {
       return preBasis.sizeTree();
     }
 
-    template<class PreBasis>
+    template<class PreBasis,
+      class = decltype(std::declval<PreBasis>().dimension())>
     auto sizeTreeImpl(const PreBasis& preBasis, PriorityTag<1>)
-      -> decltype(preBasis.dimension())
     {
       return DynamicFlatSizeTree{preBasis.dimension()};
     }
@@ -257,8 +326,15 @@ namespace Functions {
     return sizeTree;
   }
 
+  template<class ST0, class ST1>
+  auto sumNonUniformSubTrees(const ST0& sizeTree0, const ST1& sizeTree1)
+  {
+    return Impl::SumNonUniformSubTrees<ST0,ST1>::create(sizeTree0, sizeTree1);
+  }
+
   //! Merge size trees.
-  template<class ST0, class... ST>
+  template<class ST0, class... ST,
+    std::enable_if_t<(sizeof...(ST) > 1), int> = 0>
   auto sumNonUniformSubTrees(const ST0& sizeTree0, const ST&... sizeTrees)
   {
     return sumNonUniformSubTrees(sizeTree0, sumNonUniformSubTrees(sizeTrees...));

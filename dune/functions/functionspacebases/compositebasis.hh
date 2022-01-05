@@ -175,13 +175,13 @@ public:
     if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
     {
       return std::apply([&](auto const&... spb) {
-        return NonUniformSizeTree<decltype(spb.sizeTree())...>{spb.sizeTree()...};
+        return NonUniformSizeTree<decltype(Dune::Functions::sizeTree(spb))...>{Dune::Functions::sizeTree(spb)...};
       }, subPreBases_);
     }
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
     {
       return std::apply([&](auto const&... spb) {
-        return sumNonUniformSubTrees(spb.sizeTree()...);
+        return sumNonUniformSubTrees(Dune::Functions::sizeTree(spb)...);
       }, subPreBases_);
     }
     else

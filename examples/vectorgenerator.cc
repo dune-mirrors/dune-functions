@@ -41,7 +41,7 @@ auto vectorGenerator(SizeTree const& sizeTree)
       using Block = decltype(block(Dune::index_constant<0>{}));
       if constexpr(Properties::isStatic) {
         return Dune::unpackIntegerSequence(
-          [block,&](auto... ii) {
+          [block](auto... ii) {
             return typename Traits::template PowerVector<Block, std::size_t(SizeTree::size())>{block(ii)...};
           },
           std::make_index_sequence<std::size_t(SizeTree::size())>{});
@@ -56,7 +56,7 @@ auto vectorGenerator(SizeTree const& sizeTree)
     }
     else {
       return Dune::unpackIntegerSequence(
-        [block,&](auto... ii) {
+        [block](auto... ii) {
           return typename Traits::template CompositeVector<decltype(block(ii))...>{block(ii)...};
         }, std::make_index_sequence<std::size_t(SizeTree::size())>());
     }

@@ -36,15 +36,15 @@ auto vectorGenerator(SizeTree const& sizeTree)
       return typename Traits::template DynamicVector<T>(sizeTree.size());
   }
   else {
-    auto block = [&](auto ii) { return vectorGenerator(sizeTree[ii]); };
+    auto block = [&](auto i) { return vectorGenerator(sizeTree[i]); };
     if constexpr(Properties::isTypeUniform) {
       using Block = decltype(block(Dune::index_constant<0>{}));
       if constexpr(Properties::isStatic) {
         return Dune::unpackIntegerSequence(
-          [&](auto... ii) {
-            return typename Traits::template PowerVector<Block, SizeTree::size()>{block(ii)...};
+          [block,&](auto... ii) {
+            return typename Traits::template PowerVector<Block, std::size_t(SizeTree::size())>{block(ii)...};
           },
-          std::make_index_sequence<SizeTree::size()>{});
+          std::make_index_sequence<std::size_t(SizeTree::size())>{});
       }
       else {
         typename Traits::template DynamicVector<Block> container;
@@ -56,9 +56,9 @@ auto vectorGenerator(SizeTree const& sizeTree)
     }
     else {
       return Dune::unpackIntegerSequence(
-        [&](auto... ii) {
+        [block,&](auto... ii) {
           return typename Traits::template CompositeVector<decltype(block(ii))...>{block(ii)...};
-        }, std::make_index_sequence<SizeTree::size()>());
+        }, std::make_index_sequence<std::size_t(SizeTree::size())>());
     }
   }
 }

@@ -420,6 +420,7 @@ public:
 
   //! Constructor without order (uses the compile-time value)
   LagrangeNode() :
+    order_((unsigned int)(k)),
     finiteElement_(nullptr),
     element_(nullptr)
   {}

@@ -106,7 +106,7 @@ public:
    */
   Node makeNode() const
   {
-    return Node{subPreBasis_.makeNode()};
+    return Node{index_constant<children>{}, subPreBasis_.makeNode()};
   }
 
   //! Same as size(prefix) with empty prefix

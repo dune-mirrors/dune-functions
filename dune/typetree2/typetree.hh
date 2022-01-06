@@ -10,6 +10,7 @@
 #include <dune/common/tuplevector.hh>
 #include <dune/common/typelist.hh>
 #include <dune/common/typeutilities.hh>
+#include <dune/common/typetraits.hh>
 
 namespace Dune {
 namespace TypeTree2 {
@@ -66,37 +67,42 @@ namespace TypeTree2 {
   template<class... SubTrees>
   struct VariadicNonUniformTypeTree
       : public TreeProperties<IsLeaf<false>,IsUniform<false>,IsTypeUniform<false>,IsStatic<true>>
-      , public std::tuple<SubTrees...>
+      , public Dune::TupleVector<SubTrees...>
   {
-    using Super = std::tuple<SubTrees...>;
+    using Super = Dune::TupleVector<SubTrees...>;
 
     //! The type of the childs tuple
-    using ChildTypes = Super;
+    using ChildTypes = std::tuple<SubTrees...>;
 
     //! The type of the i'th child
     template <std::size_t i>
-    using Child = std::tuple_element_t<i,Super>;
+    using Child = std::tuple_element_t<i,ChildTypes>;
 
     //! Inherit the constructors from std::tuple
     using Super::Super;
 
     //! Return a reference to the i'th child of the tree
     template<std::size_t i>
-    Child<i>& child(index_constant<i>)
+    Child<i>& child(index_constant<i> ii)
     {
-      return std::get<i>(static_cast<Super&>(*this));
+      return Super::operator[](ii);
     }
 
     //! Return a const reference to the i'th child of the tree
     template<std::size_t i>
-    const Child<i>& child(index_constant<i>) const
+    const Child<i>& child(index_constant<i> ii) const
     {
-      return std::get<i>(static_cast<Super const&>(*this));
+      return Super::operator[](ii);
     }
 
     //! Return the number of nodes
     static constexpr index_constant<(sizeof...(SubTrees))> degree() { return {}; }
   };
+
+  // deduction guides
+  template<class... SubTrees>
+  VariadicNonUniformTypeTree(const SubTrees&...)
+    -> VariadicNonUniformTypeTree<SubTrees...>;
 
 
   //! Non-uniform type-tree with all sub-trees of the same type and static size.
@@ -116,15 +122,14 @@ namespace TypeTree2 {
     {}
 
     //! Forward all arguments to the array
-    template<class... Args,
-      Dune::disableCopyMove<StaticNonUniformTypeTree, Args...> = 0,
-      std::enable_if_t<(sizeof...(Args) == n || n == 1), int> = 0>
-    explicit StaticNonUniformTypeTree(Args&&... args)
-      : Super{std::forward<Args>(args)...}
+    template<class... SubTrees,
+      std::enable_if_t<(1+sizeof...(SubTrees) == n), int> = 0>
+    explicit StaticNonUniformTypeTree(const SubTree& subTree, SubTrees&&... subTrees)
+      : Super{subTree, std::forward<SubTrees>(subTrees)...}
     {}
 
     //! Repeat the single argument to fill the array
-    explicit StaticNonUniformTypeTree(SubTree const& subTree)
+    explicit StaticNonUniformTypeTree(index_constant<n>, const SubTree& subTree)
       : Super{Dune::unpackIntegerSequence(
           [&](auto... ii) {
             return Super{(void(ii), subTree)...};
@@ -141,6 +146,18 @@ namespace TypeTree2 {
     //! Return the number of nodes
     static constexpr index_constant<n> degree() { return {}; }
   };
+
+  // deduction guides
+  template<std::size_t n, class SubTree>
+  StaticNonUniformTypeTree(index_constant<n>, const SubTree&)
+    -> StaticNonUniformTypeTree<SubTree, n>;
+
+  template<class SubTree, class... SubTrees,
+    std::enable_if_t<not Dune::IsIntegralConstant<SubTree>::value, int> = 0,
+    std::enable_if_t<(std::is_convertible_v<SubTrees,SubTree> &&...), int> = 0>
+  StaticNonUniformTypeTree(const SubTree&, const SubTrees&...)
+    -> StaticNonUniformTypeTree<SubTree, 1+sizeof...(SubTrees)>;
+
 
 
   //! Non-uniform type-tree with all sub-trees of the same type and dynamic size.
@@ -166,6 +183,11 @@ namespace TypeTree2 {
     //! Return the number of nodes
     std::size_t degree() { return Super::size(); }
   };
+
+  // deduction guides
+  template<class SubTree>
+  DynamicNonUniformTypeTree(std::size_t, const SubTree&)
+    -> DynamicNonUniformTypeTree<SubTree>;
 
 
   //! Uniform type-tree with static size.

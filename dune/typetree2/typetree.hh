@@ -4,6 +4,7 @@
 #define DUNE_TYPETREE2_TYPETREE_HH
 
 #include <array>
+#include <cassert>
 #include <vector>
 
 #include <dune/common/indices.hh>
@@ -181,7 +182,7 @@ namespace TypeTree2 {
     const SubTree& child(std::size_t i) const { return Super::operator[](i); }
 
     //! Return the number of nodes
-    std::size_t degree() { return Super::size(); }
+    std::size_t degree() const { return Super::size(); }
   };
 
   // deduction guides

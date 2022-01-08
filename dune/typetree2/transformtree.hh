@@ -61,16 +61,21 @@ auto transformTree(Tree const& tree, MapNode mapNode)
 }
 
 //! Class that adds a data member and corresponding access methods to a Node base class
-template<class Data, class Node>
+template<class Node, class Data>
 struct DataNodeMixin
     : public Node
 {
-  using Node::Node;
+  template<class N, class D>
+  DataNodeMixin(N&& node, D&& data)
+    : Node{std::forward<N>(node)}
+    , data_{std::forward<D>(data)}
+  {}
 
   const Data& data() const { return data_; }
   Data& data() { return data_; }
 
-  Data data_ = {};
+private:
+  Data data_;
 };
 
 //! Add a `data` member to all tree nodes
@@ -80,10 +85,22 @@ auto attachDataToTree(const Tree& tree)
 {
   return transformTree(tree, [](auto&& node)
   {
-    return DataNodeMixin<Data,std::decay_t<decltype(node)>>{std::forward<decltype(node)>(node)};
+    using DataNode = DataNodeMixin<std::decay_t<decltype(node)>,Data>;
+    return DataNode{std::forward<decltype(node)>(node), Data{}};
   });
 }
 
+//! Add a `data` member to all tree nodes, constructed using the function `DataFactory(Node)`
+template<class Tree, class DataFactory>
+auto attachDataToTree(const Tree& tree, const DataFactory& dataFactory)
+{
+  return transformTree(tree, [dataFactory](auto const& node)
+  {
+    auto data = dataFactory(node);
+    using DataNode = DataNodeMixin<std::decay_t<decltype(node)>,std::decay_t<decltype(data)> >;
+    return DataNode{node, std::move(data)};
+  });
+}
 
 } // namespace TypeTree2
 } //namespace Dune

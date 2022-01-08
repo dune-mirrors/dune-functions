@@ -48,13 +48,15 @@ class TreeContainerVectorBackend
 
 public:
   //! Move the passed tree into the internal storage
-  TreeContainerVectorBackend(TreeContainer&& treeContainer) :
+  explicit TreeContainerVectorBackend(TreeContainer&& treeContainer) :
     treeContainer_{std::move(treeContainer)}
   {}
 
   //! Move the passed tree into the internal storage
-  template<class SizeTree, SizeTreeConcept<SizeTree> = true>
-  TreeContainerVectorBackend(const SizeTree& sizeTree) :
+  template<class SizeTree,
+    Dune::disableCopyMove<TreeContainerVectorBackend, SizeTree> = 0,
+    SizeTreeConcept<SizeTree> = true>
+  explicit TreeContainerVectorBackend(const SizeTree& sizeTree) :
     TreeContainerVectorBackend{}
   {
     resize(sizeTree);
@@ -156,7 +158,7 @@ auto makeTreeContainer(Tree const& tree, LeafToValue leafToValue)
       return node;
   };
 
-  using TreeContainer = decltype(transformTree(tree, mapNodes));
+  using TreeContainer = std::decay_t<decltype(transformTree(tree, mapNodes))>;
   return Detail::TreeContainerVectorBackend<TreeContainer>{transformTree(tree, mapNodes)};
 }
 

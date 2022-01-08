@@ -1,3 +1,5 @@
+add_subdirectory(test)
+
 install(FILES
         transformtree.hh
         treecontainer.hh

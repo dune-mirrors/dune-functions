@@ -8,7 +8,7 @@
 
 #include <dune/common/indices.hh>
 
-#include <dune/typetree2/typetree.hh>
+#include <dune/typetree/typetrees.hh>
 #include <dune/typetree/traversal.hh>
 #include <dune/typetree/visitor.hh>
 
@@ -173,17 +173,17 @@ namespace Dune {
 
     class LeafBasisNode :
         public BasisNodeMixin,
-        public TypeTree2::LeafNode
+        public TypeTree::LeafNode
     {};
 
 
     template<typename T, std::size_t n>
     class PowerBasisNode :
       public BasisNodeMixin,
-      public TypeTree2::StaticNonUniformTypeTree<T,n>
+      public TypeTree::StaticPowerNode<T,n>
     {
 
-      using Node = TypeTree2::StaticNonUniformTypeTree<T,n>;
+      using Node = TypeTree::StaticPowerNode<T,n>;
 
     public:
 
@@ -204,10 +204,10 @@ namespace Dune {
     template<typename... T>
     class CompositeBasisNode :
       public BasisNodeMixin,
-      public TypeTree2::VariadicNonUniformTypeTree<T...>
+      public TypeTree::CompositeNode<T...>
     {
 
-      using Node = TypeTree2::VariadicNonUniformTypeTree<T...>;
+      using Node = TypeTree::CompositeNode<T...>;
 
     public:
 

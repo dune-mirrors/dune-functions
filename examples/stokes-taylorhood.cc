@@ -67,7 +67,7 @@ void getLocalMatrix(
   // { get_local_fe_begin }
   using namespace Indices;
   const auto& velocityLocalFiniteElement                   /*@\label{li:stokes_taylorhood_get_velocity_lfe}@*/
-          = localView.tree().child(_0).child(0).finiteElement();
+          = localView.tree().child(_0,0).finiteElement();
   const auto& pressureLocalFiniteElement
           = localView.tree().child(_1).finiteElement();    /*@\label{li:stokes_taylorhood_get_pressure_lfe}@*/
   // { get_local_fe_end }
@@ -115,8 +115,8 @@ void getLocalMatrix(
       for (size_t j=0; j<velocityLocalFiniteElement.size(); j++ )
         for (size_t k=0; k<dim; k++)
         {
-          size_t row = localView.tree().child(_0).child(k).localIndex(i);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_row}@*/
-          size_t col = localView.tree().child(_0).child(k).localIndex(j);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_column}@*/
+          size_t row = localView.tree().child(_0,k).localIndex(i);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_row}@*/
+          size_t col = localView.tree().child(_0,k).localIndex(j);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_column}@*/
           elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j]))
                                      * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vv_element_matrix}@*/
         }
@@ -140,7 +140,7 @@ void getLocalMatrix(
       for (size_t j=0; j<pressureLocalFiniteElement.size(); j++ )
         for (size_t k=0; k<dim; k++)
         {
-          size_t vIndex = localView.tree().child(_0).child(k).localIndex(i); /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_row}@*/
+          size_t vIndex = localView.tree().child(_0,k).localIndex(i); /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_row}@*/
           size_t pIndex = localView.tree().child(_1).localIndex(j);   /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_column}@*/
 
           elementMatrix[vIndex][pIndex] +=                    /*@\label{li:stokes_taylorhood_update_vp_element_matrix_a}@*/

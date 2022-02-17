@@ -8,7 +8,7 @@
 
 #include <dune/common/indices.hh>
 
-#include <dune/typetree/typetrees.hh>
+#include <dune/typetree/nodes.hh>
 #include <dune/typetree/traversal.hh>
 #include <dune/typetree/visitor.hh>
 

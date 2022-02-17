@@ -223,8 +223,8 @@ protected:
     using namespace Dune::Indices;
     for(std::size_t child=0; child<dim; ++child)
     {
-      size_type subTreeSize = node.child(_0).child(0).size();
-      pq2PreBasis_.indices(node.child(_0).child(0), multiIndices);
+      size_type subTreeSize = node.child(_0, 0).size();
+      pq2PreBasis_.indices(node.child(_0, 0), multiIndices);
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
         multiIndexPushFront(multiIndices[i], 0);
@@ -247,8 +247,8 @@ protected:
     using namespace Dune::Indices;
     for(std::size_t child=0; child<dim; ++child)
     {
-      size_type subTreeSize = node.child(_0).child(0).size();
-      pq2PreBasis_.indices(node.child(_0).child(0), multiIndices);
+      size_type subTreeSize = node.child(_0, 0).size();
+      pq2PreBasis_.indices(node.child(_0, 0), multiIndices);
       for (std::size_t i = 0; i<subTreeSize; ++i)
       {
         multiIndexPushFront(multiIndices[i], 0);

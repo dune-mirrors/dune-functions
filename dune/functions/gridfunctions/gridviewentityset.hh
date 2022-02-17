@@ -4,7 +4,8 @@
 #define DUNE_FUNCTIONS_GRIDFUNCTIONS_GRIDVIEWENTITYSET_HH
 
 #include <memory>
-
+#include <dune/grid/common/gridenums.hh>
+#include <dune/grid/common/partitionset.hh>
 
 namespace Dune {
 
@@ -18,7 +19,7 @@ namespace Functions {
  *
  * This implements the \ref Concept::EntitySet concept.
  */
-template<class GV, int cd>
+template<class GV, int cd, PartitionIteratorType pitype = PartitionIteratorType::All_Partition>
 class GridViewEntitySet
 {
 public:
@@ -38,7 +39,7 @@ public:
   typedef Element value_type;
 
   //! A forward iterator
-  typedef typename GridView::template Codim<codim>::Iterator const_iterator;
+  typedef typename GridView::template Codim<codim>::template Partition<pitype>::Iterator const_iterator;
 
   //! Same as const_iterator
   typedef const_iterator iterator;
@@ -54,25 +55,35 @@ public:
   //! Returns true if e is contained in the EntitySet
   bool contains(const Element& e) const
   {
-    return gv_.contains(e);
+    return gv_.contains(e) && partitionSet<pitype>().contains(e.partitionType());
   }
 
   //! Number of Elements visited by an iterator
   size_t size() const
   {
-    return gv_.size(codim);
+    if constexpr(pitype == PartitionIteratorType::All_Partition)
+      return gv_.size(codim);
+    else
+      return std::count_if(begin(), end(),
+        [](auto const& e) { return partitionSet<pitype>().contains(e.partitionType()); });
   }
 
   //! Create a begin iterator
   const_iterator begin() const
   {
-    return gv_.template begin<codim>();
+    return gv_.template begin<codim,pitype>();
   }
 
   //! Create an end iterator
   const_iterator end() const
   {
-    return gv_.template end<codim>();
+    return gv_.template end<codim,pitype>();
+  }
+
+  //! Return the associated partition-iterator
+  static constexpr PartitionIteratorType partitionIterator()
+  {
+    return pitype;
   }
 
   const GridView& gridView() const

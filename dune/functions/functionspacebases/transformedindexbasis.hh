@@ -12,7 +12,6 @@
 #include <dune/common/typeutilities.hh>
 #include <dune/common/hybridutilities.hh>
 
-#include <dune/typetree/compositenode.hh>
 #include <dune/typetree/utility.hh>
 
 #include <dune/functions/common/staticforloop.hh>

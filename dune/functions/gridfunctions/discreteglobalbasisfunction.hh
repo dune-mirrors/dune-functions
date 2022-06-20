@@ -9,7 +9,6 @@
 
 #include <dune/typetree/treecontainer.hh>
 
-#include <dune/functions/common/vectorspan.hh>
 #include <dune/functions/functionspacebases/hierarchicnodetorangemap.hh>
 #include <dune/functions/functionspacebases/flatvectorview.hh>
 #include <dune/functions/gridfunctions/gridviewentityset.hh>
@@ -475,7 +474,6 @@ public:
 
 private:
   using Field = field_t<typename Base::Coefficient>;
-  using ReferenceJacobian = std::vector< FieldVector<Field, Base::Element::Geometry::mydimension> >;
 
   template<class Node>
   using LocalBasisRange = typename Node::FiniteElement::Traits::LocalBasisType::Traits::JacobianType;
@@ -548,7 +546,7 @@ public:
       Range y;
       istlVectorBackend(y) = 0;
 
-      const auto& jacobianInverseTransposed = geometry_->jacobianInverseTransposed(x);
+      const auto& jacobianInverse = geometry_->jacobianInverse(x);
 
       TypeTree::forEachLeafNode(this->localView_.tree(), [&](auto&& node, auto&& treePath) {
         const auto& nodeToRangeEntry = *this->data_->nodeToRangeEntry;
@@ -558,33 +556,34 @@ public:
 
         localBasis.evaluateJacobian(x, shapeFunctionJacobians);
 
-        auto re = flatVectorView(nodeToRangeEntry(node, treePath, y));
-        static constexpr int coordDim = Element::Geometry::coorddimension;
-        static constexpr int refDim = Element::Geometry::mydimension;
-        // TODO: make sure this does not do new allocations
-        refJacobian_.assign(re.size() / coordDim, typename ReferenceJacobian::value_type(Field{0}));
-
         // compute Jacobian wrt. reference coordinates
 
-        for (size_type i = 0; i < localBasis.size(); ++i)
+        using RefJacobian = LocalBasisRange< std::decay_t<decltype(node)> >;
+        static constexpr auto coeffDim = decltype(flatVectorView(this->localDoFs_[node.localIndex(0)]).size())::value;
+        auto refJacobians = std::array<RefJacobian, coeffDim>{};
+        refJacobians.fill(RefJacobian(Field{0}));
+        for (std::size_t j = 0; j < coeffDim; ++j)
         {
-          auto c = flatVectorView(this->localDoFs_[node.localIndex(i)]);
-          auto v = flatVectorView(shapeFunctionJacobians[i]);
-          for (size_type j = 0; j < c.size(); ++j) {
-            auto&& c_j = c[j];
-            for (size_type k = 0; k < v.size(); ++k) {
-              refJacobian_[j*v.size() + k/refDim][k%refDim] += c_j * v[k];
-            }
+          for (size_type i = 0; i < localBasis.size(); ++i)
+          {
+            auto c = flatVectorView(this->localDoFs_[node.localIndex(i)]);
+            refJacobians[j].axpy(c[j], shapeFunctionJacobians[i]);
           }
         }
 
         // multiply with Jacobian of inverse coordinate map to get
-        // Jacobian wrt. world coordinates
+        // Jacobian wrt. world coordinates and update result
 
-        for (size_type i = 0; i < refJacobian_.size(); ++i)
-        {
-          auto ji = Imp::VectorSpan<decltype(re), coordDim>(re, i * coordDim);
-          jacobianInverseTransposed.umv(refJacobian_[i], ji);
+        using Jacobian = decltype(refJacobians[0] * jacobianInverse);
+        auto jacobians = std::array<Jacobian, coeffDim>{};
+        std::transform(
+          refJacobians.begin(), refJacobians.end(), jacobians.begin(),
+          [&](const auto& refJacobian) { return refJacobian * jacobianInverse; });
+        auto flatJacobians = flatVectorView(jacobians);
+        auto flatY = flatVectorView(nodeToRangeEntry(node, treePath, y));
+        assert(flatJacobians.size() == flatY.size());
+        for (size_type i = 0; i < flatY.size(); ++i) {
+          flatY[i] += flatJacobians[i];
         }
       });
 
@@ -599,7 +598,6 @@ public:
 
   private:
     std::optional<typename Element::Geometry> geometry_;
-    mutable ReferenceJacobian refJacobian_;
   };
 
   /**

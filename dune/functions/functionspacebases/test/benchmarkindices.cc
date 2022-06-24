@@ -46,32 +46,31 @@ void benchmarkIndices(int n, const Basis& basis)
       << "       " << sum << std::endl;
   }
 
-  if constexpr (std::is_same_v<typename Basis::MultiIndex, Dune::Functions::StaticMultiIndex<std::size_t, 1>>)
-  {
-    auto localView = basis.localView();
-    auto timer = Dune::Timer();
-    long unsigned int sum = 0;
-    for (std::size_t i = 0; i<n; ++i)
-    {
-      for (const auto& e : Dune::elements(basis.gridView()))
-      {
-        localView.bind(e);
-        auto index = localView.index(0)[0];
-        for (std::size_t j = 0; j<localView.size(); ++j)
-        {
-          index++;
-          sum += index;
-        }
-      }
-    }
-    std::cout << "Incrementing from local index cache   :" << n << " times took: " << timer.elapsed()
-      << "       " << sum << std::endl;
-  }
+//  if constexpr (std::is_same_v<typename Basis::MultiIndex, Dune::Functions::StaticMultiIndex<std::size_t, 1>>)
+//  {
+//    auto localView = basis.localView();
+//    auto timer = Dune::Timer();
+//    long unsigned int sum = 0;
+//    for (std::size_t i = 0; i<n; ++i)
+//    {
+//      for (const auto& e : Dune::elements(basis.gridView()))
+//      {
+//        localView.bind(e);
+//        auto index = localView.index(0)[0];
+//        for (std::size_t j = 0; j<localView.size(); ++j)
+//        {
+//          index++;
+//          sum += index;
+//        }
+//      }
+//    }
+//    std::cout << "Incrementing from local index cache   :" << n << " times took: " << timer.elapsed()
+//      << "       " << sum << std::endl;
+//  }
 
   auto cachedBasis = Dune::Functions::CachedGlobalBasis(basis);
   {
     auto localView = cachedBasis.localView();
-    //  double sum = 0;
     auto timer = Dune::Timer();
     long unsigned int sum = 0;
     for (std::size_t i = 0; i<n; ++i)
@@ -108,6 +107,29 @@ void benchmarkIndices(int n, const Basis& basis)
     std::cout << "Incrementing from global index cache  :" << n << " times took: " << timer.elapsed()
       << "       " << sum << std::endl;
   }
+
+  if constexpr (std::is_same_v<typename Basis::MultiIndex, Dune::Functions::StaticMultiIndex<std::size_t, 1>>)
+  {
+    auto localView = cachedBasis.localView();
+    auto timer = Dune::Timer();
+    long unsigned int sum = 0;
+    for (std::size_t i = 0; i<n; ++i)
+    {
+      for (const auto& e : Dune::elements(cachedBasis.gridView()))
+      {
+        localView.bind(e);
+        std::size_t index = sum + 0.42;
+        for (std::size_t j = 0; j<localView.size(); ++j)
+        {
+          index++;
+          sum += index;
+        }
+      }
+    }
+    std::cout << "Incrementing from fake global index   :" << n << " times took: " << timer.elapsed()
+      << "       " << sum << std::endl;
+  }
+
 }
 
 
@@ -262,7 +284,23 @@ int main (int argc, char* argv[])
       )
     );
 
-  benchmarkIndices(10,
+  benchmarkIndices(1000,
+      makeBasis(gridView, lagrangeDG<1>())
+    );
+
+  benchmarkIndices(1000,
+      makeBasis(gridView, lagrangeDG<2>())
+    );
+
+  benchmarkIndices(1000,
+      makeBasis(gridView, lagrangeDG<3>())
+    );
+
+  benchmarkIndices(1000,
+      makeBasis(gridView, lagrangeDG<4>())
+    );
+
+  benchmarkIndices(1000,
       makeBasis(gridView, lagrangeDG<5>())
     );
 

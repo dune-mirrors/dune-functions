@@ -47,6 +47,7 @@ corresponding version of the Dune core modules.
   the two concepts outside dune-functions will have to implement this
   additional method.
 - The derivative of a `DiscreteGlobalBasisFunction` is now implemented.
+- Remove the type alias `Geometry` from `AnalyticGridViewFunction`
 
 ## Release 2.8
 

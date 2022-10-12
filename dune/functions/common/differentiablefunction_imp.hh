@@ -20,32 +20,22 @@ namespace Imp {
 /**
  * A concept describing types that have a derivative() method found by ADL
  */
-struct HasFreeDerivative
-{
-  template<class F>
-  auto require(F&& f) -> decltype(
-    derivative(f)
-  );
+template<class F>
+concept HasFreeDerivative = requires(const F& f) {
+  derivative(f);
 };
 
 
 
-template<class Dummy, class F,
-  std::enable_if_t<
-    models< HasFreeDerivative, F>() , int> = 0>
-auto derivativeIfImplemented(const F& f) -> decltype(derivative(f))
+template<class Dummy, class F>
+decltype(auto) derivativeIfImplemented(const F& f)
 {
-  return derivative(f);
-}
-
-
-
-template<class Dummy, class F,
-  std::enable_if_t<
-    not(models< HasFreeDerivative, F>()) , int> = 0>
-Dummy derivativeIfImplemented(const F& f)
-{
-  DUNE_THROW(Dune::NotImplemented, "Derivative not implemented");
+  if constexpr(HasFreeDerivative<F>)
+    return derivative(f);
+  else {
+    DUNE_THROW(Dune::NotImplemented, "Derivative not implemented");
+    return Dummy{};
+  }
 }
 
 

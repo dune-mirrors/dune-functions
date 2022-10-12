@@ -148,8 +148,8 @@ public:
     periodicIndexSet_(std::forward<PIS>(periodicIndexSet))
   {}
 
-  template<class GridView,
-    std::enable_if_t<models<Concept::GlobalBasis<GridView>,RawPreBasisIndicator>(), int> = 0>
+  template<class GridView>
+    requires Concept::GlobalBasis<RawPreBasisIndicator, GridView>
   auto operator()(const GridView& gridView) const
   {
     const auto& rawPreBasis = rawPreBasisIndicator_.preBasis();
@@ -157,8 +157,8 @@ public:
     return Dune::Functions::Experimental::TransformedIndexPreBasis(std::move(rawPreBasis), std::move(transformation));
   }
 
-  template<class GridView,
-    std::enable_if_t<models<Concept::PreBasis<GridView>,RawPreBasisIndicator>(), int> = 0>
+  template<class GridView>
+    requires Concept::PreBasis<RawPreBasisIndicator, GridView>
   auto operator()(const GridView& gridView) const
   {
     const auto& rawPreBasis = rawPreBasisIndicator_;
@@ -166,9 +166,9 @@ public:
     return Dune::Functions::Experimental::TransformedIndexPreBasis(std::move(rawPreBasis), std::move(transformation));
   }
 
-  template<class GridView,
-    std::enable_if_t<not models<Concept::GlobalBasis<GridView>,RawPreBasisIndicator>(), int> = 0,
-    std::enable_if_t<not models<Concept::PreBasis<GridView>,RawPreBasisIndicator>(), int> = 0>
+  template<class GridView>
+    requires (not Concept::PreBasis<RawPreBasisIndicator, GridView> &&
+              not Concept::GlobalBasis<RawPreBasisIndicator, GridView>)
   auto operator()(const GridView& gridView) const
   {
     auto rawPreBasis = rawPreBasisIndicator_(gridView);

@@ -564,7 +564,7 @@ Dune::TestSuite checkConstBasis(const Basis& basis, Flags... flags)
   using GridView = typename Basis::GridView;
 
   // Check if basis models the GlobalBasis concept.
-  test.check(Dune::models<Dune::Functions::Concept::GlobalBasis<GridView>, Basis>(), "global basis concept check")
+  test.check(Dune::Functions::Concept::GlobalBasis<Basis,GridView>, "global basis concept check")
     << "type passed to checkBasis() does not model the GlobalBasis concept";
 
   // Perform all local tests.

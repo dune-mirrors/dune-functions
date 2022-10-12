@@ -31,7 +31,7 @@ Dune::TestSuite checkFaceNormalGridFunction(const GridView& gridView, std::strin
   auto testSuite = Dune::TestSuite(name);
 
   // Check is GridFunction concept is satisfied
-  testSuite.check(isGridFunction<F, Range(Domain), EntitySet>())
+  testSuite.check(isGridFunction<F, Range, Domain, EntitySet>())
     << "FaceNormalGridFunction does not model GridFunction concept";
 
   // Check if normals coincide with intersection normals

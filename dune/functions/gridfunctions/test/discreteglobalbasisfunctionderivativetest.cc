@@ -106,11 +106,11 @@ int main(int argc, char** argv)
     auto f2prime = derivative(f2);
     static_assert(Dune::Functions::Concept::isDifferentiableGridViewFunction<
                   decltype(f2),
-                  double(Dune::FieldVector<double, 2>),
+                  double, Dune::FieldVector<double, 2>,
                   std::decay_t<decltype(gridView)>>());
     static_assert(Dune::Functions::Concept::isDifferentiableGridViewFunction<
                   decltype(f2prime),
-                  Dune::FieldVector<double, 2>(Dune::FieldVector<double, 2>),
+                  Dune::FieldVector<double, 2>, Dune::FieldVector<double, 2>,
                   std::decay_t<decltype(gridView)>>());
 
     // `order` should be enough; `order+1` is more than enough.
@@ -145,11 +145,11 @@ int main(int argc, char** argv)
     auto f2prime = derivative(f2);
     static_assert(Dune::Functions::Concept::isDifferentiableGridViewFunction<
                   decltype(f2),
-                  Dune::FieldVector<double, 3>(Dune::FieldVector<double, 2>),
+                  Dune::FieldVector<double, 3>, Dune::FieldVector<double, 2>,
                   std::decay_t<decltype(gridView)>>());
     static_assert(Dune::Functions::Concept::isDifferentiableGridViewFunction<
                   decltype(f2prime),
-                  Dune::FieldMatrix<double, 3, 2>(Dune::FieldVector<double, 2>),
+                  Dune::FieldMatrix<double, 3, 2>, Dune::FieldVector<double, 2>,
                   std::decay_t<decltype(gridView)>>());
 
     // `order` should be enough; `order+1` is more than enough.

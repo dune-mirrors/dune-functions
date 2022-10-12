@@ -15,24 +15,21 @@ namespace Functions {
 
   namespace Concept {
 
-    struct IndexMergingStrategy
-    {
-      template<typename T>
-      auto require(T&& t) -> decltype(
-        registerIndexMergingStrategy(t)
-      );
+    template <class T>
+    concept IndexMergingStrategy = requires(T t) {
+      registerIndexMergingStrategy(t);
     };
 
     template<typename T>
     static constexpr bool isIndexMergingStrategy()
     {
-      return models<Concept::IndexMergingStrategy,T>();
+      return Concept::IndexMergingStrategy<T>;
     }
 
     template<typename T>
-    static constexpr bool isIndexMergingStrategy(T&& t)
+    static constexpr bool isIndexMergingStrategy(T t)
     {
-      return models<Concept::IndexMergingStrategy,std::decay_t<T>>();
+      return Concept::IndexMergingStrategy<T>;
     }
 
   } // namespace Concept

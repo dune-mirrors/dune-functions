@@ -53,6 +53,7 @@ namespace Functions {
  * \tparam SPB  The child pre-bases
  */
 template<class IMS, class... SPB>
+  requires (Concept::PreBasis<SPB> &&...)
 class CompositePreBasis
 {
   static const bool isBlocked = std::is_same_v<IMS,BasisFactory::BlockedLexicographic> or std::is_same_v<IMS,BasisFactory::BlockedInterleaved>;
@@ -94,15 +95,11 @@ public:
    * The child pre-basis will be stored as copies
    */
   template<class... SFArgs,
-    disableCopyMove<CompositePreBasis, SFArgs...> = 0,
-    enableIfConstructible<std::tuple<SPB...>, SFArgs...> = 0>
-  CompositePreBasis(SFArgs&&... sfArgs) :
-    subPreBases_(std::forward<SFArgs>(sfArgs)...)
-  {
-    Hybrid::forEach(subPreBases_, [&](const auto& subPreBasis){
-      static_assert(models<Concept::PreBasis<GridView>, std::decay_t<decltype(subPreBasis)>>(), "Subprebases passed to CompositePreBasis does not model the PreBasis concept.");
-    });
-  }
+    disableCopyMove<CompositePreBasis, SFArgs...> = 0>
+  CompositePreBasis(SFArgs&&... sfArgs)
+        requires std::constructible_from<std::tuple<SPB...>, SFArgs...>
+    : subPreBases_(std::forward<SFArgs>(sfArgs)...)
+  {}
 
   /**
    * \brief Constructor for given GridView
@@ -110,19 +107,10 @@ public:
    * This constructor is only available if all child pre-bases are constructible
    * from the grid view.
    */
-  template<class GV,
-    std::enable_if_t<std::conjunction_v<
-      std::bool_constant<(children > 1)>,    // Avoid ambiguous constructor if there's only one child
-      std::is_same<GV, GridView>,
-      std::is_constructible<SPB, GridView>...
-    >, int> = 0>
-  CompositePreBasis(const GV& gv) :
-    subPreBases_(SPB(gv)...)
-  {
-    Hybrid::forEach(subPreBases_, [&](const auto& subPreBasis){
-      static_assert(models<Concept::PreBasis<GridView>, std::decay_t<decltype(subPreBasis)>>(), "Subprebases passed to CompositePreBasis does not model the PreBasis concept.");
-    });
-  }
+  CompositePreBasis(const GridView& gv)
+        requires (children > 1) && (std::constructible_from<SPB, GridView> &&...)
+    : subPreBases_(SPB(gv)...)
+  {}
 
   //! Initialize the global indices
   void initializeIndices()
@@ -391,9 +379,8 @@ private:
  *
  * This is the overload used if the last argument is an IndexMergingStrategy.
  */
-template<
-  typename... Args,
-  std::enable_if_t<Concept::isIndexMergingStrategy<typename LastType<Args...>::type>(),int> = 0>
+template<typename... Args>
+  requires Concept::IndexMergingStrategy<typename LastType<Args...>::type>
 auto composite(Args&&... args)
 {
   // We have to separate the last entry which is the IndexMergingStrategy
@@ -429,9 +416,8 @@ auto composite(Args&&... args)
  * This is the overload used if no IndexMergingStrategy is supplied.
  * In this case the BasisFactory::BlockedLexicographic strategy is used.
  */
-template<
-  typename... Args,
-  std::enable_if_t<not Concept::isIndexMergingStrategy<typename LastType<Args...>::type>(),int> = 0>
+template<typename... Args>
+  requires (not Concept::IndexMergingStrategy<typename LastType<Args...>::type>)
 auto composite(Args&&... args)
 {
   return Imp::CompositePreBasisFactory<BasisFactory::BlockedLexicographic, std::decay_t<Args>...>(std::forward<Args>(args)...);

@@ -282,8 +282,8 @@ struct RotateTuple
 template<class Expression>
 auto callableCheck(Expression f)
 {
-  return [f](auto&&... args){
-    return Functions::Concept::isCallable(f, std::forward<decltype(args)>(args)...);
+  return [](auto&&... args){
+    return std::bool_constant<Functions::Concept::Callable<Expression, decltype(args)...>>{};
   };
 }
 

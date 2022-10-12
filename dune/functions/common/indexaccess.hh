@@ -27,21 +27,14 @@ namespace Imp {
 
 namespace Concept {
 
-template<class size_type>
-struct HasDynamicIndexAccess
-{
-  template<class C>
-  auto require(C&& c) -> decltype(
-    c[std::declval<size_type>()]
-  );
+template<class C, class size_type>
+concept HasDynamicIndexAccess = requires(C&& c, size_type idx) {
+  c[idx];
 };
 
-struct HasStaticIndexAccess
-{
-  template<class C>
-  auto require(C&& c) -> decltype(
-    c[Dune::Indices::_0]
-  );
+template<class C>
+concept HasStaticIndexAccess = requires(C&& c) {
+  c[Dune::Indices::_0];
 };
 
 } // namespace Concept
@@ -62,8 +55,8 @@ struct HasStaticIndexAccess
  * \param i The index to use for accessing the container
  * \param f A functor to call with the result of operator[]
  */
-template<class C, class I, class F,
-  std::enable_if_t< Dune::models<Imp::Concept::HasDynamicIndexAccess<I>, C>(), int> = 0>
+template<class C, class I, class F>
+  requires Imp::Concept::HasDynamicIndexAccess<C,I>
 auto hybridIndexAccess(C&& c, const I& i, F&& f)
   -> decltype(f(c[i]))
 {
@@ -87,8 +80,8 @@ auto hybridIndexAccess(C&& c, const I& i, F&& f)
  * \param i The index to use for accessing the container
  * \param f A functor to call with the result of operator[]
  */
-template<class C, class I, class F,
-  std::enable_if_t< not Dune::models<Imp::Concept::HasDynamicIndexAccess<I>, C>(), int> = 0>
+template<class C, class I, class F>
+  requires (not Imp::Concept::HasDynamicIndexAccess<C,I>)
 decltype(auto) hybridIndexAccess(C&& c, const I& i, F&& f)
 {
   using Size = decltype(Hybrid::size(c));
@@ -241,20 +234,16 @@ struct MultiIndexResolver
     index_(index)
   {}
 
-  template<class C,
-    std::enable_if_t<not std::is_convertible_v<C&, Result>, int> = 0>
+  template<class C>
   Result operator()(C&& c)
   {
-    auto&& subIndex = Imp::shiftedDynamicMultiIndex<1>(index_);
-    auto&& subIndexResolver = MultiIndexResolver<Result, decltype(subIndex)>(subIndex);
-    return (Result)(hybridIndexAccess(c, index_[Dune::Indices::_0], subIndexResolver));
-  }
-
-  template<class C,
-    std::enable_if_t<std::is_convertible_v<C&, Result>, int> = 0>
-  Result operator()(C&& c)
-  {
-    return (Result)(std::forward<C>(c));
+    if constexpr(std::convertible_to<C&, Result>)
+      return (Result)(std::forward<C>(c));
+    else {
+      auto&& subIndex = Imp::shiftedDynamicMultiIndex<1>(index_);
+      auto&& subIndexResolver = MultiIndexResolver<Result, decltype(subIndex)>(subIndex);
+      return (Result)(hybridIndexAccess(c, index_[Dune::Indices::_0], subIndexResolver));
+    }
   }
 
   const Index& index_;

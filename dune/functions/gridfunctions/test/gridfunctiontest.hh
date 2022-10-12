@@ -86,25 +86,25 @@ bool checkGridViewFunction(const GridView& gridView, const F& f, double exactInt
 
 
   std::cout << "Checking raw function f on grid view" << std::endl;
-  passed = checkTrue(isGridFunction<decltype(f), Range(Domain), EntitySet>(), "Function does not model GridFunction concept");
+  passed = checkTrue(isGridFunction<decltype(f), Range, Domain, EntitySet>(), "Function does not model GridFunction concept");
   integral = integrateGridViewFunction(gridView, f, quadOrder);
   passed = checkTrue(std::abs(integral-exactIntegral) < 1e-10, "Integral is "+std::to_string(integral)+" but should be "+std::to_string(exactIntegral));
 
   std::cout << "Checking GridFunction<Range(Domain), EntitySet>(f) on grid view" << std::endl;
   GridFunction<Range(Domain), EntitySet> f2 = f;
-  passed = checkTrue(isGridFunction<decltype(f2), Range(Domain), EntitySet>(), "Function does not model GridFunction concept");
+  passed = checkTrue(isGridFunction<decltype(f2), Range, Domain, EntitySet>(), "Function does not model GridFunction concept");
   integral = integrateGridViewFunction(gridView, f2, quadOrder);
   passed = checkTrue(std::abs(integral-exactIntegral) < 1e-10, "Integral is "+std::to_string(integral)+" but should be "+std::to_string(exactIntegral));
 
   std::cout << "Checking GridViewFunction<Range(Domain), GridView>(f) on grid view" << std::endl;
   GridViewFunction<Range(Domain), GridView> f3 = f;
-  passed = checkTrue(isGridFunction<decltype(f3), Range(Domain), EntitySet>(), "Function does not model GridFunction concept");
+  passed = checkTrue(isGridFunction<decltype(f3), Range, Domain, EntitySet>(), "Function does not model GridFunction concept");
   integral = integrateGridViewFunction(gridView, f3, quadOrder);
   passed = checkTrue(std::abs(integral-exactIntegral) < 1e-10, "Integral is "+std::to_string(integral)+" but should be "+std::to_string(exactIntegral));
 
   std::cout << "Checking makeGridFunction(f) on grid view" << std::endl;
   auto f4 = makeGridViewFunction(f, gridView);
-  passed = checkTrue(isGridFunction<decltype(f4), Range(Domain), EntitySet>(), "Function does not model GridFunction concept");
+  passed = checkTrue(isGridFunction<decltype(f4), Range, Domain, EntitySet>(), "Function does not model GridFunction concept");
   integral = integrateGridViewFunction(gridView, f4, quadOrder);
   passed = checkTrue(std::abs(integral-exactIntegral) < 1e-10, "Integral is "+std::to_string(integral)+" but should be "+std::to_string(exactIntegral));
 

@@ -46,6 +46,7 @@ namespace Functions {
  * \tparam PB  Pre-basis providing the implementation details
  */
 template<class PB>
+  requires Concept::PreBasis<PB>
 class DefaultGlobalBasis
 {
 
@@ -81,13 +82,12 @@ public:
    * This will forward all arguments to the constructor of PreBasis
    */
   template<class... T,
-    disableCopyMove<DefaultGlobalBasis, T...> = 0,
-    enableIfConstructible<PreBasis, T...> = 0>
-  DefaultGlobalBasis(T&&... t) :
-    preBasis_(std::forward<T>(t)...),
-    prefixPath_()
+    disableCopyMove<DefaultGlobalBasis, T...> = 0>
+  DefaultGlobalBasis(T&&... t)
+        requires std::constructible_from<PreBasis, T...>
+    : preBasis_(std::forward<T>(t)...)
+    , prefixPath_()
   {
-    static_assert(models<Concept::PreBasis<GridView>, PreBasis>(), "Type passed to DefaultGlobalBasis does not model the PreBasis concept.");
     preBasis_.initializeIndices();
   }
 
@@ -97,15 +97,12 @@ public:
    * \param gridView  The GridView this basis is based on
    * \param factory  A factory functor that gets the `gridView` and returns a `PreBasis`
    */
-  template<class PreBasisFactory,
-    std::enable_if_t<Dune::IsCallable<PreBasisFactory(GridView), PreBasis>::value, int> = 0>
+  template<class PreBasisFactory>
+    requires Dune::IsCallable<PreBasisFactory(GridView), PreBasis>::value
   DefaultGlobalBasis(const GridView& gridView, PreBasisFactory&& factory) :
     preBasis_(factory(gridView)),
     prefixPath_()
-  {
-    static_assert(models<Concept::PreBasis<GridView>, PreBasis>(), "Type passed to DefaultGlobalBasis does not model the PreBasis concept.");
-    preBasis_.initializeIndices();
-  }
+  {}
 
   //! Obtain the grid view that the basis is defined on
   const GridView& gridView() const

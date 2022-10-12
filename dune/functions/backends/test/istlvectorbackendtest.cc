@@ -104,7 +104,7 @@ Dune::TestSuite checkISTLVectorBackend(std::string shortName="")
   // Create wrapped vector
   auto x = Dune::Functions::istlVectorBackend(x_raw);
 
-  test.require(Dune::models<Dune::Functions::Concept::VectorBackend<Basis>, decltype(x)>(), "VectorBackend concept check")
+  test.require(Dune::Functions::Concept::VectorBackend<decltype(x),Basis>, "VectorBackend concept check")
     << "Object returned by istlVectorBackend() does not model the VectorBackend concept";
 
   // Resize wrapped vector using basis

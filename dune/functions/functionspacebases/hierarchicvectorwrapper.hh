@@ -47,7 +47,21 @@ namespace Imp {
       using type = E;
     };
 
-    using type = typename DefaultCoefficientTypeHelper<V, StaticSizeOrZero<MultiIndex>::value>::type;
+    template<class MI>
+      requires HasStaticSize<MI>::value
+    static constexpr std::size_t getStaticSizeOrZero()
+    {
+      return StaticSize<MI>::value;
+    }
+
+    template<class MI>
+      requires (not HasStaticSize<MI>::value)
+    static constexpr std::size_t getStaticSizeOrZero()
+    {
+      return 0;
+    }
+
+    using type = typename DefaultCoefficientTypeHelper<V, getStaticSizeOrZero<MultiIndex>()>::type;
   };
 
 
@@ -97,9 +111,8 @@ HierarchicVectorWrapper
 
   using size_type = std::size_t;
 
-  template<class C, class SizeProvider,
-    std::enable_if_t< not models<Concept::HasResize, C>(), int> = 0,
-    std::enable_if_t< not models<Concept::HasSizeMethod, C>(), int> = 0>
+  template<class C, class SizeProvider>
+    requires (not Concept::HasResize<C>) && (not Concept::HasSizeMethod<C>)
   static void resizeHelper(C& c, const SizeProvider& sizeProvider, typename SizeProvider::SizePrefix prefix)
   {
     auto size = sizeProvider.size(prefix);
@@ -117,9 +130,8 @@ HierarchicVectorWrapper
     }
   };
 
-  template<class C, class SizeProvider,
-    std::enable_if_t< not models<Concept::HasResize, C>(), int> = 0,
-    std::enable_if_t< models<Concept::HasSizeMethod, C>(), int> = 0>
+  template<class C, class SizeProvider>
+    requires (not Concept::HasResize<C> && Concept::HasSizeMethod<C>)
   static void resizeHelper(C& c, const SizeProvider& sizeProvider, typename SizeProvider::SizePrefix prefix)
   {
     auto size = sizeProvider.size(prefix);
@@ -136,8 +148,8 @@ HierarchicVectorWrapper
       });
   }
 
-  template<class C, class SizeProvider,
-    std::enable_if_t< models<Concept::HasResize, C>(), int> = 0>
+  template<class C, class SizeProvider>
+    requires Concept::HasResize<C>
   static void resizeHelper(C& c, const SizeProvider& sizeProvider, typename SizeProvider::SizePrefix prefix)
   {
     auto size = sizeProvider.size(prefix);
@@ -235,11 +247,8 @@ HierarchicVectorWrapper< V > hierarchicVector(V& v)
 
 
 
-/**
- * \deprecated This function is deprecated. Use istlVectorBackend() instead.
- */
-template<class MultiIndex, class V,
-    std::enable_if_t< models<Concept::HasIndexAccess, V, MultiIndex>(), int> = 0>
+template<class MultiIndex, class V>
+  requires Concept::HasIndexAccess<V, MultiIndex>
 V& makeHierarchicVectorForMultiIndex(V& v)
 {
   return v;
@@ -247,11 +256,8 @@ V& makeHierarchicVectorForMultiIndex(V& v)
 
 
 
-/**
- * \deprecated This function is deprecated. Use istlVectorBackend() instead.
- */
-template<class MultiIndex, class V,
-    std::enable_if_t< not models<Concept::HasIndexAccess, V, MultiIndex>(), int> = 0>
+template<class MultiIndex, class V>
+  requires (not Concept::HasIndexAccess<V, MultiIndex>)
 HierarchicVectorWrapper< V > makeHierarchicVectorForMultiIndex(V& v)
 {
   return HierarchicVectorWrapper<V>(v);

@@ -166,8 +166,8 @@ public:
    * \param innerFunctions The inner grid functions
    */
   template<class OFT, class... IFT,
-    disableCopyMove<ComposedGridFunction, OFT> = 0,
-    std::enable_if_t<(sizeof...(IFT) > 0), int> = 0>
+    disableCopyMove<ComposedGridFunction, OFT> = 0>
+      requires (sizeof...(IFT) > 0)
   ComposedGridFunction(OFT&& outerFunction, IFT&&... innerFunctions) :
     outerFunction_(std::forward<OFT>(outerFunction)),
     innerFunctions_(std::forward<IFT>(innerFunctions)...)

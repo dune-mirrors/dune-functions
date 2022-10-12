@@ -73,7 +73,7 @@ public:
     globalBasis_(&globalBasis),
     tree_(globalBasis_->preBasis().makeNode())
   {
-    static_assert(models<Concept::BasisTree<GridView>, Tree>(), "Tree type passed to DefaultLocalView does not model the BasisNode concept.");
+    static_assert(Concept::BasisTree<Tree,GridView>, "Tree type passed to DefaultLocalView does not model the BasisNode concept.");
     initializeTree(tree_);
   }
 

@@ -7,7 +7,7 @@
 #ifndef DUNE_FUNCTIONS_COMMON_POLYMORPHICSMALLOBJECT_HH
 #define DUNE_FUNCTIONS_COMMON_POLYMORPHICSMALLOBJECT_HH
 
-#include <cstddef>
+#include <concepts>
 #include <utility>
 #include <type_traits>
 #include <algorithm>
@@ -69,9 +69,8 @@ public:
    * \tparam Derived Type of object to be stored, must be derived from Base
    * \param derived Object to be stored
    */
-  template<class Derived,
-        std::enable_if_t<std::is_base_of_v<Base, std::remove_cv_t<
-          std::remove_reference_t<Derived>>>, int> = 0>
+  template<class Derived>
+    requires std::derived_from<std::decay_t<Derived>, Base>
   PolymorphicSmallObject(Derived&& derived)
   {
     constexpr bool useBuffer = (sizeof(Derived) <= bufferSize)

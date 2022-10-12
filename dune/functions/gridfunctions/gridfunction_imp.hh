@@ -20,12 +20,9 @@ namespace Imp {
 /**
  * A concept describing types that have a localFunction() method found by ADL
  */
-struct HasFreeLocalFunction
-{
-  template<class F>
-  auto require(F&& f) -> decltype(
-    localFunction(f)
-  );
+template<class F>
+concept HasFreeLocalFunction = requires(const F& f) {
+  localFunction(f);
 };
 
 

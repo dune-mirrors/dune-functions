@@ -20,24 +20,17 @@ using namespace Dune::Concept;
 
 
 // Concept for a ConstVectorBackend
-template<class GlobalBasis>
-struct ConstVectorBackend
-{
-  template<class V>
-  auto require(const V& v) -> decltype(
-    v[std::declval<typename GlobalBasis::MultiIndex>()]
-  );
+template<class V, class GlobalBasis>
+concept ConstVectorBackend = requires(const V& v, typename GlobalBasis::MultiIndex mi) {
+  v[mi];
 };
 
 // Concept for a VectorBackend
-template<class GlobalBasis>
-struct VectorBackend : Refines<ConstVectorBackend<GlobalBasis>>
-{
-  template<class V>
-  auto require(const V& v) -> decltype(
-    const_cast<V&>(v).resize(std::declval<const GlobalBasis&>()),
-    const_cast<V&>(v)[std::declval<typename GlobalBasis::MultiIndex>()] = v[std::declval<typename GlobalBasis::MultiIndex>()]
-  );
+template<class V, class GlobalBasis>
+concept VectorBackend = ConstVectorBackend<V,GlobalBasis>
+&& requires(V& v, typename GlobalBasis::MultiIndex mi, const GlobalBasis& sizeProvider) {
+  v.resize(sizeProvider);
+  v[mi] = v[mi];
 };
 
 } // namespace Dune::Functions::Concept

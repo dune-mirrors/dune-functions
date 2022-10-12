@@ -7,6 +7,7 @@
 #ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_BOUNDARYDOFS_HH
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_BOUNDARYDOFS_HH
 
+#include <concepts>
 #include <utility>
 
 #include <dune/functions/functionspacebases/subentitydofs.hh>
@@ -35,8 +36,8 @@ namespace Functions {
  * \param basis A function space basis
  * \param f A callback that will be called with a local index, a bound local view, and an intersection of the visited boundary DOF
  */
-template<class Basis, class F,
-  decltype(std::declval<std::decay_t<F>>()(0, std::declval<typename Basis::LocalView>(),std::declval<typename Basis::GridView::Intersection>()), 0) = 0>
+template<class Basis, class F>
+  requires std::invocable<std::decay_t<F>, typename Basis::size_type, typename Basis::LocalView, typename Basis::GridView::Intersection>
 void forEachBoundaryDOF(const Basis& basis, F&& f)
 {
   auto localView = basis.localView();
@@ -72,8 +73,8 @@ void forEachBoundaryDOF(const Basis& basis, F&& f)
  * \param basis A function space basis
  * \param f A callback that will be called with a local index and a bound local view of the visited boundary DOF
  */
-template<class Basis, class F,
-  decltype(std::declval<std::decay_t<F>>()(0, std::declval<typename Basis::LocalView>()),0) = 0>
+template<class Basis, class F>
+  requires std::invocable<std::decay_t<F>, typename Basis::size_type, typename Basis::LocalView>
 void forEachBoundaryDOF(const Basis& basis, F&& f)
 {
   auto localView = basis.localView();
@@ -108,8 +109,8 @@ void forEachBoundaryDOF(const Basis& basis, F&& f)
  * \param basis A function space basis
  * \param f A callback that will be called with the global index of the visited boundary DOF
  */
-template<class Basis, class F,
-  decltype(std::declval<std::decay_t<F>>()(std::declval<typename Basis::MultiIndex>()),0) = 0>
+template<class Basis, class F>
+  requires std::invocable<std::decay_t<F>, typename Basis::MultiIndex>
 void forEachBoundaryDOF(const Basis& basis, F&& f)
 {
   auto localView = basis.localView();

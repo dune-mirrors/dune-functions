@@ -47,8 +47,9 @@ namespace Functions {
  * \tparam C    The exponent of the power node
  */
 template<class IMS, class SPB, std::size_t C>
+  requires Concept::PreBasis<SPB>
 class PowerPreBasis :
-    public DynamicPowerPreBasis<IMS,SPB>
+  public DynamicPowerPreBasis<IMS,SPB>
 {
   using Base = DynamicPowerPreBasis<IMS,SPB>;
 
@@ -75,10 +76,10 @@ public:
    * The child factories will be stored as copies
    */
   template<class... SFArgs,
-    disableCopyMove<PowerPreBasis, SFArgs...> = 0,
-    enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  explicit PowerPreBasis(SFArgs&&... sfArgs) :
-    Base(std::size_t(C), std::forward<SFArgs>(sfArgs)...)
+    disableCopyMove<PowerPreBasis, SFArgs...> = 0>
+  PowerPreBasis(SFArgs&&... sfArgs)
+        requires std::constructible_from<SubPreBasis, SFArgs...>
+    : Base(std::size_t(C), std::forward<SFArgs>(sfArgs)...)
   {}
 
   /**

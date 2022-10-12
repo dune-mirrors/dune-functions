@@ -206,14 +206,14 @@ void interpolate(const B& basis, C&& coeff, const F& f, const BV& bv, const NTRE
   using Element = typename GridView::template Codim<0>::Entity;
   using GlobalDomain = typename Element::Geometry::GlobalCoordinate;
 
-  static_assert(Dune::Functions::Concept::isCallable<F, GlobalDomain>(), "Function passed to interpolate does not model the Callable<GlobalCoordinate> concept");
+  static_assert(std::invocable<F, GlobalDomain>, "Function passed to interpolate does not model the Callable<GlobalCoordinate> concept");
 
   auto&& gridView = basis.gridView();
 
   // Small helper functions to wrap vectors using istlVectorBackend
   // if they do not already satisfy the VectorBackend interface.
   auto toVectorBackend = [&](auto& v) -> decltype(auto) {
-    if constexpr (models<Concept::VectorBackend<B>, decltype(v)>()) {
+    if constexpr (Concept::VectorBackend<decltype(v), B>) {
       return v;
     } else {
       return istlVectorBackend(v);
@@ -221,7 +221,7 @@ void interpolate(const B& basis, C&& coeff, const F& f, const BV& bv, const NTRE
   };
 
   auto toConstVectorBackend = [&](auto& v) -> decltype(auto) {
-    if constexpr (models<Concept::ConstVectorBackend<B>, decltype(v)>()) {
+    if constexpr (Concept::ConstVectorBackend<decltype(v), B>) {
       return v;
     } else {
       return istlVectorBackend(v);

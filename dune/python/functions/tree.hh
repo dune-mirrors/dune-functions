@@ -24,13 +24,13 @@ namespace Functions {
 
 namespace detail {
 
-template<typename Tree, std::enable_if_t< Tree::isComposite, int > = 0>
+template<typename Tree> requires Tree::isComposite
 void registerTree_(pybind11::handle scope, const char* name = "Tree");
 
-template<typename Tree, std::enable_if_t< Tree::isLeaf, int > = 0>
+template<typename Tree> requires Tree::isLeaf
 void registerTree_(pybind11::handle scope, const char* name = "Tree");
 
-template<typename Tree, std::enable_if_t< Tree::isPower, int > = 0>
+template<typename Tree> requires Tree::isPower
 void registerTree_(pybind11::handle scope, const char* name = "Tree");
 
 template<typename Tree>
@@ -73,7 +73,7 @@ void registerTreeChildAccessor(pybind11::class_<Tree, std::shared_ptr<Tree>>& cl
     pybind11::arg("i"));
 }
 
-template<typename Tree, std::enable_if_t< Tree::isComposite, int > >
+template<typename Tree> requires Tree::isComposite
 void registerTree_(pybind11::handle scope, const char* name)
 {
   if( !pybind11::already_registered< Tree >() )
@@ -103,13 +103,13 @@ struct hasFiniteElement<Tree, void_t<typename Tree::FiniteElement>>
   : std::true_type
 {};
 
-template< typename Tree, std::enable_if_t< !hasFiniteElement<Tree>::value, int > = 0>
+template< typename Tree > requires !hasFiniteElement<Tree>::value
 void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree> >&)
 {
   /* Nothing. */
 }
 
-template< typename Tree, std::enable_if_t< hasFiniteElement<Tree>::value, int > = 0>
+template< typename Tree > requires hasFiniteElement<Tree>::value
 void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree> >& cls)
 {
   // this should probably be fixed in dune-localfunctions
@@ -126,7 +126,7 @@ void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree>
 // using static to avoid double registration doesn't work with clang
 // because statics remain local to module and are not made unique between modules
 // If the class is needed use the TypeRegistry to make this work smoothly
-template<typename Tree, std::enable_if_t< Tree::isLeaf, int >>
+template<typename Tree> requires Tree::isLeaf
 void registerTree_(pybind11::handle scope, const char* name)
 {
   if( !pybind11::already_registered< Tree >() )
@@ -137,7 +137,7 @@ void registerTree_(pybind11::handle scope, const char* name)
   }
 }
 
-template<typename Tree, std::enable_if_t< Tree::isPower, int >>
+template<typename Tree> requires Tree::isPower
 void registerTree_(pybind11::handle scope, const char* name)
 {
   if( !pybind11::already_registered< Tree >() )

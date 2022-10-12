@@ -459,7 +459,7 @@ auto makeDiscreteGlobalBasisFunction(B&& basis, V&& vector)
   // Small helper functions to wrap vectors using istlVectorBackend
   // if they do not already satisfy the VectorBackend interface.
   auto toConstVectorBackend = [&](auto&& v) -> decltype(auto) {
-    if constexpr (models<Concept::ConstVectorBackend<Basis>, decltype(v)>()) {
+    if constexpr (Concept::ConstVectorBackend<decltype(v),Basis>) {
       return std::forward<decltype(v)>(v);
     } else {
       return istlVectorBackend(v);

@@ -24,30 +24,30 @@ template<class V>
 struct FlatVectorBackend
 {
 
-  template<class VV, class Index,
-    typename std::enable_if< models<Concept::HasIndexAccess, VV, Index>(), int>::type = 0>
+  template<class VV, class Index>
+    requires Concept::HasIndexAccess<VV, Index>
   static decltype(auto) getEntry(VV&& v, const Index& i)
   {
     return v[i];
   }
 
-  template<class VV, class Index,
-    typename std::enable_if< not models<Concept::HasIndexAccess, VV, Index>(), int>::type = 0>
+  template<class VV, class Index>
+    requires (not Concept::HasIndexAccess<VV, Index>)
   static decltype(auto) getEntry(VV&& v, const Index&)
   {
     return std::forward<VV>(v);
   }
 
-  template<class VV,
-    typename std::enable_if< models<Concept::HasSizeMethod, VV>(), int>::type = 0>
-  static auto size(VV&& v)
+  template<class VV>
+    requires Concept::HasSizeMethod<VV>
+  static auto size(const VV& v)
   {
     return Dune::Hybrid::size(v);
   }
 
-  template<class VV,
-    typename std::enable_if< not models<Concept::HasSizeMethod, VV>(), int>::type = 0>
-  static auto size(VV&&)
+  template<class VV>
+    requires (not Concept::HasSizeMethod<VV>)
+  static auto size(const VV&)
   {
     return Dune::index_constant<1>{};
   }

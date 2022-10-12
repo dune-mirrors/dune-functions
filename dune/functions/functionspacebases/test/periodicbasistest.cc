@@ -60,9 +60,10 @@ int main (int argc, char *argv[]) try
     for (const auto& v1 : vertices(gridView))
       for (const auto& v2 : vertices(gridView))
         if (equivalent(v1.geometry().corner(0), v2.geometry().corner(0)))
-          periodicIndices.unifyIndexPair({gridView.indexSet().index(v1)}, {gridView.indexSet().index(v2)});
+          periodicIndices.unifyIndexPair(gridView.indexSet().index(v1), gridView.indexSet().index(v2));
 
     auto basis = makeBasis(gridView, lagrange<1>());
+    static_assert(Dune::Functions::Concept::GlobalBasis<decltype(basis),GridView>);
     {
       auto periodicBasis = makeBasis(gridView, periodic(lagrange<1>(), periodicIndices));
       std::cout << "Solitary periodic basis has " << periodicBasis.dimension() << " degrees of freedom." << std::endl;
@@ -91,7 +92,7 @@ int main (int argc, char *argv[]) try
     for (const auto& v1 : vertices(gridView))
       for (const auto& v2 : vertices(gridView))
         if (equivalent(v1.geometry().corner(0), v2.geometry().corner(0)))
-          periodicIndices.unifyIndexPair({gridView.indexSet().index(v1)}, {gridView.indexSet().index(v2)});
+          periodicIndices.unifyIndexPair(gridView.indexSet().index(v1), gridView.indexSet().index(v2));
 
     // Check whether power<periodic> does at least compile
     auto periodicBasis = makeBasis(

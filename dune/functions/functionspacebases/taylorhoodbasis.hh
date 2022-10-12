@@ -135,8 +135,8 @@ public:
 
 private:
 
-  template<bool hi, class SizePrefix,
-    typename std::enable_if<not hi,int>::type = 0>
+  template<bool hi, class SizePrefix>
+    requires (not hi)
   size_type sizeImp(const SizePrefix& prefix) const
   {
     if (prefix.size() == 0)
@@ -152,8 +152,8 @@ private:
     return 0;
   }
 
-  template<bool hi, class SizePrefix,
-    typename std::enable_if<hi,int>::type = 0>
+  template<bool hi, class SizePrefix>
+    requires hi
   size_type sizeImp(const SizePrefix& prefix) const
   {
     if (prefix.size() == 0)
@@ -207,8 +207,8 @@ protected:
     M[0] = M0;
   }
 
-  template<bool hi, class It,
-    typename std::enable_if<not hi,int>::type = 0>
+  template<bool hi, class It>
+    requires (not hi)
   It indicesImp(const Node& node, It multiIndices) const
   {
     using namespace Dune::Indices;
@@ -231,8 +231,8 @@ protected:
     return multiIndices;
   }
 
-  template<bool hi, class It,
-    typename std::enable_if<hi,int>::type = 0>
+  template<bool hi, class It>
+    requires hi
   It indicesImp(const Node& node, It multiIndices) const
   {
     using namespace Dune::Indices;

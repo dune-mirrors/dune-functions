@@ -21,18 +21,18 @@ namespace Functions {
 
 namespace Impl {
 
-template<class V,
-  std::enable_if_t<not Dune::models<Imp::Concept::HasStaticIndexAccess, V>() , int> = 0>
+template<class V>
+  requires (not Imp::Concept::HasStaticIndexAccess<V>)
 auto fieldTypes(V&& /*v*/)
 {
   return TypeList<V>{};
 }
 
-template<class V,
-  std::enable_if_t<Dune::models<Imp::Concept::HasStaticIndexAccess, V>(), int> = 0>
+template<class V>
+  requires Imp::Concept::HasStaticIndexAccess<V>
 auto fieldTypes(V&& v)
 {
-  if constexpr (Dune::models<Imp::Concept::HasDynamicIndexAccess<std::size_t>, V>())
+  if constexpr (Imp::Concept::HasDynamicIndexAccess<V,std::size_t>)
      return fieldTypes(v[std::size_t{0}]);
   else
   {
@@ -146,8 +146,8 @@ class ISTLVectorBackend
   }
 
 
-  template<class C, class SizeProvider,
-    std::enable_if_t<hasResizeMethod<C>::value, int> = 0>
+  template<class C, class SizeProvider>
+    requires hasResizeMethod<C>::value
   static void resize(C&& c, const SizeProvider& sizeProvider, typename SizeProvider::SizePrefix prefix)
   {
     auto size = sizeProvider.size(prefix);
@@ -180,9 +180,8 @@ class ISTLVectorBackend
     }
   }
 
-  template<class C, class SizeProvider,
-    std::enable_if_t<not hasResizeMethod<C>::value, int> = 0,
-    std::enable_if_t<isVector<C>::value, int> = 0>
+  template<class C, class SizeProvider>
+    requires (not hasResizeMethod<C>::value && isVector<C>::value)
   static void resize(C&& c, const SizeProvider& sizeProvider, typename SizeProvider::SizePrefix prefix)
   {
     auto size = sizeProvider.size(prefix);
@@ -218,9 +217,8 @@ class ISTLVectorBackend
     });
   }
 
-  template<class C, class SizeProvider,
-    std::enable_if_t<not hasResizeMethod<C>::value, int> = 0,
-    std::enable_if_t<isScalar<C>::value, int> = 0>
+  template<class C, class SizeProvider>
+    requires (not hasResizeMethod<C>::value && isScalar<C>::value)
   static void resize(C&&, const SizeProvider& sizeProvider, typename SizeProvider::SizePrefix prefix)
   {
     auto size = sizeProvider.size(prefix);
@@ -228,21 +226,18 @@ class ISTLVectorBackend
       DUNE_THROW(RangeError, "Can't resize scalar vector entry v[" << prefix << "] to size(" << prefix << ")=" << size);
   }
 
-  template<class C, class T,
-    std::enable_if_t<std::is_assignable<C&,T>::value, int> = 0>
+  template<class C, class T>
   void recursiveAssign(C& c, const T& t)
   {
-    c = t;
+    if constexpr (std::is_assignable<C&,T>::value)
+      c = t;
+    else {
+      Dune::Hybrid::forEach(c, [&](auto&& ci) {
+        recursiveAssign(ci, t);
+      });
+    }
   }
 
-  template<class C, class T,
-    std::enable_if_t<not std::is_assignable<C&,T>::value, int> = 0>
-  void recursiveAssign(C& c, const T& t)
-  {
-    Dune::Hybrid::forEach(c, [&](auto&& ci) {
-      recursiveAssign(ci, t);
-    });
-  }
 
 public:
 

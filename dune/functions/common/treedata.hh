@@ -41,15 +41,15 @@ UniformNodeVisitor :
     // This is only enabled, if we want to incorporate inner nodes.
     // Checking leafOnly would be sufficient, but for SFINAE the
     // the enable_if condition must depend on the template parameter.
-    template<typename Node, typename TreePath,
-        typename std::enable_if<(not leafOnly) and (not Node::isLeaf), int>::type = 0>
+    template<typename Node, typename TreePath>
+      requires (not leafOnly) and (not Node::isLeaf)
     void pre(Node& node, TreePath treePath)
     {
       static_cast<SimpleNodeVisitorImp*>(this)->apply(node, treePath);
     }
 
-    template<typename Node, typename TreePath,
-        typename std::enable_if<(leafOnly) and (not Node::isLeaf), int>::type = 0>
+    template<typename Node, typename TreePath>
+        requires (leafOnly) and (not Node::isLeaf)
     void pre(Node& node, TreePath treePath)
     {}
 

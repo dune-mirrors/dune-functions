@@ -41,6 +41,7 @@ namespace Functions {
  * \tparam C   The exponent of the power node
  */
 template<class IMS, class SPB, std::size_t C>
+  requires Concept::PreBasis<SPB>
 class PowerPreBasis
 {
   static const std::size_t children = C;
@@ -75,13 +76,11 @@ public:
    * The child factories will be stored as copies
    */
   template<class... SFArgs,
-    disableCopyMove<PowerPreBasis, SFArgs...> = 0,
-    enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  PowerPreBasis(SFArgs&&... sfArgs) :
-    subPreBasis_(std::forward<SFArgs>(sfArgs)...)
-  {
-    static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to PowerPreBasis does not model the PreBasis concept.");
-  }
+    disableCopyMove<PowerPreBasis, SFArgs...> = 0>
+  PowerPreBasis(SFArgs&&... sfArgs)
+        requires std::constructible_from<SubPreBasis, SFArgs...>
+    : subPreBasis_(std::forward<SFArgs>(sfArgs)...)
+  {}
 
   //! Initialize the global indices
   void initializeIndices()

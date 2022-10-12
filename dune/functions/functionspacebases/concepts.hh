@@ -197,7 +197,7 @@ concept LocalView = requires(const V& localView) {
   { localView.tree() } -> std::convertible_to<typename V::Tree>;
   { localView.size() } -> std::convertible_to<typename V::size_type>;
   { localView.maxSize() } -> std::convertible_to<typename V::size_type>;
-  { localView.globalBasis() } -> std::convertible_to<typename V::GlobalBasis>;
+  { localView.globalBasis() } -> std::convertible_to<const typename V::GlobalBasis&>;
 
   requires BasisTree<typename V::Tree, typename V::GridView>;
   requires requires(typename V::size_type idx) {

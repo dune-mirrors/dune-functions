@@ -42,21 +42,22 @@ concept HasIndexAccess = requires(C c, I i) {
 
 // Concept for a BasisNode in a local ansatz tree
 template <class N>
-concept BasisNode = requires(const N& node, typename N::size_type idx) {
+concept BasisNode = std::derived_from<N, BasisNodeMixin>
+&& requires(const N& node, typename N::size_type idx) {
   typename N::size_type;
 
   { node.size() } -> std::convertible_to<typename N::size_type>;
   { node.localIndex(idx) } -> std::convertible_to<typename N::size_type>;
   { node.treeIndex() } -> std::convertible_to<typename N::size_type>;
-
-  requires std::derived_from<N, BasisNodeMixin>;
 };
 
 
 
 // Concept for a LeafBasisNode in a local ansatz tree
 template<class N, class GridView>
-concept LeafBasisNode = BasisNode<N> && requires(const N& node) {
+concept LeafBasisNode = BasisNode<N>
+&& std::derived_from<N, Dune::Functions::LeafBasisNode>
+&& requires(const N& node) {
   typename N::Element;
   typename N::FiniteElement;
 
@@ -64,25 +65,14 @@ concept LeafBasisNode = BasisNode<N> && requires(const N& node) {
   { node.finiteElement() } -> std::same_as<const typename N::FiniteElement&>;
 
   requires std::same_as<typename N::Element, typename GridView::template Codim<0>::Entity>;
-  requires std::derived_from<N, Dune::Functions::LeafBasisNode>;
 };
 
-
-namespace Impl {
-
-  template <class GridView, class N, class Child>
-  auto powerBasisNodeConcept(const N& node, const Child& child)
-    requires std::derived_from<N, Dune::Functions::PowerBasisNode<Child, N::degree()>>
-          && BasisNode<Child>
-  {}
-
-} // end namespace Impl
 
 // Concept for a PowerBasisNode in a local ansatz tree
 template<class N, class GridView>
-concept PowerBasisNode = BasisNode<N> && requires(const N& node, typename N::ChildType child) {
-  Impl::powerBasisNodeConcept<GridView>(node, child);
-};
+concept PowerBasisNode = BasisNode<N>
+&& std::derived_from<N, Dune::Functions::PowerBasisNode<typename N::ChildType, N::degree()>>
+&& BasisNode<typename N::ChildType>;
 
 // Concept for a DynamicPowerBasisNode in a local ansatz tree
 template<class GridView>
@@ -112,32 +102,12 @@ concept CompositeBasisNode = BasisNode<N> && requires(const N& node, typename N:
 };
 
 
-namespace Impl {
-
-  template <class GridView, class N>
-  auto basisTreeConcept(const N& node, Dune::TypeTree::LeafNodeTag)
-    requires LeafBasisNode<N,GridView> {}
-
-  template <class GridView, class N>
-  auto basisTreeConcept(const N& node, Dune::TypeTree::DynamicPowerNodeTag)
-    requires PowerBasisNode<N,GridView> {}
-
-  template <class GridView, class N>
-  auto basisTreeConcept(const N& node, Dune::TypeTree::PowerNodeTag)
-    requires PowerBasisNode<N,GridView> {}
-
-  template <class GridView, class N>
-  auto basisTreeConcept(const N& node, Dune::TypeTree::CompositeNodeTag)
-    requires CompositeBasisNode<N,GridView> {}
-
-} // end namespace Impl
-
-
 // Concept for a full local BasisTree
 template<class N, class GridView>
-concept BasisTree = BasisNode<N> && requires(const N& node) {
-  Impl::basisTreeConcept<GridView>(node, typename N::NodeTag{});
-};
+concept BasisTree = BasisNode<N> && (
+  (N::isLeaf && LeafBasisNode<N,GridView>) ||
+  (N::isPower && PowerBasisNode<N,GridView>) ||
+  (N::isComposite && CompositeBasisNode<N,GridView>));
 
 
 template<class PB>

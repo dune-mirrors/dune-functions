@@ -43,7 +43,8 @@ concept HasIndexAccess = requires(C c, I i) {
 // Concept for a BasisNode in a local ansatz tree
 template <class N>
 concept BasisNode = std::derived_from<N, BasisNodeMixin>
-&& requires(const N& node, typename N::size_type idx) {
+&& requires(const N& node, typename N::size_type idx)
+{
   typename N::size_type;
 
   { node.size() } -> std::convertible_to<typename N::size_type>;
@@ -55,9 +56,9 @@ concept BasisNode = std::derived_from<N, BasisNodeMixin>
 
 // Concept for a LeafBasisNode in a local ansatz tree
 template<class N, class GridView>
-concept LeafBasisNode = BasisNode<N>
-&& std::derived_from<N, Dune::Functions::LeafBasisNode>
-&& requires(const N& node) {
+concept LeafBasisNode = N::isLeaf && BasisNode<N>
+&& requires(const N& node)
+{
   typename N::Element;
   typename N::FiniteElement;
 
@@ -67,12 +68,13 @@ concept LeafBasisNode = BasisNode<N>
   requires std::same_as<typename N::Element, typename GridView::template Codim<0>::Entity>;
 };
 
-
 // Concept for a PowerBasisNode in a local ansatz tree
 template<class N, class GridView>
-concept PowerBasisNode = BasisNode<N>
-&& std::derived_from<N, Dune::Functions::PowerBasisNode<typename N::ChildType, N::degree()>>
-&& BasisNode<typename N::ChildType>;
+concept PowerBasisNode = N::isPower && BasisNode<N>;
+
+// Concept for a CompositeBasisNode in a local ansatz tree
+template<class N, class GridView>
+concept CompositeBasisNode = N::isComposite && BasisNode<N>;
 
 // Concept for a DynamicPowerBasisNode in a local ansatz tree
 template<class GridView>
@@ -87,27 +89,40 @@ struct DynamicPowerBasisNode : Refines<BasisNode>
 
 namespace Impl {
 
-  template <class GridView, class N, class... Childs>
-  auto compositeBasisNodeConcept(const N& node, const std::tuple<Childs...>& childs)
-    requires std::derived_from<N, Dune::Functions::CompositeBasisNode<Childs...>>
-          && (BasisNode<Childs> &&... )
-  {}
+template <class GridView, LeafBasisNode<GridView> N>
+constexpr void checkBasisTree(const N& node) {}
+
+template <class GridView, CompositeBasisNode<GridView> N>
+constexpr void checkBasisTree(const N& node);
+
+template <class GridView, PowerBasisNode<GridView> N>
+constexpr void checkBasisTree(const N& node)
+{
+  checkBasisTree<GridView>(node.child(0));
+}
+
+template <class GridView, CompositeBasisNode<GridView> N>
+constexpr void checkBasisTree(const N& node)
+{
+  Dune::unpackIntegerSequence([&](auto... i) {
+    (checkBasisTree<GridView>(node.child(i)),...);
+  }, std::make_index_sequence<N::degree()>{});
+}
 
 } // end namespace Impl
-
-// Concept for a CompositeBasisNode in a local ansatz tree
-template<class N, class GridView>
-concept CompositeBasisNode = BasisNode<N> && requires(const N& node, typename N::ChildTypes childs) {
-  Impl::compositeBasisNodeConcept<GridView>(node, childs);
-};
 
 
 // Concept for a full local BasisTree
 template<class N, class GridView>
-concept BasisTree = BasisNode<N> && (
-  (N::isLeaf && LeafBasisNode<N,GridView>) ||
-  (N::isPower && PowerBasisNode<N,GridView>) ||
-  (N::isComposite && CompositeBasisNode<N,GridView>));
+concept BasisTree = BasisNode<N>
+&& ((N::isLeaf && LeafBasisNode<N,GridView>) ||
+    (N::isPower && PowerBasisNode<N,GridView>) ||
+    (N::isComposite && CompositeBasisNode<N,GridView>))
+&& requires(N tree)
+{
+  // additionally check by function recursion
+  Impl::checkBasisTree<GridView>(tree);
+};
 
 
 template<class PB>
@@ -115,7 +130,8 @@ using MultiIndex = Dune::ReservedVector<typename PB::size_type, PB::multiIndexBu
 
 // Concept for a PreBasis
 template<class PB, class GridView = typename PB::GridView>
-concept PreBasis = requires(const PB& preBasis) {
+concept PreBasis = requires(const PB& preBasis)
+{
   typename PB::GridView;
   typename PB::size_type;
   typename PB::Node;
@@ -150,7 +166,8 @@ concept PreBasis = requires(const PB& preBasis) {
 
 // Concept for a LocalView
 template<class V, class GlobalBasis>
-concept LocalView = requires(const V& localView) {
+concept LocalView = requires(const V& localView)
+{
   typename V::size_type;
   typename V::MultiIndex;
   typename V::GlobalBasis;

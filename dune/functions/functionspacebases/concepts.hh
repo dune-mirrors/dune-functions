@@ -97,17 +97,17 @@ constexpr void checkBasisTree(const N& node);
 
 template <class GridView, PowerBasisNode<GridView> N>
 constexpr void checkBasisTree(const N& node)
-{
-  checkBasisTree<GridView>(node.child(0));
-}
+  requires requires { checkBasisTree<GridView>(node.child(0)); }{}
+
+template <class GridView, class N, std::size_t... I>
+constexpr void checkCompositeBasisTree(const N& node, std::index_sequence<I...>)
+  requires requires { (checkBasisTree<GridView>(node.child(Dune::index_constant<I>{})),...); }{}
 
 template <class GridView, CompositeBasisNode<GridView> N>
 constexpr void checkBasisTree(const N& node)
-{
-  Dune::unpackIntegerSequence([&](auto... i) {
-    (checkBasisTree<GridView>(node.child(i)),...);
-  }, std::make_index_sequence<N::degree()>{});
-}
+  requires requires {
+    checkCompositeBasisTree<GridView>(node, std::make_index_sequence<N::degree()>{});
+  }{}
 
 } // end namespace Impl
 

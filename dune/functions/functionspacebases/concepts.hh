@@ -89,25 +89,32 @@ struct DynamicPowerBasisNode : Refines<BasisNode>
 
 namespace Impl {
 
-template <class GridView, LeafBasisNode<GridView> N>
-constexpr void checkBasisTree(const N& node) {}
+template <class GridView, class N>
+struct CheckBasisTree;
 
-template <class GridView, CompositeBasisNode<GridView> N>
-constexpr void checkBasisTree(const N& node);
+template <class GridView, class N>
+constexpr void checkBasisTree(const N& node)
+  requires requires { CheckBasisTree<GridView,N>::run(node); }{}
+
+template <class GridView, LeafBasisNode<GridView> N>
+struct CheckBasisTree<GridView,N> {
+  static constexpr void run(const N& node) {}
+};
 
 template <class GridView, PowerBasisNode<GridView> N>
-constexpr void checkBasisTree(const N& node)
-  requires requires { checkBasisTree<GridView>(node.child(0)); }{}
-
-template <class GridView, class N, std::size_t... I>
-constexpr void checkCompositeBasisTree(const N& node, std::index_sequence<I...>)
-  requires requires { (checkBasisTree<GridView>(node.child(Dune::index_constant<I>{})),...); }{}
+struct CheckBasisTree<GridView,N> {
+  static constexpr void run(const N& node)
+    requires requires { checkBasisTree<GridView>(node.child(0)); }{}
+};
 
 template <class GridView, CompositeBasisNode<GridView> N>
-constexpr void checkBasisTree(const N& node)
-  requires requires {
-    checkCompositeBasisTree<GridView>(node, std::make_index_sequence<N::degree()>{});
-  }{}
+struct CheckBasisTree<GridView,N> {
+  template <std::size_t... I>
+  static constexpr void impl(const N& node, std::index_sequence<I...>)
+    requires requires { (checkBasisTree<GridView>(node.child(Dune::index_constant<I>{})),...); }{}
+  static constexpr void run(const N& node)
+    requires requires { impl(node, std::make_index_sequence<N::degree()>{}); }{}
+};
 
 } // end namespace Impl
 

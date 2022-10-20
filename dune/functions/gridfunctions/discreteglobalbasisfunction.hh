@@ -382,10 +382,10 @@ public:
   //! Create a grid-function, by wrapping all arguments into shared_ptr.
   template<class B_, class V_, class NTRE_>
   DiscreteGlobalBasisFunction(B_&& basis, V_&& dofs, NTRE_&& nodeToRangeEntry)
-    : DiscreteGlobalBasisFunction{
+    : Base{std::make_shared<Data>(EntitySet{basis.gridView()},
         wrap_or_move(std::forward<B_>(basis)),
         wrap_or_move(std::forward<V_>(dofs)),
-        wrap_or_move(std::forward<NTRE_>(nodeToRangeEntry))}
+        wrap_or_move(std::forward<NTRE_>(nodeToRangeEntry)))}
   {}
 
   //! Not implemented.

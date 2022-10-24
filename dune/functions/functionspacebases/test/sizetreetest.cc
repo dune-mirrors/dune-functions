@@ -63,7 +63,7 @@ std::bool_constant<(i < Node::size())> checkAccessIndex (Node const& node, index
 }
 
 // finally return the node itself if no further indices are provided. Break condition
-// for the recursion over the node childs.
+// for the recursion over the node children.
 template<class Node>
 decltype(auto) accessImpl (Node&& node)
 {
@@ -81,7 +81,7 @@ decltype(auto) accessImpl (Node&& node, I0 i0, [[maybe_unused]] I... i)
     return;
 }
 
-// forward to the impl methods by extracting the indices from the treepath
+// forward to the impl methods by extracting the indices from the tree path
 template<class Tree, class... Indices, std::size_t... i>
 decltype(auto) access (Tree&& tree, [[maybe_unused]] TypeTree::HybridTreePath<Indices...> tp, std::index_sequence<i...>)
 {

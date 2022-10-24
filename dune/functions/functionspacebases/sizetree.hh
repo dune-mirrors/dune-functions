@@ -74,6 +74,10 @@ namespace Functions {
 
     std::size_t size() const { return size_; }
 
+    explicit DynamicFlatSizeTree(std::size_t size)
+      : size_(size)
+    {}
+
   private:
     std::size_t size_;
   };
@@ -222,14 +226,14 @@ namespace Functions {
   auto sumSizeTrees(const ST& sizeTree)
   {
     return Impl::SumSizeTrees<ST>::template create<n>(sizeTree);
-  };
+  }
 
   //! Generate a sum of a SizeTree consisting of n identical `sizeTree`s
   template<class ST>
   auto sumSizeTrees(const ST& sizeTree, std::size_t n)
   {
     return Impl::SumSizeTrees<ST>::create(sizeTree, n);
-  };
+  }
 
 
   namespace Impl

@@ -13,7 +13,7 @@
 /**
  * \file sizetree.hh
  * \brief Lightweight representation of (hierarchic) size and blocking structure
- * The blocking tree can be used to define types for data-structures, like vectors
+ * The size tree can be used to define types for data-structures, like vectors
  * or matrices, that can be accessed by the multi-indices provided by a basis.
  **/
 
@@ -41,12 +41,14 @@ namespace Functions {
     inline static constexpr bool isComposite = !isLeaf && !isTypeUniform && !isUniform && isStatic;
   };
 
+  //! The properties class has to be specialized for each SizeTree
   template<class SizeTree>
   struct SizeTreeProperties {};
 
 
   //! Nested size-info that cannot be assigned one of the other size-tree types.
   struct UnknownSizeTree {};
+
 
   //! Leaf size-tree with static size and all sub-trees of size zero
   template <std::size_t n>
@@ -63,6 +65,7 @@ namespace Functions {
       : public SizeTreePropertiesBase<true,true,true,true>
   {};
 
+
   //! Leaf size-tree with dynamic size and all sub-trees of size zero
   struct DynamicFlatSizeTree
   {
@@ -71,6 +74,7 @@ namespace Functions {
 
     std::size_t size() const { return size_; }
 
+  private:
     std::size_t size_;
   };
 
@@ -119,8 +123,6 @@ namespace Functions {
 
     static constexpr std::size_t size() { return n; }
 
-    SubTree subTree_;
-
     UniformSizeTree(SubTree subTree)
       : subTree_{std::move(subTree)}
     {}
@@ -128,6 +130,9 @@ namespace Functions {
     UniformSizeTree(std::integral_constant<std::size_t,n>, SubTree subTree)
       : subTree_{std::move(subTree)}
     {}
+
+  private:
+    SubTree subTree_;
   };
 
   template<class SubTree, std::size_t n>
@@ -148,13 +153,14 @@ namespace Functions {
 
     std::size_t size() const { return size_; }
 
-    std::size_t size_;
-    SubTree subTree_;
-
     DynamicUniformSizeTree(std::size_t size, SubTree subTree)
       : size_{size}
       , subTree_{std::move(subTree)}
     {}
+
+  private:
+    std::size_t size_;
+    SubTree subTree_;
   };
 
   template<class SubTree>
@@ -236,12 +242,12 @@ namespace Functions {
       template<std::size_t s>
       static auto create(const ST& sizeTree)
       {
-        return DynamicFlatSizeTree{s*sizeTree.size_};
+        return DynamicFlatSizeTree{s*sizeTree.size()};
       }
 
       static auto create(const ST& sizeTree, std::size_t s)
       {
-        return DynamicFlatSizeTree{s*sizeTree.size_};
+        return DynamicFlatSizeTree{s*sizeTree.size()};
       }
     };
 
@@ -270,12 +276,12 @@ namespace Functions {
       template<std::size_t s>
       static auto create(const ST& sizeTree)
       {
-        return StaticUniformSizeTree<SubTree,s*n>{sizeTree.subTree_};
+        return StaticUniformSizeTree<SubTree,s*n>{sizeTree[0]};
       }
 
       static auto create(const ST& sizeTree, std::size_t s)
       {
-        return DynamicUniformSizeTree<SubTree>{s*n, sizeTree.subTree_};
+        return DynamicUniformSizeTree<SubTree>{s*n, sizeTree[0]};
       }
     };
 
@@ -287,12 +293,12 @@ namespace Functions {
       template<std::size_t s>
       static auto create(const ST& sizeTree)
       {
-        return DynamicUniformSizeTree<SubTree>{s*sizeTree.size_, sizeTree.subTree_};
+        return DynamicUniformSizeTree<SubTree>{s*sizeTree.size(), sizeTree[0]};
       }
 
       static auto create(const ST& sizeTree, std::size_t s)
       {
-        return DynamicUniformSizeTree<SubTree>{s*sizeTree.size_, sizeTree.subTree_};
+        return DynamicUniformSizeTree<SubTree>{s*sizeTree.size(), sizeTree[0]};
       }
     };
 
@@ -375,7 +381,7 @@ namespace Functions {
 
       static auto create(const ST1& sizeTree1, const ST2& sizeTree2)
       {
-        return DynamicFlatSizeTree{n + sizeTree2.size_};
+        return DynamicFlatSizeTree{n + sizeTree2.size()};
       }
     };
 
@@ -387,7 +393,7 @@ namespace Functions {
 
       static auto create(const ST1& sizeTree1, const ST2& sizeTree2)
       {
-        return DynamicFlatSizeTree{sizeTree1.size_ + n};
+        return DynamicFlatSizeTree{sizeTree1.size() + n};
       }
     };
 
@@ -451,14 +457,14 @@ namespace Functions {
       static auto create(const ST& sizeTree, std::size_t s)
       {
         using SubTree = DynamicFlatSizeTree;
-        return DynamicUniformSizeTree<SubTree>{sizeTree.size_, SubTree{s}};
+        return DynamicUniformSizeTree<SubTree>{sizeTree.size(), SubTree{s}};
       }
 
       template<std::size_t s>
       static auto create(const ST& sizeTree)
       {
         using SubTree = StaticFlatSizeTree<s>;
-        return DynamicUniformSizeTree<SubTree>{sizeTree.size_, SubTree{}};
+        return DynamicUniformSizeTree<SubTree>{sizeTree.size(), SubTree{}};
       }
     };
 
@@ -492,15 +498,15 @@ namespace Functions {
 
       static auto create(const ST& sizeTree, std::size_t s)
       {
-        auto subTree = appendToSizeTree(sizeTree.subTree_, s);
-        return UniformSizeTree<decltype(subTree),n>{subTree};
+        auto subTree = appendToSizeTree(sizeTree[0], s);
+        return UniformSizeTree<decltype(subTree),n>{std::move(subTree)};
       }
 
       template<std::size_t s>
       static auto create(const ST& sizeTree)
       {
-        auto subTree = appendToSizeTree<s>(sizeTree.subTree_);
-        return UniformSizeTree<decltype(subTree),n>{subTree};
+        auto subTree = appendToSizeTree<s>(sizeTree[0]);
+        return UniformSizeTree<decltype(subTree),n>{std::move(subTree)};
       }
     };
 
@@ -511,15 +517,15 @@ namespace Functions {
 
       static auto create(const ST& sizeTree, std::size_t s)
       {
-        auto subTree = appendToSizeTree(sizeTree.subTree_, s);
-        return DynamicUniformSizeTree<decltype(subTree)>{sizeTree.size_, subTree};
+        auto subTree = appendToSizeTree(sizeTree[0], s);
+        return DynamicUniformSizeTree<decltype(subTree)>{sizeTree.size(), std::move(subTree)};
       }
 
       template<std::size_t s>
       static auto create(const ST& sizeTree)
       {
-        auto subTree = appendToSizeTree<s>(sizeTree.subTree_);
-        return DynamicUniformSizeTree<decltype(subTree)>{sizeTree.size_, subTree};
+        auto subTree = appendToSizeTree<s>(sizeTree[0]);
+        return DynamicUniformSizeTree<decltype(subTree)>{sizeTree.size(), std::move(subTree)};
       }
     };
 

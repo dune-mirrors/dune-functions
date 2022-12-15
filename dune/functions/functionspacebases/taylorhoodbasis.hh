@@ -137,14 +137,14 @@ public:
   auto sizeTree() const
   {
     if constexpr(useHybridIndices)
-      return NonUniformSizeTree<DynamicUniformSizeTree<StaticFlatSizeTree<dim>>, DynamicFlatSizeTree>{
-        DynamicUniformSizeTree{pq2PreBasis_.size(), StaticFlatSizeTree<dim>{}},
-        DynamicFlatSizeTree{pq1PreBasis_.size()}
+      return StaticNonUniformSizeTree<UniformSizeTree<StaticFlatSizeTree<dim>>, FlatSizeTree>{
+        UniformSizeTree{pq2PreBasis_.size(), StaticFlatSizeTree<dim>{}},
+        FlatSizeTree{pq1PreBasis_.size()}
       };
     else
-      return StaticNonUniformSizeTree<DynamicFlatSizeTree,2>{
-        DynamicFlatSizeTree{dim * pq2PreBasis_.size()},
-        DynamicFlatSizeTree{pq1PreBasis_.size()}
+      return StaticTypeUniformSizeTree<FlatSizeTree,2>{
+        FlatSizeTree{dim * pq2PreBasis_.size()},
+        FlatSizeTree{pq1PreBasis_.size()}
       };
   }
 

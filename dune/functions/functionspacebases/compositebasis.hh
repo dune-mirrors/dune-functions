@@ -175,7 +175,7 @@ public:
     if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
     {
       return std::apply([&](auto const&... spb) {
-        return NonUniformSizeTree<decltype(Dune::Functions::sizeTree(spb))...>{Dune::Functions::sizeTree(spb)...};
+        return StaticNonUniformSizeTree<decltype(Dune::Functions::sizeTree(spb))...>{Dune::Functions::sizeTree(spb)...};
       }, subPreBases_);
     }
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>)

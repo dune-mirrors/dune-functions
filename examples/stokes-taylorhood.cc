@@ -367,9 +367,9 @@ int main (int argc, char *argv[]) try
       },
       [dim](const auto& basis) {
         using namespace Dune::Functions;
-        return StaticNonUniformSizeTree<DynamicFlatSizeTree,2>{
-          DynamicFlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{0}) * dim},
-          DynamicFlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{1})}
+        return StaticTypeUniformSizeTree<FlatSizeTree,2>{
+          FlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{0}) * dim},
+          FlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{1})}
           };
       },
       Dune::Indices::_2, Dune::Indices::_3);

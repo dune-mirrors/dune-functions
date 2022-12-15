@@ -136,7 +136,7 @@ public:
     if constexpr(std::is_same_v<IMS, FlatInterleaved> || std::is_same_v<IMS, FlatLexicographic>)
       return sumSizeTrees<children>(std::move(subSizeTree));
     else if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
-      return UniformSizeTree<decltype(subSizeTree), children>{std::move(subSizeTree)};
+      return StaticUniformSizeTree<decltype(subSizeTree), children>{std::move(subSizeTree)};
     else if constexpr(std::is_same_v<IMS, BlockedInterleaved>)
       return appendToSizeTree<children>(std::move(subSizeTree));
     else

@@ -27,26 +27,33 @@ void printType(const T&)
 template <class T = double, class Traits = Dune::StdTraits, class SizeTree>
 auto vectorGenerator(SizeTree const& sizeTree)
 {
-  using Properties = Dune::Functions::SizeTreeProperties<SizeTree>;
-
-  if constexpr(Properties::isLeaf) {
-    if constexpr(Properties::isStatic)
+  using namespace Dune::Functions;
+  if constexpr(isFlat<SizeTree>) {
+    if constexpr(isStatic<SizeTree>)
       return FieldVector<T,SizeTree::size()>{};
     else
       return typename Traits::template DynamicVector<T>(sizeTree.size());
   }
-  else {
+  else { // !flat
     auto block = [&](auto i) { return vectorGenerator(sizeTree[i]); };
-    if constexpr(Properties::isTypeUniform) {
+    if constexpr(isNonUniform<SizeTree>) { // !flat && !uniform
+      if constexpr(isStatic<SizeTree>) {
+        return Dune::unpackIntegerSequence([block](auto... ii) {
+            return typename Traits::template CompositeVector<decltype(block(ii))...>{block(ii)...};
+          }, std::make_index_sequence<std::size_t(SizeTree::size())>());
+      } else {
+        DUNE_THROW(Dune::NotImplemented, "Dynamic NonUniformSizeTrees not implemented.");
+      }
+    }
+    else { // !flat && uniform
       using Block = decltype(block(Dune::index_constant<0>{}));
-      if constexpr(Properties::isStatic) {
-        return Dune::unpackIntegerSequence(
-          [block](auto... ii) {
+      if constexpr(isStatic<SizeTree>) {
+        return Dune::unpackIntegerSequence([block](auto... ii) {
             return typename Traits::template PowerVector<Block, std::size_t(SizeTree::size())>{block(ii)...};
           },
           std::make_index_sequence<std::size_t(SizeTree::size())>{});
       }
-      else {
+      else { // !SizeTree::isStatic
         typename Traits::template DynamicVector<Block> container;
         container.reserve(sizeTree.size());
         for (std::size_t i = 0; i < sizeTree.size(); ++i)
@@ -54,14 +61,9 @@ auto vectorGenerator(SizeTree const& sizeTree)
         return container;
       }
     }
-    else {
-      return Dune::unpackIntegerSequence(
-        [block](auto... ii) {
-          return typename Traits::template CompositeVector<decltype(block(ii))...>{block(ii)...};
-        }, std::make_index_sequence<std::size_t(SizeTree::size())>());
-    }
   }
 }
+
 
 
 struct ISTLTraits

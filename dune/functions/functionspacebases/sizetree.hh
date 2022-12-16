@@ -227,8 +227,18 @@ namespace Functions {
 
 
   // -----------------------------------------------------------------------------------------------
-  // Some utilities for to generate SizeTrees
+  // Some utilities for generating SizeTrees
   // -----------------------------------------------------------------------------------------------
+
+  /*
+   * 1. The uniform sum of size-trees
+   *
+   * Combining size-trees by sum means summing up their sizes, e.g.,
+   * a flat index-merging strategy in a power-basis. It requires that
+   * trees are of the same type and of the same size.
+   *
+   * sum<n>( SizeTree(s) ) -> SizeTree(n*s)
+   */
 
   namespace Impl
   {
@@ -249,14 +259,14 @@ namespace Functions {
 
   } // end namespace Impl
 
-  //! Generate a sum of a SizeTree consisting of n identical `sizeTree`s
+  //! Generate a sum of a SizeTree consisting of `n` identical `sizeTree`s
   template<std::size_t n, class ST>
   auto sumSizeTrees (const ST& sizeTree)
   {
     return Impl::SumSizeTrees<ST>::template create<n>(sizeTree);
   }
 
-  //! Generate a sum of a SizeTree consisting of n identical `sizeTree`s
+  //! Generate a sum of a SizeTree consisting of `n` identical `sizeTree`s
   template<class ST>
   auto sumSizeTrees (const ST& sizeTree, std::size_t n)
   {
@@ -337,6 +347,19 @@ namespace Functions {
   } // end namespace Impl
 
 
+  /*
+   * 2. The non-uniform sum of size-trees
+   *
+   * Combining size-trees by sum means summing up their sizes, e.g.,
+   * a flat index-merging strategy in a composite-basis. The size-tree
+   * might have different children with different sizes.
+   *
+   * sum( SizeTrees... st ) -> CommonSizeTree( st.size() +... )
+   *
+   * This is implemented for the sum of flat size-trees only. The
+   * CommonSizeTree hereby is a StaticFlatSizeTree if all SizeTrees
+   * are StaticFlatSizeTree, otherwise it is a (dynamic) FlatSizeTree.
+   */
 
   namespace Impl
   {
@@ -354,7 +377,7 @@ namespace Functions {
   //! Overload for zero sizeTrees, return an unknown tree.
   inline auto sumNonUniformSubTrees ()
   {
-    UnknownSizeTree{};
+    return UnknownSizeTree{};
   }
 
   //! Overload for one sizeTrees, return the tree itself.
@@ -432,15 +455,23 @@ namespace Functions {
   } // end namespace Impl
 
 
+  /*
+   * 3. Append a size to all children of a size-tree
+   *
+   * Transforming size-trees by appending a size, e.g.,
+   * a blocked-interleaved index-merging strategy in a power-basis.
+   *
+   * append( FlatSizeTree st, size ) -> UniformSizeTree( st.size(), FlatSizeTree(size) )
+   * append( SizeTree(child...), size ) -> SizeTree( append(child, size)... )
+   */
+
   namespace Impl
   {
     template<class ST>
     struct AppendToSizeTree
     {
-      static auto create (const ST&, std::size_t) { return UnknownSizeTree{}; }
-
-      template<std::size_t>
-      static auto create (const ST&) { return UnknownSizeTree{}; }
+      template <class Size>
+      static auto create (const ST&, Size) { return UnknownSizeTree{}; }
     };
 
   } // end namespace Impl
@@ -453,10 +484,10 @@ namespace Functions {
   }
 
   //! Append the size `s` at the inner-most node of the tree
-  template<std::size_t s, class ST>
-  auto appendToSizeTree (const ST& sizeTree)
+  template<std::size_t S, class ST>
+  auto appendToSizeTree (const ST& sizeTree, std::integral_constant<std::size_t,S> s = {})
   {
-    return Impl::AppendToSizeTree<ST>::template create<s>(sizeTree);
+    return Impl::AppendToSizeTree<ST>::create(sizeTree, s);
   }
 
 
@@ -474,7 +505,7 @@ namespace Functions {
       }
 
       template<std::size_t s>
-      static auto create (const ST& sizeTree)
+      static auto create (const ST& sizeTree, std::integral_constant<std::size_t,s>)
       {
         using SubTree = StaticFlatSizeTree<s>;
         return StaticUniformSizeTree<SubTree,n>{SubTree{}};
@@ -493,7 +524,7 @@ namespace Functions {
       }
 
       template<std::size_t s>
-      static auto create (const ST& sizeTree)
+      static auto create (const ST& sizeTree, std::integral_constant<std::size_t,s>)
       {
         using SubTree = StaticFlatSizeTree<s>;
         return UniformSizeTree<SubTree>{sizeTree.size(), SubTree{}};
@@ -505,21 +536,61 @@ namespace Functions {
     {
       using ST = StaticNonUniformSizeTree<SubTrees...>;
 
-      static auto create (const ST& sizeTree, std::size_t s)
+      template<class Size>
+      static auto create (const ST& sizeTree, Size s)
       {
         return std::apply([&](auto const&... subTree) {
           return StaticNonUniformSizeTree<decltype(appendToSizeTree(subTree,s))...>
             {appendToSizeTree(subTree,s)...};
         }, sizeTree);
       }
+    };
 
-      template<std::size_t s>
-      static auto create (const ST& sizeTree)
+    template<>
+    struct AppendToSizeTree<NonUniformSizeTree>
+    {
+      using ST = NonUniformSizeTree;
+
+      template<class Size>
+      static auto create (const ST& sizeTree, Size s)
       {
-        return std::apply([&](auto const&... subTree) {
-          return StaticNonUniformSizeTree<decltype(appendToSizeTree<s>(subTree))...>
-            {appendToSizeTree<s>(subTree)...};
-        }, sizeTree);
+        NonUniformSizeTree result;
+        result.reserve(sizeTree.size());
+        for (std::size_t i = 0; i < sizeTree.size(); ++i)
+          result.push_back(appendToSizeTree(sizeTree[i],s));
+        return result;
+      }
+    };
+
+    template<class SubTree, std::size_t n>
+    struct AppendToSizeTree<StaticTypeUniformSizeTree<SubTree,n>>
+    {
+      using ST = StaticTypeUniformSizeTree<SubTree,n>;
+
+      template<class Size>
+      static auto create (const ST& sizeTree, Size s)
+      {
+        using Child = decltype(appendToSizeTree(std::declval<SubTree>(),s));
+        return Dune::unpackIntegerSequence([&](auto... ii) {
+          return StaticTypeUniformSizeTree<Child,n>{appendToSizeTree(sizeTree[ii],s)...};
+          }, std::make_index_sequence<n>());
+      }
+    };
+
+    template<class SubTree>
+    struct AppendToSizeTree<TypeUniformSizeTree<SubTree>>
+    {
+      using ST = TypeUniformSizeTree<SubTree>;
+
+      template<class Size>
+      static auto create (const ST& sizeTree, Size s)
+      {
+        using Child = decltype(appendToSizeTree(std::declval<SubTree>(),s));
+        TypeUniformSizeTree<Child> result;
+        result.reserve(sizeTree.size());
+        for (std::size_t i = 0; i < sizeTree.size(); ++i)
+          result.push_back(appendToSizeTree(sizeTree[i],s));
+        return result;
       }
     };
 
@@ -528,17 +599,11 @@ namespace Functions {
     {
       using ST = StaticUniformSizeTree<SubTree,n>;
 
-      static auto create (const ST& sizeTree, std::size_t s)
+      template<class Size>
+      static auto create (const ST& sizeTree, Size s)
       {
-        auto subTree = appendToSizeTree(sizeTree[0], s);
-        return StaticUniformSizeTree<decltype(subTree),n>{std::move(subTree)};
-      }
-
-      template<std::size_t s>
-      static auto create (const ST& sizeTree)
-      {
-        auto subTree = appendToSizeTree<s>(sizeTree[0]);
-        return StaticUniformSizeTree<decltype(subTree),n>{std::move(subTree)};
+        using Child = decltype(appendToSizeTree(std::declval<SubTree>(),s));
+        return StaticUniformSizeTree<Child,n>{appendToSizeTree(sizeTree[0], s)};
       }
     };
 
@@ -547,17 +612,11 @@ namespace Functions {
     {
       using ST = UniformSizeTree<SubTree>;
 
-      static auto create (const ST& sizeTree, std::size_t s)
+      template<class Size>
+      static auto create (const ST& sizeTree, Size s)
       {
-        auto subTree = appendToSizeTree(sizeTree[0], s);
-        return UniformSizeTree<decltype(subTree)>{sizeTree.size(), std::move(subTree)};
-      }
-
-      template<std::size_t s>
-      static auto create (const ST& sizeTree)
-      {
-        auto subTree = appendToSizeTree<s>(sizeTree[0]);
-        return UniformSizeTree<decltype(subTree)>{sizeTree.size(), std::move(subTree)};
+        using Child = decltype(appendToSizeTree(std::declval<SubTree>(),s));
+        return UniformSizeTree<Child>{sizeTree.size(), appendToSizeTree(sizeTree[0], s)};
       }
     };
 

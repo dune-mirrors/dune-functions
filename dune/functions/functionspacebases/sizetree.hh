@@ -23,40 +23,54 @@ namespace Dune {
 namespace Functions {
 
   // Some size-tree properties
-  struct nonUniform_t {};
-  struct typeUniform_t {};
-  struct uniform_t : typeUniform_t {};
-  struct flat_t : uniform_t {};
+  enum class SizeTreeState : int
+  {
+    flat = 1,
+    uniform = 2,
+    typeUniform = 3,
+    nonUniform = 4,
+    unknown = 5,
+  };
 
   template <class ST>
-  inline constexpr bool isNonUniform = std::is_base_of_v<nonUniform_t, typename ST::State>;
+  inline constexpr bool isNonUniform = (ST::state == SizeTreeState::nonUniform);
+
+  // uniform => typeUniform
+  template <class ST>
+  inline constexpr bool isTypeUniform = (int(ST::state) <= int(SizeTreeState::typeUniform));
+
+  // flat => uniform
+  template <class ST>
+  inline constexpr bool isUniform = (int(ST::state) <= int(SizeTreeState::uniform));
 
   template <class ST>
-  inline constexpr bool isTypeUniform = std::is_base_of_v<typeUniform_t, typename ST::State>;
-
-  template <class ST>
-  inline constexpr bool isUniform = std::is_base_of_v<uniform_t, typename ST::State>;
-
-  template <class ST>
-  inline constexpr bool isFlat = std::is_base_of_v<flat_t, typename ST::State>;
+  inline constexpr bool isFlat = (ST::state == SizeTreeState::flat);
 
   template <class ST>
   inline constexpr bool isStatic = ST::isStatic;
 
+
+  //! Nested size-info that cannot be assigned one of the other size-tree types.
   struct UnknownSizeTree {};
+
+  //! A size-tree of size zero
   struct EmptySizeTree
   {
+    static constexpr SizeTreeState state = SizeTreeState::unknown;
+    static constexpr bool isStatic = true;
+
     template <class Index>
     EmptySizeTree operator[] (const Index&) const { return {}; }
 
     static constexpr std::size_t size () { return 0; }
   };
 
-  //! Leaf size-tree with static size and all sub-trees of size zero
+
+  //! Size-tree with static size and all sub-trees empty
   template <std::size_t n>
   struct StaticFlatSizeTree
   {
-    using State = flat_t;
+    static constexpr SizeTreeState state = SizeTreeState::flat;
     static constexpr bool isStatic = true;
 
     template <class Index>
@@ -66,10 +80,10 @@ namespace Functions {
   };
 
 
-  //! Leaf size-tree with dynamic size and all sub-trees of size zero
+  //! Size-tree with dynamic size and all sub-trees empty
   struct FlatSizeTree
   {
-    using State = flat_t;
+    static constexpr SizeTreeState state = SizeTreeState::flat;
     static constexpr bool isStatic = false;
 
     explicit FlatSizeTree (std::size_t size)
@@ -92,7 +106,7 @@ namespace Functions {
       : Dune::TupleVector<SubTrees...>
   {
     using Super = Dune::TupleVector<SubTrees...>;
-    using State = nonUniform_t;
+    static constexpr SizeTreeState state = SizeTreeState::nonUniform;
     static constexpr bool isStatic = true;
 
     using Super::Super;
@@ -105,7 +119,7 @@ namespace Functions {
       : std::vector<std::any>
   {
     using Super = std::vector<std::any>;
-    using State = nonUniform_t;
+    static constexpr SizeTreeState state = SizeTreeState::nonUniform;
     static constexpr bool isStatic = false;
 
     template <class... SubTrees>
@@ -121,7 +135,7 @@ namespace Functions {
       : std::array<SubTree, n>
   {
     using Super = std::array<SubTree, n>;
-    using State = typeUniform_t;
+    static constexpr SizeTreeState state = SizeTreeState::typeUniform;
     static constexpr bool isStatic = true;
 
     StaticTypeUniformSizeTree (SubTree subTree)
@@ -146,7 +160,7 @@ namespace Functions {
       : std::vector<SubTree>
   {
     using Super = std::vector<SubTree>;
-    using State = typeUniform_t;
+    static constexpr SizeTreeState state = SizeTreeState::typeUniform;
     static constexpr bool isStatic = false;
 
     using Super::Super;
@@ -157,7 +171,7 @@ namespace Functions {
   template<class SubTree, std::size_t n>
   struct StaticUniformSizeTree
   {
-    using State = uniform_t;
+    static constexpr SizeTreeState state = SizeTreeState::uniform;
     static constexpr bool isStatic = true;
 
     StaticUniformSizeTree (SubTree subTree)
@@ -182,7 +196,7 @@ namespace Functions {
   template<class SubTree>
   struct UniformSizeTree
   {
-    using State = uniform_t;
+    static constexpr SizeTreeState state = SizeTreeState::uniform;
     static constexpr bool isStatic = false;
 
     UniformSizeTree (std::size_t size, SubTree subTree)

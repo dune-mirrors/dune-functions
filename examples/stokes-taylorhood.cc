@@ -365,11 +365,11 @@ int main (int argc, char *argv[]) try
           return basis.size(prefix) * dim;
         return basis.size(prefix);
       },
-      [dim](const auto& basis) {
+      [dim](const auto& sizeTree) {
         using namespace Dune::Functions;
         return StaticTypeUniformSizeTree<FlatSizeTree,2>{
-          FlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{0}) * dim},
-          FlatSizeTree{basis.size(Dune::ReservedVector<std::size_t,2>{1})}
+          FlatSizeTree{sizeTree[Dune::Indices::_0].size() * dim},
+          FlatSizeTree{sizeTree[Dune::Indices::_1].size()}
           };
       },
       Dune::Indices::_2, Dune::Indices::_3);

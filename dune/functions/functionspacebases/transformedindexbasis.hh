@@ -131,7 +131,7 @@ public:
   //! Return the BlockingTag of the transformed indexset
   auto sizeTree() const
   {
-    return transformation_.sizeTree(rawPreBasis_);
+    return transformation_.sizeTree(rawPreBasis_.sizeTree());
   }
 
   //! Get the total dimension of the space spanned by this basis
@@ -267,10 +267,10 @@ public:
     return preBasis.dimension();
   }
 
-  template<class PreBasis>
-  auto sizeTree(const PreBasis& preBasis) const
+  template<class SizeTree>
+  auto sizeTree(const SizeTree& sizeTree) const
   {
-    return sizeTreeImplementation_(preBasis);
+    return sizeTreeImplementation_(sizeTree);
   }
 
 private:

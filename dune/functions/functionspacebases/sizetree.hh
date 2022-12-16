@@ -3,13 +3,15 @@
 #ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_SIZETREE_HH
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_SIZETREE_HH
 
-#include <any>
 #include <array>
+#include <memory>
 #include <vector>
 
 #include <dune/common/filledarray.hh>
+#include <dune/common/hybridutilities.hh>
 #include <dune/common/tuplevector.hh>
 #include <dune/common/typeutilities.hh>
+#include <dune/common/std/type_traits.hh>
 
 
 /**
@@ -112,20 +114,97 @@ namespace Functions {
     using Super::Super;
   };
 
+  namespace Impl
+  {
+    template<class ST>
+    using HasDynamicAccess = decltype(std::declval<ST>()[std::size_t(0)]);
+
+    struct TypeErasureSizeTree
+    {
+      static constexpr SizeTreeState state = SizeTreeState::unknown;
+      static constexpr bool isStatic = false;
+
+      // VIRTUALIZATION BEGIN
+      struct Interface
+      {
+        virtual ~Interface () = default;
+        virtual Interface* clone () const = 0;
+        virtual std::size_t size () const = 0;
+        virtual TypeErasureSizeTree operator[] (std::size_t) const = 0;
+      };
+
+      template<class I>
+      struct Implementation final
+        : public Interface
+      {
+        Implementation (I&& impl) : impl_(std::forward<I>(impl)) {}
+        Implementation* clone () const override { return new Implementation(*this); }
+        std::size_t size () const override { return impl_.size(); }
+
+        TypeErasureSizeTree operator[] (std::size_t i) const override
+        {
+          if constexpr(Dune::Functions::isStatic<I> && !Dune::Std::is_detected_v<HasDynamicAccess,I>)
+            return Dune::Hybrid::switchCases(std::make_index_sequence<I::size()>{}, i,
+              [&](auto ii) { return TypeErasureSizeTree{id(impl_)[ii]}; },
+              [&]() { return TypeErasureSizeTree{EmptySizeTree{}}; });
+          else
+            return TypeErasureSizeTree{impl_[i]};
+        }
+
+      private:
+        I impl_;
+      };
+      // VIRTUALIZATION END
+
+      template<class I>
+      TypeErasureSizeTree (I&& impl)
+        : impl_(new Implementation<I>(std::forward<I>(impl)))
+      {}
+
+      TypeErasureSizeTree (const TypeErasureSizeTree& other)
+        : impl_( other.impl_ ? other.impl_->clone() : nullptr )
+      {}
+
+      TypeErasureSizeTree& operator= (const TypeErasureSizeTree& other)
+      {
+        impl_.reset(other.impl_ ? other.impl_->clone() : nullptr);
+        return *this;
+      }
+
+      TypeErasureSizeTree (TypeErasureSizeTree&&) = default;
+      TypeErasureSizeTree& operator= (TypeErasureSizeTree&&) = default;
+      ~TypeErasureSizeTree () = default;
+
+      std::size_t size () const
+      {
+        return impl_->size();
+      }
+
+      TypeErasureSizeTree operator[] (std::size_t i) const
+      {
+        return (*impl_)[i];
+      }
+
+      std::unique_ptr<Interface> impl_;
+    };
+
+  } // end namespace Impl
+
 
   //! Non-uniform size-tree with all sub-trees of different type but dynamic size
-  //! NOTE, this cannot easily be implemented, maybe using type-erasure
   struct NonUniformSizeTree
-      : std::vector<std::any>
+      : std::vector<Impl::TypeErasureSizeTree>
   {
-    using Super = std::vector<std::any>;
+    using Super = std::vector<Impl::TypeErasureSizeTree>;
     static constexpr SizeTreeState state = SizeTreeState::nonUniform;
     static constexpr bool isStatic = false;
 
     template <class... SubTrees>
     NonUniformSizeTree (const SubTrees&... subTrees)
-      : Super{std::any(subTrees)...}
+      : Super{Impl::TypeErasureSizeTree(subTrees)...}
     {}
+
+    using Super::Super;
   };
 
 

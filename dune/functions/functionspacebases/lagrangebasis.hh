@@ -13,6 +13,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 
+#include <dune/grid/common/capabilities.hh>
 
 namespace Dune {
 namespace Functions {
@@ -181,11 +182,38 @@ public:
   }
 
   //! Get the maximal number of DOFs associated to node for any element
+  template<int k_ = k,
+    std::enable_if_t<(0 > k_), int> = 0>
   size_type maxNodeSize() const
   {
     // That cast to unsigned int is necessary because GV::dimension is an enum,
     // which is not recognized by the power method as an integer type...
     return power(order()+1, (unsigned int)GV::dimension);
+  }
+
+  //! Get the maximal number of DOFs associated to node for any element as static information
+  template<int k_ = k,
+    std::enable_if_t<(k_ >= 0), int> = 0>
+  static constexpr size_type maxNodeSize()
+  {
+    using SGT = Dune::Capabilities::hasSingleGeometryType<typename GV::Grid>;
+    if constexpr(SGT::v) {
+      if constexpr(GeometryType{SGT::topologyId,GV::dimension}.isSimplex())
+        return LagrangeSimplexLocalFiniteElement<typename GV::ctype,R,GV::dimension,k>::size();
+      else if constexpr(GeometryType{SGT::topologyId,GV::dimension}.isCube())
+        return LagrangeCubeLocalFiniteElement<typename GV::ctype,R,GV::dimension,k>::size();
+      else if constexpr(GeometryType{SGT::topologyId,GV::dimension}.isPrism())
+        return LagrangePrismLocalFiniteElement<typename GV::ctype,R,k>::size();
+      else if constexpr(GeometryType{SGT::topologyId,GV::dimension}.isPyramid())
+        return LagrangePyramidLocalFiniteElement<typename GV::ctype,R,k>::size();
+      else
+        return power(k+1, (unsigned int)GV::dimension);
+    }
+    else {
+      // That cast to unsigned int is necessary because GV::dimension is an enum,
+      // which is not recognized by the power method as an integer type...
+      return power(k+1, (unsigned int)GV::dimension);
+    }
   }
 
   template<typename It>

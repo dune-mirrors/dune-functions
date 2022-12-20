@@ -237,6 +237,41 @@ public:
     return r;
   }
 
+private:
+
+  template <class SPBs_,class = void> struct HasStaticMaxNodeSizeImpl;
+  template <class... SPBs_>
+  struct HasStaticMaxNodeSizeImpl<std::tuple<SPBs_...>,std::index_sequence<SPBs_::maxNodeSize()...>>
+  {
+    using type = std::index_sequence<SPBs_::maxNodeSize()...>;
+  };
+
+  template <class SPBs_>
+  using HasStaticMaxNodeSize = typename HasStaticMaxNodeSizeImpl<SPBs_>::type;
+
+public:
+
+  //! Get the maximal number of DOFs associated to node for any element
+  template <class SPBs_ = SubPreBases,
+    std::enable_if_t<(not Std::is_detected_v<HasStaticMaxNodeSize,SPBs_>), int> = 0>
+  size_type maxNodeSize() const
+  {
+    size_type r=0;
+    // Accumulate maxNodeSize() for all subprebases
+    Hybrid::forEach(ChildIndices(), [&](auto i) {
+      r += this->subPreBasis(i).maxNodeSize();
+    });
+    return r;
+  }
+
+  //! Get the maximal number of DOFs associated to node for any element as static information
+  template <class SPBs_ = SubPreBases,
+    std::enable_if_t<(Std::is_detected_v<HasStaticMaxNodeSize,SPBs_>), int> = 0>
+  static constexpr size_type maxNodeSize()
+  {
+    return (SPB::maxNodeSize() +... );
+  }
+
   //! Const access to the stored prebasis of the factor in the power space
   template<std::size_t i>
   const SubPreBasis<i>& subPreBasis(Dune::index_constant<i> = {}) const

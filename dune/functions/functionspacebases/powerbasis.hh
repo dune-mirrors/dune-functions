@@ -6,6 +6,7 @@
 #include <dune/common/reservedvector.hh>
 #include <dune/common/typeutilities.hh>
 #include <dune/common/indices.hh>
+#include <dune/common/std/type_traits.hh>
 
 #include <dune/functions/common/utility.hh>
 #include <dune/functions/common/type_traits.hh>
@@ -209,10 +210,27 @@ public:
     return subPreBasis_.dimension() * children;
   }
 
+private:
+
+  template <class SPB_>
+  using HasStaticMaxNodeSize = std::integral_constant<size_type, SPB_::maxNodeSize()>;
+
+public:
+
   //! Get the maximal number of DOFs associated to node for any element
+  template <class SPB_ = SubPreBasis,
+    std::enable_if_t<(not Std::is_detected_v<HasStaticMaxNodeSize,SPB_>), int> = 0>
   size_type maxNodeSize() const
   {
     return subPreBasis_.maxNodeSize() * children;
+  }
+
+  //! Get the maximal number of DOFs associated to node for any element as static information
+  template <class SPB_ = SubPreBasis,
+    std::enable_if_t<(Std::is_detected_v<HasStaticMaxNodeSize,SPB_>), int> = 0>
+  static constexpr size_type maxNodeSize()
+  {
+    return SubPreBasis::maxNodeSize() * children;
   }
 
   //! Const access to the stored prebasis of the factor in the power space

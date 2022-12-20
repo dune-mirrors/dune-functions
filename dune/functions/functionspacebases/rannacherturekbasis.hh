@@ -121,7 +121,7 @@ public:
   }
 
   //! Get the maximal number of DOFs associated to node for any element
-  size_type maxNodeSize() const
+  static constexpr size_type maxNodeSize()
   {
     return 2*GV::dimension;
   }

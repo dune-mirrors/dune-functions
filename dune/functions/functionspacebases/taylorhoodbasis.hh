@@ -185,9 +185,9 @@ public:
   }
 
   //! Get the maximal number of DOFs associated to node for any element
-  size_type maxNodeSize() const
+  static constexpr size_type maxNodeSize()
   {
-    return dim * pq2PreBasis_.maxNodeSize() + pq1PreBasis_.maxNodeSize();
+    return dim * PQ2PreBasis::maxNodeSize() + PQ1PreBasis::maxNodeSize();
   }
 
   template<typename It>

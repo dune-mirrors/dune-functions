@@ -104,7 +104,7 @@ namespace Dune {
 
             // Multiply Monomial Basis-evaluation with basis transformation matrix.
             // Note that we need to multiply the transposed of C_
-            lFE_.C_mtv(tmp, out);
+            lFE_.C_.mtv(tmp, out);
             return;
         }
 

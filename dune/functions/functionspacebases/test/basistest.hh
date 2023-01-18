@@ -432,6 +432,140 @@ struct EnableCenterContinuityCheck : public EnableContinuityCheck
 };
 
 
+// Flag to enable a local continuity check for checking strong continuity
+// in the vertices of an intersection within checkBasisContinuity().
+//
+// For each inside basis function this will compute the jump against
+// zero or the corresponding inside basis function. The latter is then
+// checked for being (up to a tolerance) zero on the vertices.
+struct EnableVertexContinuityCheck : public EnableContinuityCheck
+{
+  template <class JumpEvaluator>
+  auto localJumpVertexContinuityCheck(const JumpEvaluator &jumpEvaluator, double tol) const
+  {
+    return [=](const auto &intersection, const auto &treePath, const auto &insideNode, const auto &outsideNode, const auto &insideToOutside)
+    {
+      if (!intersection.conforming())
+        DUNE_THROW(Dune::NotImplemented, "VertexContinuityCheck not implemented for nonconforming grids!");
+
+      using Node = std::decay_t<decltype(insideNode)>;
+      using Range = typename Node::FiniteElement::Traits::LocalBasisType::Traits::RangeType;
+
+      std::vector<int> isContinuous(insideNode.size(), true);
+      std::vector<std::vector<Range>> insideValues;
+      std::vector<std::vector<Range>> outsideValues;
+
+      const int numberOfIntersectingVertices = (intersection.geometry()).corners();
+      insideValues.resize(numberOfIntersectingVertices);
+      outsideValues.resize(numberOfIntersectingVertices);
+
+      for(int i=0; i<numberOfIntersectingVertices; i++)
+      {
+        auto localVertexCoordinate = (intersection.geometry()).local((intersection.geometry()).corner(i));
+        auto pointInElement = intersection.geometryInInside().global(localVertexCoordinate);
+        auto pointInNeighbor = intersection.geometryInOutside().global(localVertexCoordinate);
+        insideNode.finiteElement().localBasis().evaluateFunction(pointInElement, insideValues[i]);
+        outsideNode.finiteElement().localBasis().evaluateFunction(pointInNeighbor, outsideValues[i]);
+        // insideNode.finiteElement().localBasis().evaluateFunction(intersection.geometryInInside().corner(i), insideValues[i]);
+        // outsideNode.finiteElement().localBasis().evaluateFunction(intersection.geometryInOutside().corner(i), outsideValues[i]);
+      }
+
+      // Check jump against outside basis function or zero.
+      for (std::size_t i = 0; i<insideNode.size(); ++i)
+      {
+        for (std::size_t k = 0; k<numberOfIntersectingVertices; ++k)
+        {
+          auto jump = insideValues[k][i];
+          auto LocalVertex = intersection.geometry().local(intersection.geometry().corner(k));
+
+          if (insideToOutside[i].has_value())
+          {
+            jump -= outsideValues[k][insideToOutside[i].value()];
+          }
+          isContinuous[i] = isContinuous[i] and (jumpEvaluator(jump, intersection, LocalVertex) < tol);
+        }
+      }
+      return isContinuous;
+    };
+  }
+
+  auto localContinuityCheck() const
+  {
+    auto jumpNorm = [](auto &&jump, auto &&intersection, auto &&x) -> double
+    {
+      return jump.infinity_norm();
+    };
+    return localJumpVertexContinuityCheck(jumpNorm, tol_);
+  }
+};
+
+
+// Flag to enable a local continuity check for checking strong continuity
+// of the jacobian in the vertices of an intersection within checkBasisContinuity().
+//
+// For each inside basis function this will compute the jump of the jacobian
+// against zero or the corresponding inside basis function. The latter is then
+// checked for being (up to a tolerance) zero on the vertices.
+struct EnableVertexJacobianContinuityCheck : public EnableContinuityCheck
+{
+  template <class JumpEvaluator>
+  auto localJumpVertexJacobianContinuityCheck(const JumpEvaluator &jumpEvaluator, double tol) const
+  {
+    return [=](const auto &intersection, const auto &treePath, const auto &insideNode, const auto &outsideNode, const auto &insideToOutside)
+    {
+      if (!intersection.conforming())
+        DUNE_THROW(Dune::NotImplemented, "VertexContinuityCheck not implemented for nonconforming grids!");
+
+      using Node = std::decay_t<decltype(insideNode)>;
+      using Range = typename Node::FiniteElement::Traits::LocalBasisType::Traits::JacobianType;
+
+      std::vector<int> isContinuous(insideNode.size(), true);
+      std::vector<std::vector<Range>> insideValues;
+      std::vector<std::vector<Range>> outsideValues;
+
+      const int numberOfIntersectingVertices = (intersection.geometry()).corners();
+      insideValues.resize(numberOfIntersectingVertices);
+      outsideValues.resize(numberOfIntersectingVertices);
+
+      for (int i = 0; i < numberOfIntersectingVertices; i++)
+      {
+        auto localVertexCoordinate = (intersection.geometry()).local((intersection.geometry()).corner(i));
+        auto pointInElement = intersection.geometryInInside().global(localVertexCoordinate);
+        auto pointInNeighbor = intersection.geometryInOutside().global(localVertexCoordinate);
+        insideNode.finiteElement().localBasis().evaluateJacobian(pointInElement, insideValues[i]);
+        outsideNode.finiteElement().localBasis().evaluateJacobian(pointInNeighbor, outsideValues[i]);
+      }
+
+      // Check jump against outside basis function or zero.
+      for (std::size_t i = 0; i < insideNode.size(); ++i)
+      {
+        for (std::size_t k = 0; k < numberOfIntersectingVertices; ++k)
+        {
+          auto jump = insideValues[k][i];
+          auto LocalVertex = intersection.geometry().local(intersection.geometry().corner(k));
+
+          if (insideToOutside[i].has_value())
+          {
+            jump -= outsideValues[k][insideToOutside[i].value()];
+          }
+          isContinuous[i] = isContinuous[i] and (jumpEvaluator(jump, intersection, LocalVertex) < tol);
+        }
+      }
+      return isContinuous;
+    };
+  }
+
+  auto localContinuityCheck() const
+  {
+    auto jumpNorm = [](auto &&jump, auto &&intersection, auto &&x) -> double
+    {
+      return jump.infinity_norm();
+    };
+    return localJumpVertexJacobianContinuityCheck(jumpNorm, tol_);
+  }
+};
+
+
 /*
  * Check if basis functions are continuous across faces.
  * Continuity is checked by evaluation at a set of quadrature points

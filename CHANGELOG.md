@@ -10,6 +10,9 @@ corresponding version of the Dune core modules.
   As this evaluation requires finding the element that the evaluation point is in,
   it can be very slow.
 
+- The `dune-functions` module now contains an implementation of a reduced cubic Hermite triangle
+  basis.
+
 ## Release 2.9
 
 - The `MultiIndex` used by `DefaultGlobalBasis` is now a `StaticMultiIndex`

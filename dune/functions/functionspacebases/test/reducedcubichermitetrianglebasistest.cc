@@ -11,15 +11,9 @@
 #include <dune/functions/functionspacebases/reducedcubichermitetrianglebasis.hh>
 #include <dune/functions/functionspacebases/test/basistest.hh>
 
-#include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>  //remove
-#include <dune/grid/io/file/vtk/vtkwriter.hh>                           //remove
-#include <dune/grid/io/file/vtk/subsamplingvtkwriter.hh>                //remove
-#include <iostream>
-
-
 using namespace Dune;
 
-int main (int argc, char* argv[])
+int main(int argc, char *argv[])
 {
   MPIHelper::instance(argc, argv);
 
@@ -29,15 +23,14 @@ int main (int argc, char* argv[])
 
   using Grid = UGGrid<dim>;
   using GridView = Grid::LeafGridView;
-  FieldVector<double,dim> l(1);
-  std::shared_ptr<Grid> grid = StructuredGridFactory<Grid>::createSimplexGrid({0.0,0.0}, l, {{10,10}});
+  FieldVector<double, dim> l(1);
+  std::shared_ptr<Grid> grid = StructuredGridFactory<Grid>::createSimplexGrid({0.0, 0.0}, l, {{10, 10}});
   auto gridView = grid->leafGridView();
 
   // check ReducedCubicHermiteTriangleBasis created 'manually'
   {
     Functions::ReducedCubicHermiteTriangleBasis<GridView> basis(gridView);
     test.subTest(checkBasis(basis, EnableContinuityCheck()));
-    test.subTest(checkBasis(basis, EnableVertexContinuityCheck()));
     test.subTest(checkBasis(basis, EnableVertexJacobianContinuityCheck()));
   }
 
@@ -46,7 +39,6 @@ int main (int argc, char* argv[])
     using namespace Functions::BasisFactory;
     auto basis = makeBasis(gridView, reducedCubicHermiteTriangle());
     test.subTest(checkBasis(basis, EnableContinuityCheck()));
-    test.subTest(checkBasis(basis, EnableVertexContinuityCheck()));
     test.subTest(checkBasis(basis, EnableVertexJacobianContinuityCheck()));
   }
 

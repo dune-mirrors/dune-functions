@@ -10,6 +10,7 @@
 
 #include <dune/functions/functionspacebases/reducedcubichermitetrianglebasis.hh>
 #include <dune/functions/functionspacebases/test/basistest.hh>
+#include <dune/functions/functionspacebases/powerbasis.hh>
 
 using namespace Dune;
 
@@ -40,6 +41,15 @@ int main(int argc, char *argv[])
     auto basis = makeBasis(gridView, reducedCubicHermiteTriangle());
     test.subTest(checkBasis(basis, EnableContinuityCheck()));
     test.subTest(checkBasis(basis, EnableVertexJacobianContinuityCheck()));
+
+    /**
+     * @brief TODO: Test with PowerBasis leads to Segmentation fault!
+     */
+    // auto powerBasis = makeBasis(gridView,
+    //                             power<3>(
+    //                             reducedCubicHermiteTriangle(),
+    //                             blockedInterleaved()));
+    // test.subTest(checkBasis(powerBasis, EnableContinuityCheck()));
   }
 
   return test.exit();

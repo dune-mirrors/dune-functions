@@ -80,6 +80,12 @@ namespace Dune::Functions
         }
 
         /** \brief  Evaluate all shape functions
+         *
+         * There is a total of 9 shape functions and the indices for the Output vector are as follows:
+         * Indices 0,1,2 return the values of the shape function corresponding to the function evaluation at the vertices 0,1,2, respectively.
+         * Indices 3,4,5 return the values of the shape function corresponding to the partial derivative w.r.t x at the vertices 0,1,2, respectively.
+         * Indices 6,7,8 return the values of the shape function corresponding to the partial derivative w.r.t y at the vertices 0,1,2, respectively.
+         *
          *  \param in Coordinates where to evaluate the functions, in local coordinates
          *  \param out Output vector of values of shape function values
          */
@@ -111,6 +117,12 @@ namespace Dune::Functions
         }
 
         /** \brief Evaluate Jacobian of all shape functions
+         *
+         * There is a total of 9 shape functions and the indices for the Output vector are as follows:
+         * Indices 0,1,2 return the Jacobian of the shape function corresponding to the function evaluation at the vertices 0,1,2, respectively.
+         * Indices 3,4,5 return the Jacobian of the shape function corresponding to the partial derivative w.r.t x at the vertices 0,1,2, respectively.
+         * Indices 6,7,8 return the Jacobian of the shape function corresponding to the partial derivative w.r.t y at the vertices 0,1,2, respectively.
+         *
          *  \param in Coordinates where to evaluate the Jacobian, in local coordinates
          *  \param out The Jacobians of all shape functions at the point x
          */

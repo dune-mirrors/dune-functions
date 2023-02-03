@@ -455,11 +455,11 @@ struct EnableVertexJacobianContinuityCheck : public EnableContinuityCheck
       std::vector<std::vector<Range>> insideValues;
       std::vector<std::vector<Range>> outsideValues;
 
-      const int numberOfIntersectingVertices = (intersection.geometry()).corners();
+      const std::size_t numberOfIntersectingVertices = (intersection.geometry()).corners();
       insideValues.resize(numberOfIntersectingVertices);
       outsideValues.resize(numberOfIntersectingVertices);
 
-      for (int i = 0; i < numberOfIntersectingVertices; i++)
+      for (std::size_t i = 0; i < numberOfIntersectingVertices; i++)
       {
         auto localVertexCoordinate = (intersection.geometry()).local((intersection.geometry()).corner(i));
         auto pointInElement = intersection.geometryInInside().global(localVertexCoordinate);

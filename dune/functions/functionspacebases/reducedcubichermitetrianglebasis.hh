@@ -295,8 +295,10 @@ namespace Dune::Functions
          */
         ReducedCubicHermiteTriangleLocalFiniteElement(const ReducedCubicHermiteTrianglePreBasis<GV> &preBasis)
             : localBasis_(preBasis, *this),
-              element_(nullptr),
-              localInterpolation_(*this) {}
+              localInterpolation_(*this),
+              element_(nullptr)
+              {}
+
         /** \brief Bind LocalFiniteElement to a specific element
          *
          *  Compute the basis transformation matrix on each element for the
@@ -372,7 +374,7 @@ namespace Dune::Functions
 
             // Right-Hand side is identity matrix (of size 9x9) with added zero-row
             FieldMatrix<double, 10, 9> b(0);
-            for (int i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
                 b[i][i] = 1.0;
 
             N.invert(); // Todo: improve
@@ -422,8 +424,8 @@ namespace Dune::Functions
         ReducedCubicHermiteTriangleLocalCoefficients localCoefficients_;
         ReducedCubicHermiteTriangleLocalInterpolation<ReducedCubicHermiteTriangleLocalBasis<GV, R>> localInterpolation_;
 
-        FieldMatrix<double, 10, 9> C_; // (transposed) basis transformation matrix
         const Element *element_;
+        FieldMatrix<double, 10, 9> C_; // (transposed) basis transformation matrix
     };
 
     /** \brief Pre-basis for the Reduced cubic Hermite triangle basis
@@ -472,7 +474,7 @@ namespace Dune::Functions
         void update(const GridView &gv)
         {
             gridView_ = gv;
-            mcmgMap_.update();
+            mcmgMap_.update(gridView_);
         }
 
         /**

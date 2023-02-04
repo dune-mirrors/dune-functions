@@ -5,6 +5,8 @@ corresponding version of the Dune core modules.
 
 ## Master (will become release 2.10)
 
+- The class `DefaultNodeToRangeMap` and the corresponding header `functionspacebases/defaultnodetorangemap.hh`
+  have been deprecated. This has been replaced as default by `HierarchicNodeToRangeMap` for some time.
 - The deprecated header `common/treedata.hh` was removed.
 - The deprecated header `common/referencehelper.hh` was removed. Use the corresponding header
   from dune-common instead.

@@ -15,7 +15,23 @@
 
 using namespace Dune;
 
-// Test function: The natural embedding of the 2d grid into R^3.
+// Test function
+// Is there no way to do this shorter, e.g., with two lambdas?
+class ConstantScalarFunction
+{
+public:
+  double operator() (const FieldVector<double,2>& x) const
+  {
+    return 1.0;
+  }
+
+  friend auto derivative(const ConstantScalarFunction& p)
+  {
+    return [](const FieldVector<double,2>& x) { return FieldVector<double,2>({0,0}); };
+  }
+};
+
+// Test function for a power basis: The natural embedding of the 2d grid into R^3.
 // Is there no way to do this shorter, e.g., with two lambdas?
 class IdentityGridEmbedding
 {
@@ -49,6 +65,11 @@ int main(int argc, char *argv[])
   {
     Functions::ReducedCubicHermiteTriangleBasis<GridView> basis(gridView);
     test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableVertexJacobianContinuityCheck()));
+
+    // Test whether we can call 'interpolate'
+    std::vector<double> x;
+    ConstantScalarFunction constantScalarFunction;
+    Functions::interpolate(basis, x, constantScalarFunction);
   }
 
   // check ReducedCubicHermiteTriangleBasis created using basis builder mechanism

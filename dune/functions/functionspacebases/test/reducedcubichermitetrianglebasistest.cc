@@ -31,16 +31,14 @@ int main(int argc, char *argv[])
   // check ReducedCubicHermiteTriangleBasis created 'manually'
   {
     Functions::ReducedCubicHermiteTriangleBasis<GridView> basis(gridView);
-    test.subTest(checkBasis(basis, EnableContinuityCheck()));
-    test.subTest(checkBasis(basis, EnableVertexJacobianContinuityCheck()));
+    test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableVertexJacobianContinuityCheck()));
   }
 
   // check ReducedCubicHermiteTriangleBasis created using basis builder mechanism
   {
     using namespace Functions::BasisFactory;
     auto basis = makeBasis(gridView, reducedCubicHermiteTriangle());
-    test.subTest(checkBasis(basis, EnableContinuityCheck()));
-    test.subTest(checkBasis(basis, EnableVertexJacobianContinuityCheck()));
+    test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableVertexJacobianContinuityCheck()));
 
     /**
      * @brief TODO: Test with PowerBasis leads to Segmentation fault!
@@ -63,7 +61,7 @@ int main(int argc, char *argv[])
       std::cout << localView.tree().child(0).finiteElement().localBasis().element().type() << std::endl;
     }
 
-    test.subTest(checkBasis(powerBasis, EnableContinuityCheck()));
+    test.subTest(checkBasis(powerBasis, EnableContinuityCheck(), EnableVertexJacobianContinuityCheck()));
   }
 
   return test.exit();

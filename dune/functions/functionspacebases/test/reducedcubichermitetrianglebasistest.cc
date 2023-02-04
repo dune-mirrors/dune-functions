@@ -11,8 +11,25 @@
 #include <dune/functions/functionspacebases/reducedcubichermitetrianglebasis.hh>
 #include <dune/functions/functionspacebases/test/basistest.hh>
 #include <dune/functions/functionspacebases/powerbasis.hh>
+#include <dune/functions/functionspacebases/interpolate.hh>
 
 using namespace Dune;
+
+// Test function: The natural embedding of the 2d grid into R^3.
+// Is there no way to do this shorter, e.g., with two lambdas?
+class IdentityGridEmbedding
+{
+public:
+  FieldVector<double,3> operator() (const FieldVector<double,2>& x) const
+  {
+    return {x[0], x[1], 0.0};
+  }
+
+  friend auto derivative(const IdentityGridEmbedding& p)
+  {
+    return [](const FieldVector<double,2>& x) { return FieldMatrix<double,3,2>({{1,0}, {0,1}, {0,0}}); };
+  }
+};
 
 int main(int argc, char *argv[])
 {
@@ -62,6 +79,11 @@ int main(int argc, char *argv[])
     }
 
     test.subTest(checkBasis(powerBasis, EnableContinuityCheck(), EnableVertexJacobianContinuityCheck()));
+
+    // Test whether we can call 'interpolate'
+    std::vector<FieldVector<double,3> > x;
+    IdentityGridEmbedding identityGridEmbedding;
+    Functions::interpolate(powerBasis, x, identityGridEmbedding);
   }
 
   return test.exit();

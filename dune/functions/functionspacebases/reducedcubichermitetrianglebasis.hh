@@ -241,11 +241,33 @@ namespace Dune::Functions
         {
         }
 
-        //! \brief Local interpolation of a function
+        /** \brief Local interpolation of a function
+         *
+         * The evaluation of f happens in world coordinates!
+         */
         template <typename F, typename C>
         void interpolate(const F &f, std::vector<C> &out) const
         {
-            DUNE_THROW(NotImplemented, "ReducedCubicHermiteTriangleLocalInterpolation::interpolate");
+            auto&& geometry = lFE_.element().geometry();
+
+            if (geometry.type() != GeometryTypes::triangle)
+              DUNE_THROW(NotImplemented, "ReducedCubicHermiteTriangleLocalInterpolation is only implemented for triangle elements!");
+
+            out.resize(9);
+
+            auto df = derivative(f);
+
+            // Loop over the vertices
+            for (std::size_t i=0; i<3; i++)
+            {
+                // Value-type degrees of freedom
+                out[i+0] = f(geometry.corner(i));
+
+                // Partial-derivative-type degrees of freedom
+                auto dfv = df(geometry.corner(i));
+                out[i+3] = df[0];
+                out[i+6] = df[1];
+            }
         }
 
     private:

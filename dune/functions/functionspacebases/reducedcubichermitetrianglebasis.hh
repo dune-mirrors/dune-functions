@@ -229,9 +229,6 @@ namespace Dune::Functions
         }
     };
 
-    template <typename GV>
-    class ReducedCubicHermiteTriangleNode;
-
     /** \brief Evaluate the degrees of freedom of a reduced cubic Hermite triangle basis
      * \tparam LocalBasis The corresponding set of shape functions
      */
@@ -427,6 +424,9 @@ namespace Dune::Functions
         const Element *element_;
         FieldMatrix<double, 10, 9> C_; // (transposed) basis transformation matrix
     };
+
+    template <typename GV>
+    class ReducedCubicHermiteTriangleNode;
 
     /** \brief Pre-basis for the Reduced cubic Hermite triangle basis
      *

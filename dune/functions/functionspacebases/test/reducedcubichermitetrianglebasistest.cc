@@ -45,11 +45,25 @@ int main(int argc, char *argv[])
     /**
      * @brief TODO: Test with PowerBasis leads to Segmentation fault!
      */
-    // auto powerBasis = makeBasis(gridView,
-    //                             power<3>(
-    //                             reducedCubicHermiteTriangle(),
-    //                             blockedInterleaved()));
-    // test.subTest(checkBasis(powerBasis, EnableContinuityCheck()));
+    auto powerBasis = makeBasis(gridView,
+                                power<3>(
+                                reducedCubicHermiteTriangle(),
+                                blockedInterleaved()));
+
+    // For debugging:
+    auto localView = powerBasis.localView();
+    for (const auto& e : elements(powerBasis.gridView()))
+    {
+      localView.bind(e);
+
+      // This call works...
+      std::cout << localView.tree().child(0).finiteElement().element().type() << std::endl;
+
+      // ... this call crashes.
+      std::cout << localView.tree().child(0).finiteElement().localBasis().element().type() << std::endl;
+    }
+
+    test.subTest(checkBasis(powerBasis, EnableContinuityCheck()));
   }
 
   return test.exit();

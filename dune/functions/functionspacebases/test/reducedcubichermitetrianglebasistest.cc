@@ -92,10 +92,8 @@ int main(int argc, char *argv[])
     {
       localView.bind(e);
 
-      // This call works...
       std::cout << localView.tree().child(0).finiteElement().element().type() << std::endl;
 
-      // ... this call crashes.
       std::cout << localView.tree().child(0).finiteElement().localBasis().element().type() << std::endl;
     }
 

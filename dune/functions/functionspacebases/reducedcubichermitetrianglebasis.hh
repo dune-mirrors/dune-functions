@@ -73,7 +73,7 @@ namespace Dune::Functions
 
         //! \brief Constructor with a given PreBasis and LocalFiniteElement
         ReducedCubicHermiteTriangleLocalBasis(const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &lFE)
-            : lFE_(lFE)
+            : lFE_(&lFE)
         {}
 
         /** \brief  Evaluate all shape functions
@@ -89,7 +89,7 @@ namespace Dune::Functions
         void evaluateFunction(const typename Traits::DomainType &in,
                               std::vector<typename Traits::RangeType> &out) const
         {
-            auto element = lFE_.element();
+            auto element = lFE_->element();
             auto geometry = element.geometry();
 
             // map input to global coordinates
@@ -110,7 +110,7 @@ namespace Dune::Functions
                                             x[1] * x[1] * x[1]};
 
             // multiply monomial Basis-evaluation with basis transformation matrix.
-            lFE_.C_.mtv(tmp, out);
+            (*lFE_).C_.mtv(tmp, out);
         }
 
         /** \brief Evaluate Jacobian of all shape functions
@@ -127,7 +127,7 @@ namespace Dune::Functions
                               std::vector<typename Traits::JacobianType> &out) const
         {
 
-            auto element = lFE_.element();
+            auto element = lFE_->element();
             auto geometry = element.geometry();
 
             // map input to global coordinates
@@ -161,8 +161,8 @@ namespace Dune::Functions
             FieldVector<double, 9> out_x;
             FieldVector<double, 9> out_y;
 
-            lFE_.C_.mtv(tmp_x, out_x);
-            lFE_.C_.mtv(tmp_y, out_y);
+            (*lFE_).C_.mtv(tmp_x, out_x);
+            (*lFE_).C_.mtv(tmp_y, out_y);
 
             // fill output vector
             out.resize(size());
@@ -195,17 +195,23 @@ namespace Dune::Functions
         //! \brief Return the number of basis functions
         std::size_t size() const
         {
-            return lFE_.size();
+            return lFE_->size();
         }
 
         //! Return current element, throw if unbound
         const Element &element() const
         {
-            return *lFE_.element_;
+            return *(*lFE_).element_;
+        }
+
+        //! Update local finite element
+        void updateLFE(ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &localFiniteElement)
+        {
+            lFE_ = &localFiniteElement;
         }
 
     private:
-        const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &lFE_;
+        const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> *lFE_;
     };
 
     //! \brief Associations of degrees of freedom to subentities
@@ -237,9 +243,8 @@ namespace Dune::Functions
         using Element = typename LocalBasis::Element;
 
         ReducedCubicHermiteTriangleLocalInterpolation(const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &lFE)
-            : lFE_(lFE)
-        {
-        }
+            : lFE_(&lFE)
+        {}
 
         /** \brief Local interpolation of a function
          *
@@ -270,8 +275,14 @@ namespace Dune::Functions
             }
         }
 
+        //! Update local finite element
+        void updateLFE(ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &localFiniteElement)
+        {
+            lFE_ = &localFiniteElement;
+        }
+
     private:
-        const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &lFE_;
+        const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> *lFE_;
     };
 
     /** \brief LocalFiniteElement in the sense of dune-localfunctions, for the reduced cubic Hermite triangle basis
@@ -324,6 +335,7 @@ namespace Dune::Functions
         {
             element_ = &e;
             auto geometry = element_->geometry();
+
 
             /*
              * Left-hand side matrix N are the degrees of freedom
@@ -395,6 +407,10 @@ namespace Dune::Functions
             N.invert(); // Todo: improve
 
             C_ = b.leftmultiply(N);
+
+            // Update local finite element
+            localBasis_.updateLFE(*this);
+            localInterpolation_.updateLFE(*this);
         }
 
         /** \brief Hand out a LocalBasis object */

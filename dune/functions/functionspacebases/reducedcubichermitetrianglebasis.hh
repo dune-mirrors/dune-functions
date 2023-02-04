@@ -72,12 +72,9 @@ namespace Dune::Functions
         typedef LocalBasisTraits<D, dim, FieldVector<D, dim>, R, 1, FieldVector<R, 1>, FieldMatrix<R, 1, dim>> Traits;
 
         //! \brief Constructor with a given PreBasis and LocalFiniteElement
-        ReducedCubicHermiteTriangleLocalBasis(const ReducedCubicHermiteTrianglePreBasis<GV> &preBasis,
-                                              const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &lFE)
-            : preBasis_(preBasis),
-              lFE_(lFE)
-        {
-        }
+        ReducedCubicHermiteTriangleLocalBasis(const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &lFE)
+            : lFE_(lFE)
+        {}
 
         /** \brief  Evaluate all shape functions
          *
@@ -192,7 +189,7 @@ namespace Dune::Functions
         //! \brief Polynomial order of the shape functions
         unsigned int order() const
         {
-            return preBasis_.order();
+            return 3;
         }
 
         //! \brief Return the number of basis functions
@@ -208,7 +205,6 @@ namespace Dune::Functions
         }
 
     private:
-        const ReducedCubicHermiteTrianglePreBasis<GV, R> &preBasis_;
         const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> &lFE_;
     };
 
@@ -290,8 +286,8 @@ namespace Dune::Functions
 
         /** \brief Constructor with a given ReducedCubicHermiteTriangle basis
          */
-        ReducedCubicHermiteTriangleLocalFiniteElement(const ReducedCubicHermiteTrianglePreBasis<GV> &preBasis)
-            : localBasis_(preBasis, *this),
+        ReducedCubicHermiteTriangleLocalFiniteElement()
+            : localBasis_(*this),
               localInterpolation_(*this),
               element_(nullptr)
               {}
@@ -564,8 +560,8 @@ namespace Dune::Functions
         using Element = typename GV::template Codim<0>::Entity;
         using FiniteElement = ReducedCubicHermiteTriangleLocalFiniteElement<GV, double>;
 
-        ReducedCubicHermiteTriangleNode(const ReducedCubicHermiteTrianglePreBasis<GV> *preBasis) : finiteElement_(*preBasis),
-                                                                                                   element_(nullptr)
+        ReducedCubicHermiteTriangleNode(const ReducedCubicHermiteTrianglePreBasis<GV> *preBasis)
+        : element_(nullptr)
         {
         }
 

@@ -28,39 +28,42 @@ struct StdTraits
 };
 
 namespace Functions {
+namespace BasisFactory {
 
+/**
+ * \brief Collection of basis factories with additional info to be used in tests.
+ *
+ * This collection of factories to generate global bases with various index merging
+ * strategies. These factories represent different ways to encode a taylor-hood
+ * basis, i.e., `dim` velocity components and a pressure component.
+ *
+ * In addition to the basis factories, the class provides methods for constructing
+ * vector containers compatible with the bases. Therefore, we use the `StdTraits`
+ * type definition for different kinds of vectors.
+ **/
 template <int dim>
 class BasisFactories
 {
-  using GridType = YaspGrid<dim>;
   using Traits = StdTraits;
 
 public:
   static const std::size_t num_bases = 11;
   static const std::size_t num_false_bases = 1;
 
-  BasisFactories()
-    : grid_({1.0, 1.0}, {2, 2})
-  {}
-
-  GridType& grid() { return grid_; }
-  auto gridView() const { return grid_.leafGridView(); }
-
-  auto basis(index_constant<0>) const // Root: blockedLexicographic, Velocity: flatLexicographic
+  // Root: blockedLexicographic, Velocity: flatLexicographic
+  static auto basis(index_constant<0>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<dim>(
           lagrange<2>(),
           flatLexicographic()),
         lagrange<1>(),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<0>) const
+  static auto vector(index_constant<0>)
   {
     return Traits::CompositeVector<
       Traits::DynamicVector<T>,
@@ -68,31 +71,21 @@ public:
       >{};
   }
 
-  auto prefixes(index_constant<0>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<1>) const // Root: blockedLexicographic, Velocity: flatInterleaved
+  // Root: blockedLexicographic, Velocity: flatInterleaved
+  static auto basis(index_constant<1>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<dim>(
           lagrange<2>(),
           flatInterleaved()),
         lagrange<1>(),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<1>) const
+  static auto vector(index_constant<1>)
   {
     return Traits::CompositeVector<
       Traits::DynamicVector<T>,
@@ -100,31 +93,21 @@ public:
       >{};
   }
 
-  auto prefixes(index_constant<1>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<2>) const // Root: blockedLexicographic, Velocity: blockedLexicographic
+  // Root: blockedLexicographic, Velocity: blockedLexicographic
+  static auto basis(index_constant<2>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<dim>(
           lagrange<2>(),
           blockedLexicographic()),
         lagrange<1>(),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<2>) const
+  static auto vector(index_constant<2>)
   {
     using Vector = Traits::CompositeVector<
       Traits::PowerVector<Traits::DynamicVector<T>, dim>,
@@ -133,32 +116,21 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<2>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 1u),
-      hybridTreePath(_0, 0u, 0u), hybridTreePath(_0, 1u, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<3>) const // Root: blockedLexicographic, Velocity: blockedInterleaved
+  // Root: blockedLexicographic, Velocity: blockedInterleaved
+  static auto basis(index_constant<3>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<dim>(
           lagrange<2>(),
           blockedInterleaved()),
         lagrange<1>(),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<3>) const
+  static auto vector(index_constant<3>)
   {
     using Vector = Traits::CompositeVector<
       Traits::DynamicVector<Dune::FieldVector<T, dim>>,
@@ -167,22 +139,11 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<3>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 1u),
-      hybridTreePath(_0, 0u, 0u), hybridTreePath(_0, 0u, 1u)
-    };
-  }
 
-
-  auto basis(index_constant<4>) const // Root: flatLexicographic, Velocity/Pressure: flatLexicographic
+  // Root: flatLexicographic, Velocity/Pressure: flatLexicographic
+  static auto basis(index_constant<4>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<dim>(
           lagrange<2>(),
           flatLexicographic()),
@@ -190,31 +151,21 @@ public:
           lagrange<1>(),
           flatLexicographic()),
         flatLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<4>) const
+  static auto vector(index_constant<4>)
   {
     using Vector = Traits::DynamicVector<T>;
     return Vector{};
   }
 
-  auto prefixes(index_constant<4>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(0u)
-    };
-  }
 
-
-  auto basis(index_constant<5>) const // Root: blockedLexicographic, Velocity/Pressure: blockedLexicographic
+  // Root: blockedLexicographic, Velocity/Pressure: blockedLexicographic
+  static auto basis(index_constant<5>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<dim>(
           lagrange<2>(),
           blockedLexicographic()),
@@ -222,11 +173,11 @@ public:
           lagrange<1>(),
           blockedLexicographic()),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<5>) const
+  static auto vector(index_constant<5>)
   {
     using Vector = Traits::CompositeVector<
       Traits::PowerVector<Traits::DynamicVector<T>, dim>,
@@ -235,32 +186,20 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<5>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 1u),
-      hybridTreePath(_1, 0u), hybridTreePath(_0, 0u, 0u), hybridTreePath(_0, 0u, 1u),
-      hybridTreePath(_1, 0u, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<6>) const // Root: blockedLexicographic, Velocity/Pressure: on the same level
+  // Root: blockedLexicographic, Velocity/Pressure: on the same level
+  static auto basis(index_constant<6>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         lagrange<2>(),
         lagrange<2>(),
         lagrange<1>(),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<6>) const
+  static auto vector(index_constant<6>)
   {
     using Vector = Traits::CompositeVector<
       Traits::DynamicVector<T>,
@@ -270,22 +209,10 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<6>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_2), hybridTreePath(_0, 0u),
-      hybridTreePath(_1, 0u), hybridTreePath(_2, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<7>) const
+  static auto basis(index_constant<7>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<1>(
           power<dim>(
             lagrange<2>(),
@@ -293,11 +220,11 @@ public:
           blockedLexicographic() ),
         lagrange<1>(),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<7>) const
+  static auto vector(index_constant<7>)
   {
     using Vector = Traits::CompositeVector<
       Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, dim>, 1>,
@@ -306,22 +233,10 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<7>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 0u, 0u),
-      hybridTreePath(_0, 0u, 0u, 0u), hybridTreePath(_1, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<8>) const
+  static auto basis(index_constant<8>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<1>(
           power<dim>(
             lagrange<2>(),
@@ -331,11 +246,11 @@ public:
           lagrange<1>(),
           blockedLexicographic() ),
         blockedLexicographic()
-      ));
+      );
   }
 
   template <class T>
-  auto vector(index_constant<8>) const
+  static auto vector(index_constant<8>)
   {
     using Vector = Traits::CompositeVector<
       Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, dim>, 1>,
@@ -344,34 +259,22 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<8>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 0u, 0u),
-      hybridTreePath(_0, 0u, 0u, 0u), hybridTreePath(_1, 0u), hybridTreePath(_1, 0u, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<9>) const
+  static auto basis(index_constant<9>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<2>(lagrange<2>()),  // Cahn-Hilliard equation
-        composite(                  // Stokes equation
+        composite(                // Stokes equation
           power<dim>(
             lagrange<2>()
           ),
           lagrange<1>()
         )
-    ));
+    );
   }
 
   template <class T>
-  auto vector(index_constant<9>) const
+  static auto vector(index_constant<9>)
   {
     using Vector = Traits::CompositeVector<
       Traits::DynamicVector<FieldVector<T, 2>>,
@@ -383,23 +286,10 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<9>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_0, 0u), hybridTreePath(_0, 0u, 0u),
-      hybridTreePath(_1, _0), hybridTreePath(_1, _0, 0u), hybridTreePath(_1, _0, 0u, 0u),
-      hybridTreePath(_1, _1), hybridTreePath(_1, _1, 0u)
-    };
-  }
 
-
-  auto basis(index_constant<10>) const
+  static auto basis(index_constant<10>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         lagrange<2>(),              // Diffusion equation
         power<2>(                   // Cahn-Hilliard equation
           lagrange<2>(),
@@ -413,11 +303,11 @@ public:
           blockedLexicographic()
         ),
         blockedLexicographic()
-    ));
+    );
   }
 
   template <class T>
-  auto vector(index_constant<10>) const
+  static auto vector(index_constant<10>)
   {
     using Vector = Traits::CompositeVector<
       Traits::DynamicVector<T>,
@@ -430,24 +320,10 @@ public:
     return Vector{};
   }
 
-  auto prefixes(index_constant<10>) const
-  {
-    using namespace Dune::Indices;
-    using namespace Dune::TypeTree;
-    return std::tuple{
-      hybridTreePath(_0), hybridTreePath(_1), hybridTreePath(_2), hybridTreePath(_0, 0u),
-      hybridTreePath(_1, 0u), hybridTreePath(_1, 0u, 0u),
-      hybridTreePath(_2, _0), hybridTreePath(_2, _0, 0u), hybridTreePath(_2, _0, 0u, 0u),
-      hybridTreePath(_2, _1), hybridTreePath(_2, _1, 0u)
-    };
-  }
 
-
-  auto false_basis(index_constant<0>) const
+  static auto false_basis(index_constant<0>)
   {
-    using namespace Dune::Functions::BasisFactory;
-    return makeBasis(gridView(),
-      composite(
+    return composite(
         power<dim>(
           lagrange<2>(),
           blockedLexicographic()),
@@ -455,11 +331,8 @@ public:
           lagrange<1>(),
           blockedLexicographic()),
         flatLexicographic()
-      ));
+      );
   }
-
-private:
-  GridType grid_;
 };
 
-}} // end namespace Dune::Functions
+}}} // end namespace Dune::Functions::BasisFactory

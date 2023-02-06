@@ -14,7 +14,6 @@
 #include "basisfactories.hh"
 
 using namespace Dune;
-using namespace Dune::Functions::BasisFactory;
 
 // check at run time whether index is a valid child index
 template <class Node, class Index>
@@ -99,12 +98,14 @@ int main (int argc, char *argv[])
 
   TestSuite test;
 
-  using Factories = Functions::BasisFactories<2>;
-  Factories factories;
-  Hybrid::forEach(Dune::StaticIntegralRange<std::size_t,Factories::num_bases>{},
+  using Grid = Dune::YaspGrid<2>;
+  Grid grid({1.0, 1.0}, {2, 2});
+
+  using namespace Dune::Functions::BasisFactory;
+  Hybrid::forEach(Dune::StaticIntegralRange<std::size_t,BasisFactories<2>::num_bases>{},
   [&](auto i) {
     std::cout << std::size_t(i) << ") ";
-    auto basis = factories.basis(i);
+    auto basis = makeBasis(grid.leafGridView(), BasisFactories<2>::basis(i));
     std::cout << Dune::className(basis.preBasis()) << std::endl;
     checkSize(test, basis.preBasis().indexTree(), basis, TypeTree::HybridTreePath<>{});
   });

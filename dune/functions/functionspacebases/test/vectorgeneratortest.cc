@@ -54,15 +54,18 @@ auto vectorGenerator(IndexTree const& indexTree)
   }
 }
 
-template <class Factory, std::size_t I>
-void test(Dune::TestSuite& testSuite, Factory const& factory, index_constant<I> ii)
+template <class GridView, std::size_t I>
+void test(Dune::TestSuite& testSuite, GridView const& gridView, index_constant<I> ii)
 {
   using namespace Dune::Indices;
-  auto basis = factory.basis(ii);
+  using namespace Dune::Functions::BasisFactory;
+  using Factories = BasisFactories<GridView::dimensionworld>;
+
+  auto basis = makeBasis(gridView, Factories::basis(ii));
   auto const& preBasis = basis.preBasis();
 
   using Vector1 = decltype(vectorGenerator<double>(preBasis.indexTree()));    // generate vector
-  using Vector2 = decltype(factory.template vector<double>(ii));   // expected type
+  using Vector2 = decltype(Factories::template vector<double>(ii));   // expected type
 
   std::cout << ii << ":" << std::endl;
   std::cout << Dune::className(preBasis) << std::endl;
@@ -78,15 +81,16 @@ void test(Dune::TestSuite& testSuite, Factory const& factory, index_constant<I> 
 int main(int argc, char** argv)
 {
   MPIHelper::instance(argc, argv);
-
-  using Factory = Dune::Functions::BasisFactories<2>;
-  Factory factory{};
   Dune::TestSuite testSuite;
 
-  Hybrid::forEach(range(index_constant<Factory::num_bases>{}),
+  using Grid = Dune::YaspGrid<2>;
+  Grid grid({1.0, 1.0}, {2, 2});
+
+  using namespace Dune::Functions::BasisFactory;
+  Hybrid::forEach(range(index_constant<BasisFactories<2>::num_bases>{}),
     [&](auto ii) {
       Dune::TestSuite subTestSuite("basis " + std::to_string(std::size_t(ii)));
-      test(subTestSuite, factory, ii);
+      test(subTestSuite, grid.leafGridView(), ii);
       testSuite.subTest(subTestSuite);
     });
 

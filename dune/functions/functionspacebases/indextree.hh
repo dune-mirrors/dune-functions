@@ -19,6 +19,36 @@
  * \brief Lightweight representation of (hierarchic) size and blocking structure
  * The index-tree can be used to define types for data-structures, like vectors
  * or matrices, that can be accessed by the multi-indices provided by a basis.
+ *
+ * An index-tree encodes the dimensions of the index-space in a hierarchic basis.
+ * This means especially, for each component of a multi-index it encodes the
+ * possible range of indices.
+ *
+ * The structure of an index-tree is as follows
+ * \code
+  struct IndexTree
+  {
+    static constexpr bool isUniform = [true|false];     // Whether all children are identical
+    static constexpr bool isTypeUniform = [true|false]; // Whether all children have the same type
+
+    template<class Index>
+    SubTree operator[](Index i) const;  // return the i-th sub-tree
+
+    [static constexpr] std::size_t size() [const];  // return the number of sub-nodes
+  };
+ * \endcode
+ *
+ * The property `isUniform` specifies that all nodes of that tree are identical,
+ * especially have the same size, the same properties and the same children.
+ *
+ * The property `isTypeUniform` is a bet less, it specifies that only the type
+ * of all nodes of that tree are identical. This means that all static information
+ * of the children are identical, e.g., the static size.
+ *
+ * With the `operator[]` the children can be accessed. Thereby, the `Index` type
+ * is either an integral value or an `integral_constant` for non-uniform nodes.
+ *
+ * Size is either a static property, or a runtime value.
  **/
 
 namespace Dune {

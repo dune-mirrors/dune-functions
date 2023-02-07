@@ -47,7 +47,7 @@ class BasisFactories
   using Traits = StdTraits;
 
 public:
-  static const std::size_t num_bases = 11;
+  static const std::size_t num_bases = 13;
   static const std::size_t num_false_bases = 1;
 
   // Root: blockedLexicographic, Velocity: flatLexicographic
@@ -317,6 +317,38 @@ public:
         Traits::DynamicVector<T>
         >
       >;
+    return Vector{};
+  }
+
+
+  static auto basis(index_constant<11>)
+  {
+    return power<2>(
+        power<2>(lagrange<2>(), blockedLexicographic()),
+        flatInterleaved()
+        );
+  }
+
+  template <class T>
+  static auto vector(index_constant<11>)
+  {
+    using Vector = Traits::PowerVector<Traits::DynamicVector<T>, 4>;
+    return Vector{};
+  }
+
+
+  static auto basis(index_constant<12>)
+  {
+    return power<2>(
+        power<2>(lagrange<2>(), blockedLexicographic()),
+        flatLexicographic()
+        );
+  }
+
+  template <class T>
+  static auto vector(index_constant<12>)
+  {
+    using Vector = Traits::PowerVector<Traits::DynamicVector<T>, 4>;
     return Vector{};
   }
 

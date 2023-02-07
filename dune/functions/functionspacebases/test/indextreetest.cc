@@ -15,6 +15,8 @@
 
 using namespace Dune;
 
+namespace TestImpl {
+
 // check at run time whether index is a valid child index
 template <class Node, class Index>
 std::true_type checkAccessIndex (Node const& node, Index i)
@@ -75,13 +77,34 @@ auto sizePrefix (TypeTree::HybridTreePath<Indices...> tp)
 }
 
 
+template<class T, class Value, class Branches>
+constexpr void hybridSwitchCases(IntegralRange<T> cases,
+                                 const Value& value, Branches&& branches)
+{
+  branches(value);
+}
+
+template<class T, T to, T from, class Value, class Branches>
+constexpr void hybridSwitchCases(StaticIntegralRange<T,to,from> cases,
+                                 const Value& value, Branches&& branches)
+{
+  using seq = typename decltype(cases)::integer_sequence;
+  Dune::Hybrid::switchCases(seq{}, value, std::forward<Branches>(branches), []() {});
+}
+
+} // end namespace TestImpl
+
+// ---------------------------------------------------
+
+// check that the sizes of an index-tree correspond to the sizes provided by the
+// basis (size-provider) directly.
 template<class IndexTree, class SizeProvider, class... Indices>
 void checkSize (TestSuite& test, const IndexTree& indexTree, const SizeProvider& sizeProvider,
                 TypeTree::HybridTreePath<Indices...> prefix)
 {
   using SizePrefix = typename SizeProvider::SizePrefix;
-  auto size1 = sizeProvider.size(sizePrefix<SizePrefix>(prefix));
-  auto size2 = Dune::Hybrid::size(access(indexTree, prefix));
+  auto size1 = sizeProvider.size(TestImpl::sizePrefix<SizePrefix>(prefix));
+  auto size2 = Dune::Hybrid::size(TestImpl::access(indexTree, prefix));
   test.require(std::size_t(size1) == std::size_t(size2));
 
   if constexpr(sizeof...(Indices) < SizePrefix::max_size()) {
@@ -91,6 +114,33 @@ void checkSize (TestSuite& test, const IndexTree& indexTree, const SizeProvider&
   }
 }
 
+// check a specific multi-index by traversing all its components and the index-tree simultaneously
+template <class IndexTree, class MultiIndex>
+void checkMultiIndex (TestSuite& test, const IndexTree& indexTree,
+                      const MultiIndex& mi, std::size_t j = 0)
+{
+  if (j < mi.size()) {
+    test.require(mi[j] < indexTree.size());
+    auto size = Dune::Hybrid::size(indexTree);
+    TestImpl::hybridSwitchCases(Dune::range(size), mi[j],
+      [&](auto jj) { checkMultiIndex(test,indexTree[jj],mi,j+1); });
+  }
+}
+
+// check that all multi-indices of a global basis are within the range of the index-tree
+template <class IndexTree, class Basis>
+void checkMultiIndices (TestSuite& test, const IndexTree& indexTree, const Basis& basis)
+{
+  auto localView = basis.localView();
+  for (auto const& e : elements(basis.gridView()))
+  {
+    localView.bind(e);
+    for (std::size_t i = 0; i < localView.size(); ++i) {
+      auto mi = localView.index(i);
+      checkMultiIndex(test,indexTree,mi);
+    }
+  }
+}
 
 int main (int argc, char *argv[])
 {
@@ -108,6 +158,7 @@ int main (int argc, char *argv[])
     auto basis = makeBasis(grid.leafGridView(), BasisFactories<2>::basis(i));
     std::cout << Dune::className(basis.preBasis()) << std::endl;
     checkSize(test, basis.preBasis().indexTree(), basis, TypeTree::HybridTreePath<>{});
+    checkMultiIndices(test, basis.preBasis().indexTree(), basis);
   });
 
   return test.exit();

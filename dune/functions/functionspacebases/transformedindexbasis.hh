@@ -316,6 +316,18 @@ auto indexTransformation(IndexTransformation&& indexTransformation,
         std::forward<IndexTreeImplementation>(indexTreeImplementation));
 }
 
+//! Fallback implementation if no index-tree argument is given. Defaults to an index-tree generator
+//! that always returns `UnknownIndexTree`.
+template<class IndexTransformation, class SizeImplementation,
+         std::size_t minIndexSize, std::size_t maxIndexSize>
+auto indexTransformation(IndexTransformation&& indexTrafo,
+                         SizeImplementation&& sizeImpl,
+                         Dune::index_constant<minIndexSize> minSize,
+                         Dune::index_constant<maxIndexSize> maxSize)
+{
+  return indexTransformation(indexTrafo, sizeImpl,
+    [](auto&&){ return UnknownIndexTree{}; }, minSize, maxSize);
+}
 
 } // end namespace Experimental
 } // end namespace BasisFactory

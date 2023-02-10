@@ -96,6 +96,13 @@ constexpr void hybridSwitchCases(StaticIntegralRange<T,to,from> cases,
 
 // ---------------------------------------------------
 
+template <class SizeProvider, class... Indices>
+void checkSize (TestSuite& test, const Dune::Functions::UnknownIndexTree& indexTree,
+                const SizeProvider& sizeProvider, TypeTree::HybridTreePath<Indices...> prefix)
+{
+  test.require(false, "Got an UnknownIndexTree!");
+}
+
 // check that the sizes of an index-tree correspond to the sizes provided by the
 // basis (size-provider) directly.
 template<class IndexTree, class SizeProvider, class... Indices>
@@ -105,7 +112,7 @@ void checkSize (TestSuite& test, const IndexTree& indexTree, const SizeProvider&
   using SizePrefix = typename SizeProvider::SizePrefix;
   auto size1 = sizeProvider.size(TestImpl::sizePrefix<SizePrefix>(prefix));
   auto size2 = Dune::Hybrid::size(TestImpl::access(indexTree, prefix));
-  test.require(std::size_t(size1) == std::size_t(size2));
+  test.require(std::size_t(size1) == std::size_t(size2), "size1 == size2");
 
   if constexpr(sizeof...(Indices) < SizePrefix::max_size()) {
     Hybrid::forEach(Dune::range(size2), [&](auto i) {
@@ -114,13 +121,20 @@ void checkSize (TestSuite& test, const IndexTree& indexTree, const SizeProvider&
   }
 }
 
+template <class MultiIndex>
+void checkMultiIndex (TestSuite& test, const Dune::Functions::UnknownIndexTree& indexTree,
+                      const MultiIndex& mi, std::size_t j = 0)
+{
+  test.require(false, "Got an UnknownIndexTree!");
+}
+
 // check a specific multi-index by traversing all its components and the index-tree simultaneously
 template <class IndexTree, class MultiIndex>
 void checkMultiIndex (TestSuite& test, const IndexTree& indexTree,
                       const MultiIndex& mi, std::size_t j = 0)
 {
   if (j < mi.size()) {
-    test.require(mi[j] < indexTree.size());
+    test.check(mi[j] < indexTree.size(), "mi[j] < indexTree.size");
     auto size = Dune::Hybrid::size(indexTree);
     TestImpl::hybridSwitchCases(Dune::range(size), mi[j],
       [&](auto jj) { checkMultiIndex(test,indexTree[jj],mi,j+1); });

@@ -180,7 +180,7 @@ public:
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
     {
       return std::apply([&](auto const&... spb) {
-        return mergeIndexTrees(spb.indexTree()...);
+        return Impl::mergeIndexTrees<FlatLexicographic>(spb.indexTree()...);
       }, subPreBases_);
     }
     else

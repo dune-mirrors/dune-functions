@@ -47,7 +47,7 @@ class BasisFactories
   using Traits = StdTraits;
 
 public:
-  static const std::size_t num_bases = 13;
+  static const std::size_t num_bases = 16;
   static const std::size_t num_false_bases = 1;
 
   // Root: blockedLexicographic, Velocity: flatLexicographic
@@ -349,6 +349,90 @@ public:
   static auto vector(index_constant<12>)
   {
     using Vector = Traits::PowerVector<Traits::DynamicVector<T>, 4>;
+    return Vector{};
+  }
+
+
+  static auto basis(index_constant<13>)
+  {
+    return power<2>(
+        composite(
+          power<1>(power<1>(lagrange<1>())),
+          power<2>(lagrange<1>()),
+          power<3>(lagrange<1>())
+        ),
+        flatLexicographic()
+      );
+  }
+
+  template <class T>
+  static auto vector(index_constant<13>)
+  {
+    using Vector = Traits::CompositeVector<
+      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
+      Traits::DynamicVector<Dune::FieldVector<T,2>>,
+      Traits::DynamicVector<Dune::FieldVector<T,3>>,
+      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
+      Traits::DynamicVector<Dune::FieldVector<T,2>>,
+      Traits::DynamicVector<Dune::FieldVector<T,3>>
+      >;
+    return Vector{};
+  }
+
+
+  static auto basis(index_constant<14>)
+  {
+    return power<2>(
+        composite(
+          power<1>(power<1>(lagrange<1>())),
+          power<2>(lagrange<1>()),
+          power<3>(lagrange<1>())
+        ),
+        flatInterleaved()
+      );
+  }
+
+  template <class T>
+  static auto vector(index_constant<14>)
+  {
+    using Vector = Traits::CompositeVector<
+      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
+      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
+      Traits::DynamicVector<Dune::FieldVector<T,2>>,
+      Traits::DynamicVector<Dune::FieldVector<T,2>>,
+      Traits::DynamicVector<Dune::FieldVector<T,3>>,
+      Traits::DynamicVector<Dune::FieldVector<T,3>>
+      >;
+    return Vector{};
+  }
+
+
+  static auto basis(index_constant<15>)
+  {
+    return composite(
+        composite(
+          power<2>(lagrange<1>()),
+          power<1>(power<2>(lagrange<1>()))
+        ),
+        composite(
+          power<1>(power<1>(lagrange<1>())),
+          power<2>(lagrange<1>()),
+          power<3>(lagrange<1>())
+        ),
+        flatLexicographic()
+      );
+  }
+
+  template <class T>
+  static auto vector(index_constant<15>)
+  {
+    using Vector = Traits::CompositeVector<
+      Traits::DynamicVector<Dune::FieldVector<T,2>>,
+      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,2>>,
+      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
+      Traits::DynamicVector<Dune::FieldVector<T,2>>,
+      Traits::DynamicVector<Dune::FieldVector<T,3>>
+      >;
     return Vector{};
   }
 

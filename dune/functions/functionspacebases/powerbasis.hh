@@ -133,13 +133,13 @@ public:
 
     auto subIndexTree = subPreBasis_.indexTree();
     if constexpr(std::is_same_v<IMS, FlatInterleaved>)
-      return Impl::mergeIndexTrees<children,FlatInterleaved>(std::move(subIndexTree));
+      return Impl::mergeIndexTrees<children,FlatInterleaved>(subIndexTree);
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
-      return Impl::mergeIndexTrees<children,FlatLexicographic>(std::move(subIndexTree));
+      return Impl::mergeIndexTrees<children,FlatLexicographic>(subIndexTree);
     else if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
       return StaticUniformIndexTree<decltype(subIndexTree), children>{std::move(subIndexTree)};
     else if constexpr(std::is_same_v<IMS, BlockedInterleaved>)
-      return Impl::appendToIndexTree<children>(std::move(subIndexTree));
+      return Impl::appendToIndexTree<children>(subIndexTree);
     else
       return UnknownIndexTree{};
   }

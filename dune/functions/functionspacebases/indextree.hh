@@ -4,6 +4,7 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_INDEXTREE_HH
 
 #include <array>
+#include <cassert>
 #include <functional>
 #include <vector>
 
@@ -221,51 +222,58 @@ namespace Functions {
   // Some utilities for generating index-trees
   // -----------------------------------------------------------------------------------------------
 
-
-  struct Incr
+  struct FlatIndexAccess
   {
-    template<class T>
-    constexpr auto operator()(T i) const { return i+1; }
-  };
+    struct Increment
+    {
+      template<class T>
+      constexpr auto operator()(T i) const { return i+1; }
+    };
 
-  template<class IMS>
-  struct FlatIndexAccess;
+    static constexpr auto lt_ = Hybrid::hybridFunctor(std::less<>{});
+    static constexpr auto incr_ = Hybrid::hybridFunctor(Increment{});
+    static constexpr auto minus_ = Hybrid::hybridFunctor(std::minus<>{});
 
-  template<>
-  struct FlatIndexAccess<Dune::Functions::BasisFactory::FlatLexicographic>
-  {
+    template<class FlatIndex, class OuterOffsetIndex, class IMS>
+    static auto getEntry(const UnknownIndexTree& tree, FlatIndex i, OuterOffsetIndex o, IMS)
+    {
+      return UnknownIndexTree{};
+    }
+
+    template<class FlatIndex, class OuterOffsetIndex, class IMS>
+    static auto getEntry(const EmptyIndexTree& tree, FlatIndex i, OuterOffsetIndex o, IMS)
+    {
+      return UnknownIndexTree{};
+    }
 
     template<class IndexTree, class FlatIndex, class OuterOffsetIndex>
-    static auto getEntry(const IndexTree& tree, FlatIndex i, OuterOffsetIndex o)
+    static auto getEntry(const IndexTree& tree, FlatIndex i, OuterOffsetIndex o,
+                         Dune::Functions::BasisFactory::FlatLexicographic ims)
     {
+      const auto treeSize = Hybrid::size(tree);
       const auto outerOffsetSize = Hybrid::size(tree[o]);
-      auto incr = Hybrid::hybridFunctor(Incr{});
-      auto less = Hybrid::hybridFunctor(std::less<>{});
-      return Hybrid::ifElse(less(i,outerOffsetSize), // i < outerOffsetSize
+      return Hybrid::ifElse(lt_(i,outerOffsetSize), // i < outerOffsetSize
         [&](auto id) {
           return id(tree)[o][i];
         },
         [&](auto id) {
-          return getEntry(id(tree), Hybrid::minus(i,outerOffsetSize), incr(o));
+          assert((o+1) < treeSize && i >= outerOffsetSize);
+          return getEntry(id(tree), minus_(i,outerOffsetSize), incr_(o), ims);
         });
     }
-  };
 
-  template<>
-  struct FlatIndexAccess<Dune::Functions::BasisFactory::FlatInterleaved>
-  {
     template<class IndexTree, class FlatIndex, class InnerIndex>
-    static auto getEntry(const IndexTree& tree, FlatIndex i, InnerIndex o)
+    static auto getEntry(const IndexTree& tree, FlatIndex i, InnerIndex o,
+                         Dune::Functions::BasisFactory::FlatInterleaved ims)
     {
       const auto rootSize = Hybrid::size(tree);
-      auto incr = Hybrid::hybridFunctor(Incr{});
-      auto less = Hybrid::hybridFunctor(std::less<>{});
-      return Hybrid::ifElse(less(i,rootSize), // i < rootSize
+      return Hybrid::ifElse(lt_(i,rootSize), // i < rootSize
         [&](auto id) {
           return id(tree)[i][o];
         },
         [&](auto id) {
-          return getEntry(id(tree), Hybrid::minus(i,rootSize), incr(o));
+          assert(i >= rootSize);
+          return getEntry(id(tree), minus_(i,rootSize), incr_(o), ims);
         });
     }
   };
@@ -275,19 +283,30 @@ namespace Functions {
                             std::bool_constant<allUniform>,
                             std::bool_constant<allTypeUniform>)
   {
-    auto child = [&](auto ii) { return FlatIndexAccess<IMS>::getEntry(tree,ii,index_constant<0>{}); };
+    auto child = [&](auto ii) { return FlatIndexAccess::getEntry(tree,ii,index_constant<0>{},IMS{}); };
 
     if constexpr(allUniform)
-      return makeUniformIndexTree(size, tree[Dune::Indices::_0][Dune::Indices::_0]);
+      return makeUniformIndexTree(size, tree[index_constant<0>{}][index_constant<0>{}]);
     else if constexpr(Dune::IsIntegralConstant<Size>::value)
     {
+      using Child0 = decltype(child(index_constant<0>{}));
       return Dune::unpackIntegerSequence([&](auto... ii) {
         if constexpr(allTypeUniform)
-          return StaticTypeUniformIndexTree{child(ii)...};
+          return StaticTypeUniformIndexTree<Child0,Size::value>{child(ii)...};
         else
-          return StaticNonUniformIndexTree{child(ii)...};
+          return StaticNonUniformIndexTree<decltype(child(ii))...>{child(ii)...};
       }, std::make_index_sequence<Size::value>{});
-    } else {
+    }
+    else if constexpr(allTypeUniform) {
+      using Child0 = decltype(child(index_constant<0>{}));
+      TypeUniformIndexTree<Child0> result;
+      result.reserve(size);
+      for (std::size_t i = 0; i < size; ++i)
+        result.push_back(child(i));
+      return result;
+    }
+    else {
+      DUNE_THROW(Dune::NotImplemented, "Merging of dynamic non-uniform index-trees not implemented");
       return UnknownIndexTree{};
     }
   }
@@ -312,7 +331,7 @@ namespace Functions {
   auto mergeIndexTrees (const IT&... indexTrees)
   {
     auto sumSizes = Hybrid::plus(Hybrid::size(indexTrees)...);
-    return mergeIndexTreesImpl<IMS>(sumSizes, StaticNonUniformIndexTree{indexTrees...},
+    return mergeIndexTreesImpl<IMS>(sumSizes, StaticNonUniformIndexTree<IT...>{indexTrees...},
       std::bool_constant<(... && IT::isUniform)>{},
       std::bool_constant<(... && IT::isTypeUniform)>{}
     );
@@ -360,32 +379,29 @@ namespace Functions {
   template<class IT, class Size>
   auto appendToIndexTree (const IT& indexTree, Size s)
   {
+    auto child = [&](auto ii) { return appendToIndexTree(indexTree[ii], s); };
+    using Child0 = decltype(child(Dune::Indices::_0));
+
     if constexpr(IT::isUniform) {
-      return makeUniformIndexTree(Hybrid::size(indexTree), appendToIndexTree(indexTree[Dune::Indices::_0], s));
+      return makeUniformIndexTree(Hybrid::size(indexTree), child(Dune::Indices::_0));
+    }
+    else if constexpr(HasStaticSize_v<IT>) {
+      return Dune::unpackIntegerSequence([&](auto... ii) {
+        if constexpr(IT::isTypeUniform)
+          return StaticTypeUniformIndexTree<Child0,IT::size()>{child(ii)...};
+        else
+          return StaticNonUniformIndexTree<decltype(child(ii))...>{child(ii)...};
+        }, std::make_index_sequence<std::size_t(IT::size())>());
     }
     else if constexpr(IT::isTypeUniform) {
-      using Child = decltype(appendToIndexTree(indexTree[Dune::Indices::_0],s));
-      if constexpr(HasStaticSize_v<IT>) {
-        return Dune::unpackIntegerSequence([&](auto... ii) {
-          return StaticTypeUniformIndexTree{appendToIndexTree(indexTree[ii],s)...};
-          }, std::make_index_sequence<std::size_t(IT::size())>());
-      } else {
-        TypeUniformIndexTree<Child> result;
-        result.reserve(indexTree.size());
-        for (std::size_t i = 0; i < indexTree.size(); ++i)
-          result.push_back(appendToIndexTree(indexTree[i],s));
-        return result;
-      }
+      TypeUniformIndexTree<Child0> result;
+      result.reserve(indexTree.size());
+      for (std::size_t i = 0; i < indexTree.size(); ++i)
+        result.push_back(child(i));
+      return result;
     }
     else {
-      if constexpr(HasStaticSize_v<IT>) {
-        return std::apply([&](auto const&... subTree) {
-          return StaticNonUniformIndexTree{appendToIndexTree(subTree,s)...};
-        }, indexTree);
-      }
-      else {
-        DUNE_THROW(Dune::NotImplemented, "Merging of dynamic non-uniform index-trees not implemented");
-      }
+      DUNE_THROW(Dune::NotImplemented, "Merging of dynamic non-uniform index-trees not implemented");
     }
   }
 

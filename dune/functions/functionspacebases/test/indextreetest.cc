@@ -100,7 +100,7 @@ template <class SizeProvider, class... Indices>
 void checkSize (TestSuite& test, const Dune::Functions::UnknownIndexTree& indexTree,
                 const SizeProvider& sizeProvider, TypeTree::HybridTreePath<Indices...> prefix)
 {
-  test.require(false, "Got an UnknownIndexTree!");
+  test.require(false) << "Got an UnknownIndexTree!";
 }
 
 // check that the sizes of an index-tree correspond to the sizes provided by the
@@ -125,7 +125,7 @@ template <class MultiIndex>
 void checkMultiIndex (TestSuite& test, const Dune::Functions::UnknownIndexTree& indexTree,
                       const MultiIndex& mi, std::size_t j = 0)
 {
-  test.require(false, "Got an UnknownIndexTree!");
+  test.require(false) << "Got an UnknownIndexTree!";
 }
 
 // check a specific multi-index by traversing all its components and the index-tree simultaneously

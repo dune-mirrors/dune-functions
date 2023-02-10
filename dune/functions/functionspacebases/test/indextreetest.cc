@@ -166,10 +166,10 @@ int main (int argc, char *argv[])
   Grid grid({1.0, 1.0}, {2, 2});
 
   using namespace Dune::Functions::BasisFactory;
-  Hybrid::forEach(Dune::StaticIntegralRange<std::size_t,BasisFactories<2>::num_bases>{},
+  Hybrid::forEach(Dune::StaticIntegralRange<std::size_t,BasisFactories::size>{},
   [&](auto i) {
     std::cout << std::size_t(i) << ") ";
-    auto basis = makeBasis(grid.leafGridView(), BasisFactories<2>::basis(i));
+    auto basis = makeBasis(grid.leafGridView(), BasisFactories::basis(i));
     std::cout << Dune::className(basis.preBasis()) << std::endl;
     checkSize(test, basis.preBasis().indexTree(), basis, TypeTree::HybridTreePath<>{});
     checkMultiIndices(test, basis.preBasis().indexTree(), basis);

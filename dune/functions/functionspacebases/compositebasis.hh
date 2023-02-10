@@ -171,14 +171,12 @@ public:
   auto indexTree() const
   {
     using namespace Dune::Functions::BasisFactory;
-    if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
-    {
+    if constexpr(std::is_same_v<IMS, BlockedLexicographic>) {
       return std::apply([&](auto const&... spb) {
-        return StaticNonUniformIndexTree{spb.indexTree()...};
+        return makeNonUniformIndexTree(spb.indexTree()...);
       }, subPreBases_);
     }
-    else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
-    {
+    else if constexpr(std::is_same_v<IMS, FlatLexicographic>) {
       return std::apply([&](auto const&... spb) {
         return Impl::mergeIndexTrees<FlatLexicographic>(spb.indexTree()...);
       }, subPreBases_);

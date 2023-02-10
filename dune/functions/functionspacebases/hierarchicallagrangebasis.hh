@@ -8,6 +8,7 @@
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/indextree.hh>
 #include <dune/grid/common/mcmgmapper.hh>
 
 namespace Dune {
@@ -114,6 +115,12 @@ namespace Dune {
       size_type dimension() const
       {
         return size();
+      }
+
+      //! Return a flat index-tree for this preBasis
+      auto indexTree() const
+      {
+        return FlatIndexTree{dimension()};
       }
 
       /** \brief Get the maximal number of DOFs associated to node for any element

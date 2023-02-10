@@ -59,13 +59,12 @@ void test(Dune::TestSuite& testSuite, GridView const& gridView, index_constant<I
 {
   using namespace Dune::Indices;
   using namespace Dune::Functions::BasisFactory;
-  using Factories = BasisFactories<GridView::dimensionworld>;
 
-  auto basis = makeBasis(gridView, Factories::basis(ii));
+  auto basis = makeBasis(gridView, BasisFactories::basis(ii));
   auto const& preBasis = basis.preBasis();
 
   using Vector1 = decltype(vectorGenerator<double>(preBasis.indexTree()));    // generate vector
-  using Vector2 = decltype(Factories::template vector<double>(ii));   // expected type
+  using Vector2 = decltype(BasisFactories::template vector<double>(ii));   // expected type
 
   std::cout << ii << ":" << std::endl;
   std::cout << Dune::className(preBasis) << std::endl;
@@ -87,7 +86,7 @@ int main(int argc, char** argv)
   Grid grid({1.0, 1.0}, {2, 2});
 
   using namespace Dune::Functions::BasisFactory;
-  Hybrid::forEach(range(index_constant<BasisFactories<2>::num_bases>{}),
+  Hybrid::forEach(range(index_constant<BasisFactories::size>{}),
     [&](auto ii) {
       Dune::TestSuite subTestSuite("basis " + std::to_string(std::size_t(ii)));
       test(subTestSuite, grid.leafGridView(), ii);

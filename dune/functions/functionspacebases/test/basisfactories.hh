@@ -33,28 +33,33 @@ namespace BasisFactory {
 /**
  * \brief Collection of basis factories with additional info to be used in tests.
  *
- * This collection of factories to generate global bases with various index merging
- * strategies. These factories represent different ways to encode a taylor-hood
- * basis, i.e., `dim` velocity components and a pressure component.
+ * This collection of factories can be used to generate global bases with various
+ * index merging strategies. Some factories represent different ways to encode a
+ * taylor-hood basis, i.e., a combination of velocity components and a pressure component.
+ * Other bases are tailored to trigger complicated cases for the index-tree / size
+ * construction.
+ *
+ * The basis factories are numbered from `[0, BasisFactory::size)` and can be accessed
+ * using the static methods `basis(index)` where `index` is an `index_constant` in
+ * that range.
  *
  * In addition to the basis factories, the class provides methods for constructing
  * vector containers compatible with the bases. Therefore, we use the `StdTraits`
- * type definition for different kinds of vectors.
+ * type definition for different kinds of vectors. The vectors can be accessed using
+ * the static method `vector<T>(index)` where `T` is the field-type to be used in the
+ * vector container.
  **/
-template <int dim>
 class BasisFactories
 {
   using Traits = StdTraits;
 
 public:
-  static const std::size_t num_bases = 16;
-  static const std::size_t num_false_bases = 1;
+  static constexpr std::size_t size = 16;
 
-  // Root: blockedLexicographic, Velocity: flatLexicographic
   static auto basis(index_constant<0>)
   {
     return composite(
-        power<dim>(
+        power<3>(
           lagrange<2>(),
           flatLexicographic()),
         lagrange<1>(),
@@ -72,11 +77,10 @@ public:
   }
 
 
-  // Root: blockedLexicographic, Velocity: flatInterleaved
   static auto basis(index_constant<1>)
   {
     return composite(
-        power<dim>(
+        power<3>(
           lagrange<2>(),
           flatInterleaved()),
         lagrange<1>(),
@@ -94,11 +98,10 @@ public:
   }
 
 
-  // Root: blockedLexicographic, Velocity: blockedLexicographic
   static auto basis(index_constant<2>)
   {
     return composite(
-        power<dim>(
+        power<3>(
           lagrange<2>(),
           blockedLexicographic()),
         lagrange<1>(),
@@ -110,18 +113,17 @@ public:
   static auto vector(index_constant<2>)
   {
     using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::DynamicVector<T>, dim>,
+      Traits::PowerVector<Traits::DynamicVector<T>, 3>,
       Traits::DynamicVector<T>
       >;
     return Vector{};
   }
 
 
-  // Root: blockedLexicographic, Velocity: blockedInterleaved
   static auto basis(index_constant<3>)
   {
     return composite(
-        power<dim>(
+        power<3>(
           lagrange<2>(),
           blockedInterleaved()),
         lagrange<1>(),
@@ -133,18 +135,17 @@ public:
   static auto vector(index_constant<3>)
   {
     using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<Dune::FieldVector<T, dim>>,
+      Traits::DynamicVector<Dune::FieldVector<T, 3>>,
       Traits::DynamicVector<T>
       >;
     return Vector{};
   }
 
 
-  // Root: flatLexicographic, Velocity/Pressure: flatLexicographic
   static auto basis(index_constant<4>)
   {
     return composite(
-        power<dim>(
+        power<3>(
           lagrange<2>(),
           flatLexicographic()),
         power<1>(
@@ -162,11 +163,10 @@ public:
   }
 
 
-  // Root: blockedLexicographic, Velocity/Pressure: blockedLexicographic
   static auto basis(index_constant<5>)
   {
     return composite(
-        power<dim>(
+        power<3>(
           lagrange<2>(),
           blockedLexicographic()),
         power<1>(
@@ -180,14 +180,13 @@ public:
   static auto vector(index_constant<5>)
   {
     using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::DynamicVector<T>, dim>,
+      Traits::PowerVector<Traits::DynamicVector<T>, 3>,
       Traits::PowerVector<Traits::DynamicVector<T>, 1>
       >;
     return Vector{};
   }
 
 
-  // Root: blockedLexicographic, Velocity/Pressure: on the same level
   static auto basis(index_constant<6>)
   {
     return composite(
@@ -214,7 +213,7 @@ public:
   {
     return composite(
         power<1>(
-          power<dim>(
+          power<3>(
             lagrange<2>(),
             blockedLexicographic() ),
           blockedLexicographic() ),
@@ -227,7 +226,7 @@ public:
   static auto vector(index_constant<7>)
   {
     using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, dim>, 1>,
+      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, 3>, 1>,
       Traits::DynamicVector<T>
       >;
     return Vector{};
@@ -238,7 +237,7 @@ public:
   {
     return composite(
         power<1>(
-          power<dim>(
+          power<3>(
             lagrange<2>(),
             blockedLexicographic() ),
           blockedLexicographic() ),
@@ -253,7 +252,7 @@ public:
   static auto vector(index_constant<8>)
   {
     using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, dim>, 1>,
+      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, 3>, 1>,
       Traits::PowerVector<Traits::DynamicVector<T>, 1>
       >;
     return Vector{};
@@ -263,9 +262,9 @@ public:
   static auto basis(index_constant<9>)
   {
     return composite(
-        power<2>(lagrange<2>()),  // Cahn-Hilliard equation
-        composite(                // Stokes equation
-          power<dim>(
+        power<2>(lagrange<2>()),
+        composite(
+          power<3>(
             lagrange<2>()
           ),
           lagrange<1>()
@@ -279,7 +278,7 @@ public:
     using Vector = Traits::CompositeVector<
       Traits::DynamicVector<FieldVector<T, 2>>,
       Traits::CompositeVector<
-        Traits::DynamicVector<FieldVector<T, dim>>,
+        Traits::DynamicVector<FieldVector<T, 3>>,
         Traits::DynamicVector<T>
         >
       >;
@@ -290,12 +289,12 @@ public:
   static auto basis(index_constant<10>)
   {
     return composite(
-        lagrange<2>(),              // Diffusion equation
-        power<2>(                   // Cahn-Hilliard equation
+        lagrange<2>(),
+        power<2>(
           lagrange<2>(),
           blockedLexicographic()),
-        composite(                  // Stokes equation
-          power<dim>(
+        composite(
+          power<3>(
             lagrange<2>(),
             blockedLexicographic()
           ),
@@ -313,7 +312,7 @@ public:
       Traits::DynamicVector<T>,
       Traits::PowerVector<Traits::DynamicVector<T>, 2>,
       Traits::CompositeVector<
-        Traits::PowerVector<Traits::DynamicVector<T>, dim>,
+        Traits::PowerVector<Traits::DynamicVector<T>, 3>,
         Traits::DynamicVector<T>
         >
       >;
@@ -434,20 +433,6 @@ public:
       Traits::DynamicVector<Dune::FieldVector<T,3>>
       >;
     return Vector{};
-  }
-
-
-  static auto false_basis(index_constant<0>)
-  {
-    return composite(
-        power<dim>(
-          lagrange<2>(),
-          blockedLexicographic()),
-        power<1>(
-          lagrange<1>(),
-          blockedLexicographic()),
-        flatLexicographic()
-      );
   }
 };
 

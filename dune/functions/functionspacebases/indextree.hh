@@ -320,10 +320,9 @@ namespace Functions {
         return makeNonUniformIndexTree(child(ii)...);
       }, std::make_index_sequence<Size::value>{});
     else if constexpr(allTypeUniform) {
-      TypeUniformIndexTree<decltype(child(0))> result;
-      result.reserve(size);
+      TypeUniformIndexTree<decltype(child(0))> result(size);
       for (std::size_t i = 0; i < size; ++i)
-        result.push_back(child(i));
+        result[i] = std::move(child(i));
       return result;
     }
     else {
@@ -410,10 +409,9 @@ namespace Functions {
         return makeNonUniformIndexTree(child(ii)...);
       }, std::make_index_sequence<std::size_t(IT::size())>());
     else if constexpr(IT::isTypeUniform) {
-      TypeUniformIndexTree<decltype(child(0))> result;
-      result.reserve(indexTree.size());
+      TypeUniformIndexTree<decltype(child(0))> result(indexTree.size());
       for (std::size_t i = 0; i < indexTree.size(); ++i)
-        result.push_back(child(i));
+        result[i] = std::move(child(i));
       return result;
     }
     else {

@@ -81,6 +81,12 @@ namespace Functions {
     static constexpr bool isUniform = false;
     static constexpr bool isTypeUniform = false;
 
+    template<class ST = std::tuple<SubTrees...>,
+      std::enable_if_t<std::is_default_constructible_v<ST>, int> = 0>
+    StaticNonUniformIndexTree ()
+      : StaticNonUniformIndexTree{SubTrees{}...}
+    {}
+
     explicit StaticNonUniformIndexTree (const SubTrees&... subTrees)
       : Super{subTrees...}
     {}
@@ -112,6 +118,12 @@ namespace Functions {
     using Super = std::array<SubTree, n>;
     static constexpr bool isUniform = false;
     static constexpr bool isTypeUniform = true;
+
+    template<class ST = SubTree,
+      std::enable_if_t<std::is_default_constructible_v<ST>, int> = 0>
+    StaticTypeUniformIndexTree ()
+      : StaticTypeUniformIndexTree{SubTree{}}
+    {}
 
     explicit StaticTypeUniformIndexTree (SubTree subTree)
       : Super{Dune::filledArray<n>(std::move(subTree))}
@@ -201,6 +213,13 @@ namespace Functions {
   {
     static constexpr bool isUniform = true;
     static constexpr bool isTypeUniform = true;
+
+    template<class ST = SubTree,
+      std::enable_if_t<std::is_default_constructible_v<ST>, int> = 0>
+    UniformIndexTree ()
+      : size_{0}
+      , subTree_{}
+    {}
 
     template<class ST = SubTree,
       std::enable_if_t<std::is_default_constructible_v<ST>, int> = 0>

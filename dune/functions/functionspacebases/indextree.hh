@@ -343,7 +343,7 @@ namespace Functions {
         },
         [&](auto id) {
           assert(i >= treeSize);
-          return Hybrid::ifElse(lt_(incr_(o),treeSize),
+          return Hybrid::ifElse(lt_(o,treeSize),
             [&](auto id_) {
               return getEntry(id_(id(tree)), minus_(i,treeSize), incr_(o), ims);
             },

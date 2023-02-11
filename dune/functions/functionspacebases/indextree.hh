@@ -263,6 +263,24 @@ namespace Functions {
   // Some utilities for generating index-trees
   // ---------------------------------------------------------------------------
 
+  template <bool b>
+  void hybridAssert(std::bool_constant<b>)
+  {
+    static_assert(b);
+  }
+
+  inline void hybridAssert(bool b)
+  {
+    assert(b);
+  }
+
+
+  struct LogicalAnd
+  {
+    template<class... T>
+    constexpr auto operator() (T... b) const { return (...&& b); }
+  };
+
   class FlatIndexAccess
   {
     struct Increment
@@ -318,14 +336,21 @@ namespace Functions {
     static auto getEntry (const IndexTree& tree, FlatIndex i, InnerIndex o,
                           Dune::Functions::BasisFactory::FlatInterleaved ims)
     {
-      const auto rootSize = Hybrid::size(tree);
-      return Hybrid::ifElse(lt_(i,rootSize), // i < rootSize
+      const auto treeSize = Hybrid::size(tree);
+      return Hybrid::ifElse(lt_(i,treeSize), // i < treeSize
         [&](auto id) {
           return id(tree)[i][o];
         },
         [&](auto id) {
-          assert(i >= rootSize);
-          return getEntry(id(tree), minus_(i,rootSize), incr_(o), ims);
+          assert(i >= treeSize);
+          return Hybrid::ifElse(lt_(incr_(o),treeSize),
+            [&](auto id_) {
+              return getEntry(id_(id(tree)), minus_(i,treeSize), incr_(o), ims);
+            },
+            [&](auto id_) {
+              // fallback condition to fix a return type
+              return id_(id(tree))[Indices::_0][Indices::_0];
+            });
         });
     }
 
@@ -398,27 +423,35 @@ namespace Functions {
     std::enable_if_t<(sizeof...(IT) > 0), int> = 0>
   auto mergeIndexTrees (const IT0& indexTree0, const IT&... indexTrees)
   {
-    // The merge of variadic index-trees currently is only implemented with lexicographic ordering
-    static_assert(std::is_same_v<IMS,Dune::Functions::BasisFactory::FlatLexicographic>);
+    auto and_ = Hybrid::hybridFunctor(LogicalAnd{});
+    auto or_ = Hybrid::hybridFunctor(std::logical_or<>{});
+    auto equal_ = Hybrid::hybridFunctor(std::equal_to<>{});
+
     using IT00 = std::decay_t<decltype(indexTree0[Indices::_0])>;
 
     // collect some properties of the passed index-trees
-    static constexpr bool isUniform = (IT0::isUniform &&...&& IT::isUniform);
-    static constexpr bool isTypeUniform = (IT0::isTypeUniform &&...&& IT::isTypeUniform);
-    static constexpr bool isSubTypeUniform = (...&&
+    const bool allUniform = (IT0::isUniform &&...&& IT::isUniform);
+    const bool allTypeUniform = (IT0::isTypeUniform &&...&& IT::isTypeUniform);
+    const bool allSubTypeUniform = (...&&
       std::is_same_v<IT00, std::decay_t<decltype(indexTrees[Indices::_0])>>);
+    const auto allSameSize = and_(equal_(Hybrid::size(indexTree0), Hybrid::size(indexTrees))...);
 
     // The resulting index-tree can only be uniform if we can deduce at compile-time that
     // all nodes of all index-trees are identical. This is only possible in some cases,
     // e.g. if all nodes are EmptyNodes. Additionally, one could check that all index-trees
     // have static size and have the same type.
-    static constexpr bool isSubTypeEmpty = (std::is_same_v<IT00, EmptyIndexTree> &&...&&
+    const bool allSubTypeEmpty = (std::is_same_v<IT00, EmptyIndexTree> &&...&&
       std::is_same_v<std::decay_t<decltype(indexTrees[Indices::_0])>, EmptyIndexTree>);
+
+    // The merge of variadic index-trees currently is only implemented with lexicographic merge
+    // or interleaved merge if all index-trees have the same size
+    const bool isFlatLexicographic = std::is_same_v<IMS,BasisFactory::FlatLexicographic>;
+    hybridAssert(or_(std::bool_constant<isFlatLexicographic>{}, allSameSize));
 
     auto sumSizes = Hybrid::plus(Hybrid::size(indexTree0),Hybrid::size(indexTrees)...);
     return mergeIndexTreesImpl<IMS>(sumSizes, makeNonUniformIndexTree(indexTree0,indexTrees...),
-      std::bool_constant<isUniform && isSubTypeEmpty>{},
-      std::bool_constant<isTypeUniform && isSubTypeUniform>{}
+      std::bool_constant<allUniform && allSubTypeEmpty>{},
+      std::bool_constant<allTypeUniform && allSubTypeUniform>{}
     );
   }
 

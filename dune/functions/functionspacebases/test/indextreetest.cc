@@ -180,23 +180,23 @@ void testMergeIndexTrees (TestSuite& test)
   }
 
   { // merge flat index-trees
-    // auto it1a = mergeIndexTrees<FI>(StaticFlatIndexTree<3>{},StaticFlatIndexTree<4>{});
-    // static_assert(std::is_same_v<decltype(it1a), StaticFlatIndexTree<7>>);
+    auto it1a = mergeIndexTrees<FI>(StaticFlatIndexTree<3>{},StaticFlatIndexTree<3>{});
+    static_assert(std::is_same_v<decltype(it1a), StaticFlatIndexTree<6>>);
 
     auto it1b = mergeIndexTrees<FL>(StaticFlatIndexTree<3>{},StaticFlatIndexTree<4>{});
     static_assert(std::is_same_v<decltype(it1b), StaticFlatIndexTree<7>>);
 
-    // auto it2a = mergeIndexTrees<FI>(FlatIndexTree{2},FlatIndexTree{3});
-    // static_assert(std::is_same_v<decltype(it2a), FlatIndexTree>);
-    // test.check(it2a.size() == 5, "merge dynamic flat index-trees");
+    auto it2a = mergeIndexTrees<FI>(FlatIndexTree{2},FlatIndexTree{2});
+    static_assert(std::is_same_v<decltype(it2a), FlatIndexTree>);
+    test.check(it2a.size() == 4, "merge dynamic flat index-trees");
 
     auto it2b = mergeIndexTrees<FL>(FlatIndexTree{2},FlatIndexTree{3});
     static_assert(std::is_same_v<decltype(it2b), FlatIndexTree>);
     test.check(it2b.size() == 5, "merge dynamic flat index-trees");
 
-    // auto it3a = mergeIndexTrees<FI>(FlatIndexTree{1},StaticFlatIndexTree<2>{});
-    // static_assert(std::is_same_v<decltype(it3a), FlatIndexTree>);
-    // test.check(it3a.size() == 3, "merge mixed flat index-trees");
+    auto it3a = mergeIndexTrees<FI>(FlatIndexTree{1},StaticFlatIndexTree<1>{});
+    static_assert(std::is_same_v<decltype(it3a), FlatIndexTree>);
+    test.check(it3a.size() == 2, "merge mixed flat index-trees");
 
     auto it3b = mergeIndexTrees<FL>(FlatIndexTree{1},StaticFlatIndexTree<2>{});
     static_assert(std::is_same_v<decltype(it3b), FlatIndexTree>);
@@ -215,12 +215,21 @@ void testMergeIndexTrees (TestSuite& test)
     auto it1a = mergeIndexTrees<FL>(UniformIndexTree{2,FlatIndexTree{3}},
                                     UniformIndexTree{3,FlatIndexTree{2}});
     static_assert(std::is_same_v<decltype(it1a), TypeUniformIndexTree<FlatIndexTree>>);
-    test.check(it1a.size() == 5, "merge uniform index-trees");
+    test.check(it1a.size() == 5, "merge uniform index-trees FlatLexicographic");
     test.check(it1a[0].size() == 3, "merge uniform index-trees, tree[0].size");
     test.check(it1a[1].size() == 3, "merge uniform index-trees, tree[1].size");
     test.check(it1a[2].size() == 2, "merge uniform index-trees, tree[2].size");
     test.check(it1a[3].size() == 2, "merge uniform index-trees, tree[3].size");
     test.check(it1a[4].size() == 2, "merge uniform index-trees, tree[4].size");
+
+    auto it1b = mergeIndexTrees<FI>(UniformIndexTree{2,FlatIndexTree{3}},
+                                    UniformIndexTree{2,FlatIndexTree{2}});
+    static_assert(std::is_same_v<decltype(it1b), TypeUniformIndexTree<FlatIndexTree>>);
+    test.check(it1b.size() == 4, "merge uniform index-trees FlatInterleaved");
+    test.check(it1b[0].size() == 3, "merge uniform index-trees, tree[0].size");
+    test.check(it1b[1].size() == 2, "merge uniform index-trees, tree[1].size");
+    test.check(it1b[2].size() == 3, "merge uniform index-trees, tree[2].size");
+    test.check(it1b[3].size() == 2, "merge uniform index-trees, tree[3].size");
   }
 }
 

@@ -70,10 +70,7 @@ public:
   template <class T>
   static auto vector(index_constant<0>)
   {
-    return Traits::CompositeVector<
-      Traits::DynamicVector<T>,
-      Traits::DynamicVector<T>
-      >{};
+    return Traits::PowerVector<Traits::DynamicVector<T>,2>{};
   }
 
 
@@ -91,10 +88,7 @@ public:
   template <class T>
   static auto vector(index_constant<1>)
   {
-    return Traits::CompositeVector<
-      Traits::DynamicVector<T>,
-      Traits::DynamicVector<T>
-      >{};
+    return Traits::PowerVector<Traits::DynamicVector<T>,2>{};
   }
 
 
@@ -200,11 +194,7 @@ public:
   template <class T>
   static auto vector(index_constant<6>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<T>,
-      Traits::DynamicVector<T>,
-      Traits::DynamicVector<T>
-      >;
+    using Vector = Traits::PowerVector<Traits::DynamicVector<T>, 3>;
     return Vector{};
   }
 

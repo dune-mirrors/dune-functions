@@ -140,7 +140,8 @@ namespace Functions {
     {}
 
     using Super::operator[];
-    using Super::size;
+
+    static constexpr std::size_t size () { return n; }
   };
 
   template<class SubTree0, class... SubTrees,

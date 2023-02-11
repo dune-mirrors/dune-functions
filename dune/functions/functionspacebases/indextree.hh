@@ -438,8 +438,7 @@ namespace Functions {
 
     // The resulting index-tree can only be uniform if we can deduce at compile-time that
     // all nodes of all index-trees are identical. This is only possible in some cases,
-    // e.g. if all nodes are EmptyNodes. Additionally, one could check that all index-trees
-    // have static size and have the same type.
+    // e.g. if all nodes are `EmptyIndexTree`s.
     const bool allSubTypeEmpty = (std::is_same_v<IT00, EmptyIndexTree> &&...&&
       std::is_same_v<std::decay_t<decltype(indexTrees[Indices::_0])>, EmptyIndexTree>);
 

@@ -156,6 +156,74 @@ void checkMultiIndices (TestSuite& test, const IndexTree& indexTree, const Basis
   }
 }
 
+
+void testMergeIndexTrees (TestSuite& test)
+{
+  using namespace Dune::Functions;
+  using namespace Dune::Functions::BasisFactory;
+  using FI = FlatInterleaved;
+  using FL = FlatLexicographic;
+
+  using Dune::Functions::Impl::mergeIndexTrees;
+
+  { // merge no trees
+    auto it1 = mergeIndexTrees<FI>();
+    static_assert(std::is_same_v<decltype(it1), UnknownIndexTree>);
+  }
+
+  { // merge single tree
+    auto it1 = mergeIndexTrees<FI>(StaticFlatIndexTree<4>{});
+    static_assert(std::is_same_v<decltype(it1), StaticFlatIndexTree<4>>);
+
+    auto it2 = mergeIndexTrees<FI>(FlatIndexTree{4});
+    static_assert(std::is_same_v<decltype(it2), FlatIndexTree>);
+  }
+
+  { // merge flat index-trees
+    // auto it1a = mergeIndexTrees<FI>(StaticFlatIndexTree<3>{},StaticFlatIndexTree<4>{});
+    // static_assert(std::is_same_v<decltype(it1a), StaticFlatIndexTree<7>>);
+
+    auto it1b = mergeIndexTrees<FL>(StaticFlatIndexTree<3>{},StaticFlatIndexTree<4>{});
+    static_assert(std::is_same_v<decltype(it1b), StaticFlatIndexTree<7>>);
+
+    // auto it2a = mergeIndexTrees<FI>(FlatIndexTree{2},FlatIndexTree{3});
+    // static_assert(std::is_same_v<decltype(it2a), FlatIndexTree>);
+    // test.check(it2a.size() == 5, "merge dynamic flat index-trees");
+
+    auto it2b = mergeIndexTrees<FL>(FlatIndexTree{2},FlatIndexTree{3});
+    static_assert(std::is_same_v<decltype(it2b), FlatIndexTree>);
+    test.check(it2b.size() == 5, "merge dynamic flat index-trees");
+
+    // auto it3a = mergeIndexTrees<FI>(FlatIndexTree{1},StaticFlatIndexTree<2>{});
+    // static_assert(std::is_same_v<decltype(it3a), FlatIndexTree>);
+    // test.check(it3a.size() == 3, "merge mixed flat index-trees");
+
+    auto it3b = mergeIndexTrees<FL>(FlatIndexTree{1},StaticFlatIndexTree<2>{});
+    static_assert(std::is_same_v<decltype(it3b), FlatIndexTree>);
+    test.check(it3b.size() == 3, "merge mixed flat index-trees");
+
+    auto it4a = mergeIndexTrees<4,FI>(FlatIndexTree{2});
+    static_assert(std::is_same_v<decltype(it4a), FlatIndexTree>);
+    test.check(it4a.size() == 8, "merge 4 dynamic flat index-trees");
+
+    auto it4b = mergeIndexTrees<4,FL>(FlatIndexTree{2});
+    static_assert(std::is_same_v<decltype(it4b), FlatIndexTree>);
+    test.check(it4b.size() == 8, "merge 4 dynamic flat index-trees");
+  }
+
+  {
+    auto it1a = mergeIndexTrees<FL>(UniformIndexTree{2,FlatIndexTree{3}},
+                                    UniformIndexTree{3,FlatIndexTree{2}});
+    static_assert(std::is_same_v<decltype(it1a), TypeUniformIndexTree<FlatIndexTree>>);
+    test.check(it1a.size() == 5, "merge uniform index-trees");
+    test.check(it1a[0].size() == 3, "merge uniform index-trees, tree[0].size");
+    test.check(it1a[1].size() == 3, "merge uniform index-trees, tree[1].size");
+    test.check(it1a[2].size() == 2, "merge uniform index-trees, tree[2].size");
+    test.check(it1a[3].size() == 2, "merge uniform index-trees, tree[3].size");
+    test.check(it1a[4].size() == 2, "merge uniform index-trees, tree[4].size");
+  }
+}
+
 int main (int argc, char *argv[])
 {
   MPIHelper::instance(argc, argv);
@@ -174,6 +242,8 @@ int main (int argc, char *argv[])
     checkSize(test, basis.preBasis().indexTree(), basis, TypeTree::HybridTreePath<>{});
     checkMultiIndices(test, basis.preBasis().indexTree(), basis);
   });
+
+  testMergeIndexTrees(test);
 
   return test.exit();
 }

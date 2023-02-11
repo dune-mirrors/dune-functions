@@ -95,6 +95,7 @@ namespace Functions {
     using Super::size;
   };
 
+  //! Generate a StaticNonUniformIndexTree in case the sub-trees are not all of the same type.
   template<class SubTree0, class... SubTrees,
     std::enable_if_t<(sizeof...(SubTrees) > 0), int> = 0,
     std::enable_if_t<(...|| (not std::is_same_v<SubTree0, SubTrees>)), int> = 0>
@@ -144,6 +145,7 @@ namespace Functions {
     static constexpr std::size_t size () { return n; }
   };
 
+  //! Generate a StaticTypeUniformIndexTree in case the sub-trees are all of the same type.
   template<class SubTree0, class... SubTrees,
     std::enable_if_t<(...&& std::is_same_v<SubTree0, SubTrees>), int> = 0>
   auto makeNonUniformIndexTree (SubTree0 subTree0, SubTrees... subTrees)
@@ -201,6 +203,7 @@ namespace Functions {
   template <std::size_t n>
   using StaticFlatIndexTree = StaticUniformIndexTree<EmptyIndexTree,n>;
 
+  //! Generate a StaticUniformIndexTree in case the size is a static constant
   template<class SubTree, std::size_t n>
   auto makeUniformIndexTree (std::integral_constant<std::size_t,n>, SubTree subTree)
   {
@@ -246,6 +249,7 @@ namespace Functions {
 
   using FlatIndexTree = UniformIndexTree<EmptyIndexTree>;
 
+  //! Generate a UniformIndexTree in case the size is a dynamic value
   template<class SubTree>
   auto makeUniformIndexTree (std::size_t n, SubTree subTree)
   {
@@ -255,9 +259,9 @@ namespace Functions {
 
   namespace Impl {
 
-  // -----------------------------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Some utilities for generating index-trees
-  // -----------------------------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   class FlatIndexAccess
   {
@@ -271,12 +275,14 @@ namespace Functions {
     static constexpr auto incr_ = Hybrid::hybridFunctor(Increment{});
     static constexpr auto minus_ = Hybrid::hybridFunctor(std::minus<>{});
 
+    // overload for UnknownIndexTrees. Cannot access any component.
     template<class FlatIndex, class OuterOffsetIndex, class IMS>
     static auto getEntry (UnknownIndexTree, FlatIndex, OuterOffsetIndex, IMS)
     {
       return UnknownIndexTree{};
     }
 
+    // overload for UnknownIndexTrees. Cannot access any component.
     template<class FlatIndex, class OuterOffsetIndex, class IMS>
     static auto getEntry (EmptyIndexTree, FlatIndex, OuterOffsetIndex, IMS)
     {
@@ -326,11 +332,23 @@ namespace Functions {
     }
   };
 
+
+  /*
+   * Generic implementation of the index-tree merging. The trees to merge are
+   * collected into an artificial super index-tree `tree`. The number of nodes
+   * after mergin the sub-trees of `tree` is given by the parameter `size`.
+   *
+   * \param size  Number of sub-trees to be stored in the merged node.
+   * \param tree  Collection of nodes to be merged
+   * \param allUniform  All nodes (that should be merged) have the property `isUniform`
+   * \param allTypeUniform  All nodes (that should be merged) have the property `isTypeUniform`
+   */
   template<class IMS, class Size, class IndexTree, bool allUniform, bool allTypeUniform>
   auto mergeIndexTreesImpl (Size size, const IndexTree& tree,
                             std::bool_constant<allUniform>,
                             std::bool_constant<allTypeUniform>)
   {
+    // access one of the sub-nodes of the nodes in `tree` by a flat index `ii`
     auto child = [&](auto ii) { return FlatIndexAccess::getEntry<IMS>(tree,ii); };
 
     if constexpr(allUniform)
@@ -366,7 +384,7 @@ namespace Functions {
     return indexTree;
   }
 
-  // Generate a sum of a different index-trees
+  // Merge a variadic list of index-trees
   template<class IMS, class... IT,
     std::enable_if_t<(sizeof...(IT) > 1), int> = 0>
   auto mergeIndexTrees (const IT&... indexTrees)
@@ -378,7 +396,7 @@ namespace Functions {
     );
   }
 
-  // Generate a sum of an index-tree consisting of `n` identical `indexTree`s
+  // Merge `n` identical `indexTree`s
   template<class IMS, class Size, class IT,
     std::enable_if_t<std::is_convertible_v<Size,std::size_t>, int> = 0>
   auto mergeIndexTrees (Size n, const IT& indexTree)
@@ -391,7 +409,7 @@ namespace Functions {
     );
   }
 
-  // Generate a sum of an index-tree consisting of `n` identical `indexTree`s
+  // Merge `n` identical `indexTree`s, redirects to the function with 2 arguments
   template<std::size_t n, class IMS, class IT>
   auto mergeIndexTrees (const IT& indexTree)
   {
@@ -399,15 +417,6 @@ namespace Functions {
   }
 
 
-  /*
-   * Append a size to all children of an index-tree
-   *
-   * Transforming index-trees by appending a size, e.g.,
-   * a blocked-interleaved index-merging strategy in a power-basis.
-   *
-   * append( FlatIndexTree it, size ) -> UniformIndexTree( it.size(), FlatIndexTree(size) )
-   * append( IndexTree(child...), size ) -> IndexTree( append(child, size)... )
-   */
 
   // Append the size `s` at the inner-most node of the tree
   template<class Size>
@@ -416,7 +425,16 @@ namespace Functions {
     return makeUniformIndexTree(s, EmptyIndexTree{});
   }
 
-  // Append the size `s` at the inner-most node of the tree
+  /*
+   * Append a size to the inner-most node of the index-tree
+   *
+   * This transforming of the given index-tree is used to implement
+   * a blocked-interleaved index-merging strategy in a power-basis.
+   *
+   * Examples:
+   * append( FlatIndexTree it, size ) -> UniformIndexTree( it.size(), FlatIndexTree(size) )
+   * append( IndexTree(child...), size ) -> IndexTree( append(child, size)... )
+   */
   template<class IT, class Size>
   auto appendToIndexTree (const IT& indexTree, Size s)
   {
@@ -441,7 +459,8 @@ namespace Functions {
     }
   }
 
-  // Append the size `s` at the inner-most node of the tree
+  // Append the size `s` at the inner-most node of the tree. Redirects to the
+  // two-argument functions
   template<std::size_t s, class IT>
   auto appendToIndexTree (const IT& indexTree)
   {

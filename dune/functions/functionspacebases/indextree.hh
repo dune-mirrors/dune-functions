@@ -302,7 +302,14 @@ namespace Functions {
         },
         [&](auto id) {
           assert((o+1) < treeSize && i >= outerOffsetSize);
-          return getEntry(id(tree), minus_(i,outerOffsetSize), incr_(o), ims);
+          return Hybrid::ifElse(lt_(incr_(o),treeSize),
+            [&](auto id_) {
+              return getEntry(id_(id(tree)), minus_(i,outerOffsetSize), incr_(o), ims);
+            },
+            [&](auto id_) {
+              // fallback condition to fix a return type
+              return id_(id(tree))[Indices::_0][Indices::_0];
+            });
         });
     }
 
@@ -350,6 +357,7 @@ namespace Functions {
   {
     // access one of the sub-nodes of the nodes in `tree` by a flat index `ii`
     auto child = [&](auto ii) { return FlatIndexAccess::getEntry<IMS>(tree,ii); };
+    using Child00 = std::decay_t<decltype(tree[Indices::_0][Indices::_0])>;
 
     if constexpr(allUniform)
       return makeUniformIndexTree(size, tree[Indices::_0][Indices::_0]);
@@ -358,7 +366,7 @@ namespace Functions {
         return makeNonUniformIndexTree(child(ii)...);
       }, std::make_index_sequence<Size::value>{});
     else if constexpr(allTypeUniform) {
-      TypeUniformIndexTree<decltype(child(0))> result(size);
+      TypeUniformIndexTree<Child00> result(size);
       for (std::size_t i = 0; i < size; ++i)
         result[i] = std::move(child(i));
       return result;
@@ -372,27 +380,45 @@ namespace Functions {
 
 
   // Overload for zero index-trees, return an unknown tree.
+  template<class IMS>
   inline auto mergeIndexTrees ()
   {
     return UnknownIndexTree{};
   }
 
   // Overload for one index-tree, return the tree itself.
-  template<class IT>
+  template<class IMS,class IT>
   const auto& mergeIndexTrees (const IT& indexTree)
   {
     return indexTree;
   }
 
   // Merge a variadic list of index-trees
-  template<class IMS, class... IT,
-    std::enable_if_t<(sizeof...(IT) > 1), int> = 0>
-  auto mergeIndexTrees (const IT&... indexTrees)
+  template<class IMS, class IT0, class... IT,
+    std::enable_if_t<(sizeof...(IT) > 0), int> = 0>
+  auto mergeIndexTrees (const IT0& indexTree0, const IT&... indexTrees)
   {
-    auto sumSizes = Hybrid::plus(Hybrid::size(indexTrees)...);
-    return mergeIndexTreesImpl<IMS>(sumSizes, makeNonUniformIndexTree(indexTrees...),
-      std::bool_constant<(... && IT::isUniform)>{},
-      std::bool_constant<(... && IT::isTypeUniform)>{}
+    // The merge of variadic index-trees currently is only implemented with lexicographic ordering
+    static_assert(std::is_same_v<IMS,Dune::Functions::BasisFactory::FlatLexicographic>);
+    using IT00 = std::decay_t<decltype(indexTree0[Indices::_0])>;
+
+    // collect some properties of the passed index-trees
+    static constexpr bool isUniform = (IT0::isUniform &&...&& IT::isUniform);
+    static constexpr bool isTypeUniform = (IT0::isTypeUniform &&...&& IT::isTypeUniform);
+    static constexpr bool isSubTypeUniform = (...&&
+      std::is_same_v<IT00, std::decay_t<decltype(indexTrees[Indices::_0])>>);
+
+    // The resulting index-tree can only be uniform if we can deduce at compile-time that
+    // all nodes of all index-trees are identical. This is only possible in some cases,
+    // e.g. if all nodes are EmptyNodes. Additionally, one could check that all index-trees
+    // have static size and have the same type.
+    static constexpr bool isSubTypeEmpty = (std::is_same_v<IT00, EmptyIndexTree> &&...&&
+      std::is_same_v<std::decay_t<decltype(indexTrees[Indices::_0])>, EmptyIndexTree>);
+
+    auto sumSizes = Hybrid::plus(Hybrid::size(indexTree0),Hybrid::size(indexTrees)...);
+    return mergeIndexTreesImpl<IMS>(sumSizes, makeNonUniformIndexTree(indexTree0,indexTrees...),
+      std::bool_constant<isUniform && isSubTypeEmpty>{},
+      std::bool_constant<isTypeUniform && isSubTypeUniform>{}
     );
   }
 

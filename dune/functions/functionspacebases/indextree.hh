@@ -342,7 +342,7 @@ namespace Functions {
           return id(tree)[i][o];
         },
         [&](auto id) {
-          assert(i >= treeSize);
+          assert(i >= treeSize && o < treeSize);
           return Hybrid::ifElse(lt_(o,treeSize),
             [&](auto id_) {
               return getEntry(id_(id(tree)), minus_(i,treeSize), incr_(o), ims);
@@ -368,29 +368,30 @@ namespace Functions {
   /*
    * Generic implementation of the index-tree merging. The trees to merge are
    * collected into an artificial super index-tree `tree`. The number of nodes
-   * after mergin the sub-trees of `tree` is given by the parameter `size`.
+   * after merging the sub-trees of `tree` is given by the parameter `size`. And
+   * the tree properties as `isUniform` and `isTypeUniform`.
    *
-   * \param size  Number of sub-trees to be stored in the merged node.
    * \param tree  Collection of nodes to be merged
-   * \param allUniform  All nodes (that should be merged) have the property `isUniform`
-   * \param allTypeUniform  All nodes (that should be merged) have the property `isTypeUniform`
+   * \param size  The size of the resulting index-tree
+   * \param isUniform  The resulting index-tree has the property `isUniform`
+   * \param isTypeUniform  The resulting index-tree has the property `isTypeUniform`
    */
-  template<class IMS, class Size, class IndexTree, bool allUniform, bool allTypeUniform>
-  auto mergeIndexTreesImpl (Size size, const IndexTree& tree,
-                            std::bool_constant<allUniform>,
-                            std::bool_constant<allTypeUniform>)
+  template<class IMS, class Tree, class Size, bool isUniform, bool isTypeUniform>
+  auto mergeIndexTreesImpl (const Tree& tree, Size size,
+                            std::bool_constant<isUniform>,
+                            std::bool_constant<isTypeUniform>)
   {
     // access one of the sub-nodes of the nodes in `tree` by a flat index `ii`
     auto child = [&](auto ii) { return FlatIndexAccess::getEntry<IMS>(tree,ii); };
     using Child00 = std::decay_t<decltype(tree[Indices::_0][Indices::_0])>;
 
-    if constexpr(allUniform)
+    if constexpr(isUniform)
       return makeUniformIndexTree(size, tree[Indices::_0][Indices::_0]);
     else if constexpr(IsIntegralConstant<Size>::value)
       return unpackIntegerSequence([&](auto... ii) {
         return makeNonUniformIndexTree(child(ii)...);
       }, std::make_index_sequence<Size::value>{});
-    else if constexpr(allTypeUniform) {
+    else if constexpr(isTypeUniform) {
       TypeUniformIndexTree<Child00> result(size);
       for (std::size_t i = 0; i < size; ++i)
         result[i] = std::move(child(i));
@@ -448,7 +449,8 @@ namespace Functions {
     hybridAssert(or_(std::bool_constant<isFlatLexicographic>{}, allSameSize));
 
     auto sumSizes = Hybrid::plus(Hybrid::size(indexTree0),Hybrid::size(indexTrees)...);
-    return mergeIndexTreesImpl<IMS>(sumSizes, makeNonUniformIndexTree(indexTree0,indexTrees...),
+    return mergeIndexTreesImpl<IMS>(makeNonUniformIndexTree(indexTree0,indexTrees...),
+      sumSizes,
       std::bool_constant<allUniform && allSubTypeEmpty>{},
       std::bool_constant<allTypeUniform && allSubTypeUniform>{}
     );
@@ -461,7 +463,8 @@ namespace Functions {
   {
     auto multiplies = Hybrid::hybridFunctor(std::multiplies<>{});
     auto sumSizes = multiplies(Hybrid::size(indexTree), n);
-    return mergeIndexTreesImpl<IMS>(sumSizes, makeUniformIndexTree(n,indexTree),
+    return mergeIndexTreesImpl<IMS>(makeUniformIndexTree(n,indexTree),
+      sumSizes,
       std::bool_constant<IT::isUniform>{},
       std::bool_constant<IT::isTypeUniform>{}
     );

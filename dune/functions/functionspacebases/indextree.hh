@@ -263,18 +263,22 @@ namespace Functions {
   // Some utilities for generating index-trees
   // ---------------------------------------------------------------------------
 
+  // Hybrid assert for static error messages.
+  // Overload that checks the static constant bool.
   template <bool b>
   void hybridAssert(std::bool_constant<b>)
   {
     static_assert(b);
   }
 
+  // Hybrid assert for dynamic error messages
+  // Overload that checks the boolean value.
   inline void hybridAssert(bool b)
   {
     assert(b);
   }
 
-
+  // Constexpr functor that is used to define a Hybrid::HybridFunctor
   struct LogicalAnd
   {
     template<class... T>
@@ -370,6 +374,9 @@ namespace Functions {
    * collected into an artificial super index-tree `tree`. The number of nodes
    * after merging the sub-trees of `tree` is given by the parameter `size`. And
    * the tree properties as `isUniform` and `isTypeUniform`.
+   *
+   * \tparam IMS  The index-merging strategy used as strategy for merging the tree
+   *    nodes, either BasisFactory::FlatLexicographic or BasisFactory::FlatInterleaved.
    *
    * \param tree  Collection of nodes to be merged
    * \param size  The size of the resulting index-tree

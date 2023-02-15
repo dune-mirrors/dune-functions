@@ -6,7 +6,7 @@
 /** \file
  * \brief A reduced cubic Hermite triangle global function space basis
  *
- * Based on a standard cubic monomial basis on each triangle
+ * Based on a standard cubic Lagrange basis on each triangle
  * the basis is constructed as the dual basis to the set of
  * degrees of freedom consisting of: function evaluations in
  * each vertex and evaluations of the partial derivatives in
@@ -34,6 +34,8 @@
 #include <dune/localfunctions/common/localfiniteelementtraits.hh>
 #include <dune/localfunctions/common/localinterpolation.hh>
 #include <dune/localfunctions/common/localkey.hh>
+
+#include <dune/localfunctions/lagrange/lagrangesimplex.hh>
 
 namespace Dune::Functions
 {
@@ -92,24 +94,17 @@ namespace Dune::Functions
             auto element = lFE_->element();
             auto geometry = element.geometry();
 
-            // map input to global coordinates
-            auto x = geometry.global(in);
+            std::vector<FieldVector<double, 1>> values;
+            P3LocalFiniteElement_.localBasis().evaluateFunction(in, values);
+
+            FieldVector<R, 10> tmp(0);
+
+            for(std::size_t j=0; j<P3LocalFiniteElement_.size(); j++)
+                tmp[j] = values[j][0];
 
             out.resize(size());
 
-            // evaluate the standard monomial cubic basis {1,x,y,x^2,...,x^3} at the given input
-            const FieldVector<R, 10> tmp = {1.0,
-                                            x[0],
-                                            x[1],
-                                            x[0] * x[0],
-                                            x[0] * x[1],
-                                            x[1] * x[1],
-                                            x[0] * x[0] * x[0],
-                                            x[0] * x[0] * x[1],
-                                            x[0] * x[1] * x[1],
-                                            x[1] * x[1] * x[1]};
-
-            // multiply monomial Basis-evaluation with basis transformation matrix.
+            // multiply Lagrange Basis-evaluation with basis transformation matrix.
             (*lFE_).C_.mtv(tmp, out);
         }
 
@@ -130,60 +125,25 @@ namespace Dune::Functions
             auto element = lFE_->element();
             auto geometry = element.geometry();
 
-            // map input to global coordinates
-            auto x = geometry.global(in);
+            std::vector<FieldMatrix<double, 1, dim>> referenceGradients;
+            P3LocalFiniteElement_.localBasis().evaluateJacobian(in, referenceGradients);
 
-            // evaluate the partial derivatives of the standard monomial cubic basis {1,x,y,x^2,...,x^3} at the given input
-            FieldVector<double, 10> tmp_x(0);
-            FieldVector<double, 10> tmp_y(0);
-            tmp_x[0] = 0.0;
-            tmp_y[0] = 0.0;
-            tmp_x[1] = 1.0;
-            tmp_y[1] = 0.0;
-            tmp_x[2] = 0.0;
-            tmp_y[2] = 1.0;
-            tmp_x[3] = 2.0 * x[0];
-            tmp_y[3] = 0.0;
-            tmp_x[4] = x[1];
-            tmp_y[4] = x[0];
-            tmp_x[5] = 0.0;
-            tmp_y[5] = 2.0 * x[1];
-            tmp_x[6] = 3.0 * x[0] * x[0];
-            tmp_y[6] = 0.0;
-            tmp_x[7] = 2.0 * x[0] * x[1];
-            tmp_y[7] = x[0] * x[0];
-            tmp_x[8] = x[1] * x[1];
-            tmp_y[8] = 2.0 * x[0] * x[1];
-            tmp_x[9] = 0.0;
-            tmp_y[9] = 3.0 * x[1] * x[1];
+            const auto jacobian = element.geometry().jacobianInverseTransposed(in);
+
+            std::vector<FieldVector<R, dim>> gradients(referenceGradients.size());
+            for (size_t i = 0; i<gradients.size(); i++)
+                jacobian.mv(referenceGradients[i][0], gradients[i]);
+
+            auto transformationMatrix = (*lFE_).C_.transposed();
 
             // Multiply Jacobian evaluation with basis transformation matrix
-            FieldVector<double, 9> out_x;
-            FieldVector<double, 9> out_y;
-
-            (*lFE_).C_.mtv(tmp_x, out_x);
-            (*lFE_).C_.mtv(tmp_y, out_y);
-
-            // fill output vector
             out.resize(size());
-            out[0][0][0] = out_x[0];
-            out[0][0][1] = out_y[0];
-            out[1][0][0] = out_x[1];
-            out[1][0][1] = out_y[1];
-            out[2][0][0] = out_x[2];
-            out[2][0][1] = out_y[2];
-            out[3][0][0] = out_x[3];
-            out[3][0][1] = out_y[3];
-            out[4][0][0] = out_x[4];
-            out[4][0][1] = out_y[4];
-            out[5][0][0] = out_x[5];
-            out[5][0][1] = out_y[5];
-            out[6][0][0] = out_x[6];
-            out[6][0][1] = out_y[6];
-            out[7][0][0] = out_x[7];
-            out[7][0][1] = out_y[7];
-            out[8][0][0] = out_x[8];
-            out[8][0][1] = out_y[8];
+            for(std::size_t i=0; i<transformationMatrix.N(); i++)
+            for(std::size_t j=0; j<transformationMatrix.M(); j++)
+            {
+                out[i][0][0] += transformationMatrix[i][j]*gradients[j][0];
+                out[i][0][1] += transformationMatrix[i][j]*gradients[j][1];
+            }
         }
 
         //! \brief Polynomial order of the shape functions
@@ -212,6 +172,8 @@ namespace Dune::Functions
 
     private:
         const ReducedCubicHermiteTriangleLocalFiniteElement<GV, R> *lFE_;
+
+        Dune::LagrangeSimplexLocalFiniteElement<R, double, dim, 3> P3LocalFiniteElement_;
     };
 
     //! \brief Associations of degrees of freedom to subentities
@@ -253,7 +215,7 @@ namespace Dune::Functions
         template <typename F, typename C>
         void interpolate(const F &f, std::vector<C> &out) const
         {
-            auto&& geometry = lFE_.element().geometry();
+            auto&& geometry = lFE_->element().geometry();
 
             if (geometry.type() != GeometryTypes::triangle)
               DUNE_THROW(NotImplemented, "ReducedCubicHermiteTriangleLocalInterpolation is only implemented for triangle elements!");
@@ -270,8 +232,8 @@ namespace Dune::Functions
 
                 // Partial-derivative-type degrees of freedom
                 auto dfv = df(geometry.corner(i));
-                out[i+3] = df[0];
-                out[i+6] = df[1];
+                out[i+3] = dfv[0];
+                out[i+6] = dfv[1];
             }
         }
 
@@ -328,7 +290,7 @@ namespace Dune::Functions
         /** \brief Bind LocalFiniteElement to a specific element
          *
          *  Compute the basis transformation matrix on each element for the
-         *  transformation of the standard cubic monomial basis to the dual basis
+         *  transformation of the standard cubic Lagrange basis to the dual basis
          *  corresponding to the degrees of freedom: function values and gradients at the nodes.
          */
         void bind(const Element &e)
@@ -336,68 +298,44 @@ namespace Dune::Functions
             element_ = &e;
             auto geometry = element_->geometry();
 
-
             /*
              * Left-hand side matrix N are the degrees of freedom
-             * applied to the cubic monomial basis.
+             * applied to the cubic Lagrange basis.
              */
             FieldMatrix<double, 10, 10> N(0);
 
             for (int i = 0; i < geometry.corners(); i++)
             {
                 auto c = geometry.corner(i);
-                // first three degrees of freedom: point-evaluations at corners
-                N[i][0] = 1.0;                //(1)
-                N[i][1] = c[0];               //(x) ...
-                N[i][2] = c[1];               //(y)
-                N[i][3] = c[0] * c[0];        //(x^2)
-                N[i][4] = c[0] * c[1];        //(x*y)
-                N[i][5] = c[1] * c[1];        //(y^2)
-                N[i][6] = c[0] * c[0] * c[0]; //(x^3)
-                N[i][7] = c[0] * c[0] * c[1]; //(x^2*y)
-                N[i][8] = c[0] * c[1] * c[1]; //(x*y^2)
-                N[i][9] = c[1] * c[1] * c[1]; //(y^3)
-                // next three degrees of freedom: point-evaluations of partial_x derivative at corners
-                N[i + 3][0] = 0.0;
-                N[i + 3][1] = 1.0;
-                N[i + 3][2] = 0.0;
-                N[i + 3][3] = 2.0 * c[0];
-                N[i + 3][4] = c[1];
-                N[i + 3][5] = 0.0;
-                N[i + 3][6] = 3.0 * c[0] * c[0];
-                N[i + 3][7] = 2.0 * c[0] * c[1];
-                N[i + 3][8] = c[1] * c[1];
-                N[i + 3][9] = 0.0;
-                // next three degrees of freedom: point-evaluations of partial_y derivative at corners
-                N[i + 6][0] = 0.0;
-                N[i + 6][1] = 0.0;
-                N[i + 6][2] = 1.0;
-                N[i + 6][3] = 0.0;
-                N[i + 6][4] = c[0];
-                N[i + 6][5] = 2.0 * c[1];
-                N[i + 6][6] = 0.0;
-                N[i + 6][7] = c[0] * c[0];
-                N[i + 6][8] = 2.0 * c[0] * c[1];
-                N[i + 6][9] = 3.0 * c[1] * c[1];
-            }
+                auto center = geometry.center();
+                auto diff = center - c;
+                std::vector<FieldVector<double, 1>> values;
+                P3LocalFiniteElement_.localBasis().evaluateFunction(geometry.local(c), values);
 
-            /*
-             *  The following "kinematic condition" removes degree of freedom in the center of the element.
-             */
-            auto c0 = geometry.corner(0);
-            auto c1 = geometry.corner(1);
-            auto c2 = geometry.corner(2);
-            auto center = geometry.center();
-            N[9][0] = 0.0;
-            N[9][1] = 3.0 * center[0] - c0[0] - c1[0] - c2[0];
-            N[9][2] = 3.0 * center[1] - c0[1] - c1[1] - c2[1];
-            N[9][3] = 6.0 * center[0] * center[0] - (c0[0] + c1[0] + c2[0]) * 2.0 * center[0];
-            N[9][4] = 6.0 * center[0] * center[1] - c0[1] * center[0] - c0[0] * center[1] - c1[1] * center[0] - c1[0] * center[1] - c2[1] * center[0] - c2[0] * center[1];
-            N[9][5] = 6.0 * center[1] * center[1] - (c0[1] + c1[1] + c2[1]) * 2.0 * center[1];
-            N[9][6] = 6.0 * center[0] * center[0] * center[0] + c0[0] * c0[0] * c0[0] + c1[0] * c1[0] * c1[0] + c2[0] * c2[0] * c2[0] - (c0[0] * c0[0] + c1[0] * c1[0] + c2[0] * c2[0]) * 3.0 * center[0];
-            N[9][7] = 6.0 * center[0] * center[0] * center[1] - 2.0 * center[0] * (c0[0] * c0[1] + c1[0] * c1[1] + c2[0] * c2[1]) + c0[0] * c0[0] * (c0[1] - center[1]) + c1[0] * c1[0] * (c1[1] - center[1]) + c2[0] * c2[0] * (c2[1] - center[1]);
-            N[9][8] = 6.0 * center[0] * center[1] * center[1] - 2.0 * center[1] * (c0[0] * c0[1] + c1[0] * c1[1] + c2[0] * c2[1]) + c0[1] * c0[1] * (c0[0] - center[0]) + c1[1] * c1[1] * (c1[0] - center[0]) + c2[1] * c2[1] * (c2[0] - center[0]);
-            N[9][9] = 6.0 * center[1] * center[1] * center[1] + c0[1] * c0[1] * c0[1] + c1[1] * c1[1] * c1[1] + c2[1] * c2[1] * c2[1] - 3.0 * center[1] * (c0[1] * c0[1] + c1[1] * c1[1] + c2[1] * c2[1]);
+                std::vector<FieldVector<double, 1>> valuesCenter;
+                P3LocalFiniteElement_.localBasis().evaluateFunction(geometry.local(center), valuesCenter);
+
+                const auto jacobian = e.geometry().jacobianInverseTransposed(geometry.local(c));
+
+                std::vector<FieldMatrix<double, 1, dim>> referenceGradients;
+                P3LocalFiniteElement_.localBasis().evaluateJacobian(geometry.local(c), referenceGradients);
+
+                std::vector<FieldVector<R, dim>> gradients(referenceGradients.size());
+                for (size_t i = 0; i<gradients.size(); i++)
+                   jacobian.mv(referenceGradients[i][0], gradients[i]);
+
+                for(std::size_t j=0; j<P3LocalFiniteElement_.size(); j++)
+                {
+                    // first three degrees of freedom: point-evaluations at corners
+                    N[i][j] = values[j][0];
+                    // next three degrees of freedom: point-evaluations of partial_x derivative at corners
+                    N[i+3][j] = gradients[j][0];
+                    // next three degrees of freedom: point-evaluations of partial_y derivative at corners
+                    N[i+6][j] = gradients[j][1];
+                    //  The following "kinematic condition" removes degree of freedom in the center of the element.
+                    N[9][j] += valuesCenter[j][0] - (values[j][0] + gradients[j]*diff);
+                }
+            }
 
             // Right-Hand side is identity matrix (of size 9x9) with added zero-row
             FieldMatrix<double, 10, 9> b(0);
@@ -457,6 +395,8 @@ namespace Dune::Functions
 
         const Element *element_;
         FieldMatrix<double, 10, 9> C_; // (transposed) basis transformation matrix
+
+        Dune::LagrangeSimplexLocalFiniteElement<R, double, dim, 3> P3LocalFiniteElement_;
     };
 
     template <typename GV>

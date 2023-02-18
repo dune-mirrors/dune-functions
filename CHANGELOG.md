@@ -5,6 +5,9 @@ corresponding version of the Dune core modules.
 
 ## Master (will become release 2.10)
 
+- The class `Polynomial` now allows to explicitly specify the used coefficient container.
+  Supported containers are `std::vector` (default, as before), `std::array`, `std::tuple`,
+  and `std::integer_sequence`.
 - The class `HierarchicalVectorWrapper` and the corresponding header `functionspacebases/hierarchicvectorwrapper.hh`
   have been deprecated. Use `istlVectorBackend()` from `backends/istlvectorbackend.hh` instead.
 - The class `SizeInfo` and the corresponding header `functionspacebases/sizeinfo.hh`

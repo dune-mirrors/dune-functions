@@ -7,6 +7,8 @@ dune_add_test(SOURCES brezzidouglasmarinibasistest.cc LABELS quick)
 
 dune_add_test(SOURCES bsplinebasistest.cc LABELS quick)
 
+dune_add_test(SOURCES hermitebasistest.cc LABELS quick)
+
 dune_add_test(SOURCES globalvaluedlfetest.cc LABELS quick)
 target_compile_definitions(globalvaluedlfetest PRIVATE -DDUNE_DEPRECATED_INTERPOLATE_CHECK=1)
 
@@ -39,4 +41,5 @@ dune_add_test(SOURCES hierarchicallagrangebasistest.cc LABELS quick)
 install(
   FILES
   basistest.hh
+  interpolatetest.hh
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/test)

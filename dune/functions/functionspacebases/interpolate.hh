@@ -8,6 +8,7 @@
 
 #include <dune/common/exceptions.hh>
 #include <dune/common/bitsetvector.hh>
+#include <dune/common/referencehelper.hh>
 
 #include <dune/typetree/traversal.hh>
 
@@ -49,6 +50,90 @@ struct AllTrueBitSetVector
 };
 
 
+#if HERMITE_INTERPOLATION_VARIANT_A
+// This is variant (A) of interpolation for Hermite elements.
+// It transforms derivatives to local coordinates and hence
+// needs the Jacobian.
+
+// This helper function implements the restriction of some given function of type F.
+// The restriction is a simple callback that is applied to the values of the
+// function and the values of its derivative.
+template<class F, class Restriction, class Element>
+class ComponentFunction
+{
+public:
+
+  ComponentFunction(F f, Restriction restriction, const Element& element) :
+    f_(std::move(f)),
+    restriction_(std::move(restriction)),
+    element_(element)
+  {}
+
+  template<class Domain>
+  auto operator()(const Domain& x) const
+  {
+    return restriction_(f_(x));
+  }
+
+  friend auto derivative(const ComponentFunction& cf)
+  {
+    // This provides support for capturing the derivative of the function by reference
+    // using forwardCapture for perfect forwarding capture. If the function caches its
+    // derivative, this saves a potentially costly copy.
+    auto&& df = derivative(Dune::resolveRef(cf.f_));
+    return [&, df=forwardCapture(std::forward<decltype(df)>(df))](const auto&& x) {
+      return cf.restriction_(df.forward()(x)) * cf.element_.geometry().jacobian(x);
+    };
+  }
+
+private:
+  F f_;
+  Restriction restriction_;
+  Element element_;
+};
+
+#else
+// This is variant (B) of interpolation for Hermite elements.
+// It simply forwards derivatives in global coordinates.
+
+// This helper function implements the restriction of some given function of type F.
+// The restriction is a simple callback that is applied to the values of the
+// function and the values of its derivative.
+template<class F, class Restriction>
+class ComponentFunction
+{
+public:
+
+  ComponentFunction(F f, Restriction restriction) :
+    f_(std::move(f)),
+    restriction_(std::move(restriction))
+  {}
+
+  template<class Domain>
+  auto operator()(const Domain& x) const
+  {
+    return restriction_(f_(x));
+  }
+
+  friend auto derivative(const ComponentFunction& cf)
+  {
+    // This provides support for capturing the derivative of the function by reference
+    // using forwardCapture for perfect forwarding capture. If the function caches its
+    // derivative, this saves a potentially costly copy.
+    auto&& df = derivative(Dune::resolveRef(cf.f_));
+    return [&, df=forwardCapture(std::forward<decltype(df)>(df))](const auto&& x) {
+      return cf.restriction_(df.forward()(x));
+    };
+  }
+
+private:
+  F f_;
+  Restriction restriction_;
+};
+
+#endif
+
+
 
 template<class VectorBackend, class BitVectorBackend, class LocalFunction, class LocalView, class NodeToRangeEntry>
 void interpolateLocal(VectorBackend& vector, const BitVectorBackend& bitVector, const LocalFunction& localF, const LocalView& localView, const NodeToRangeEntry& nodeToRangeEntry)
@@ -56,18 +141,16 @@ void interpolateLocal(VectorBackend& vector, const BitVectorBackend& bitVector, 
   Dune::TypeTree::forEachLeafNode(localView.tree(), [&](auto&& node, auto&& treePath) {
     using Node = std::decay_t<decltype(node)>;
     using FiniteElement = typename Node::FiniteElement;
-    using FiniteElementRange = typename FiniteElement::Traits::LocalBasisType::Traits::RangeType;
     using FiniteElementRangeField = typename FiniteElement::Traits::LocalBasisType::Traits::RangeFieldType;
-    using LocalDomain = typename FiniteElement::Traits::LocalBasisType::Traits::DomainType;
 
     auto interpolationCoefficients = std::vector<FiniteElementRangeField>();
     auto&& fe = node.finiteElement();
 
-    // for all other finite elements: use the FiniteElementRange directly for the interpolation
-    auto localF_RE = [&](const LocalDomain& x){
-      const auto& y = localF(x);
-      return FiniteElementRange(nodeToRangeEntry(node, treePath, y));
-    };
+#if HERMITE_INTERPOLATION_VARIANT_A
+    auto localF_RE = ComponentFunction(std::cref(localF), [&](auto&& y) { return nodeToRangeEntry(node, treePath, y); }, localView.element());
+#else
+    auto localF_RE = ComponentFunction(std::cref(localF), [&](auto&& y) { return nodeToRangeEntry(node, treePath, y); });
+#endif
 
     fe.localInterpolation().interpolate(localF_RE, interpolationCoefficients);
     for (size_t i=0; i<fe.localBasis().size(); ++i)

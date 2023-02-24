@@ -333,7 +333,8 @@ namespace Dune::Functions
                     // next three degrees of freedom: point-evaluations of partial_y derivative at corners
                     N[i+6][j] = gradients[j][1];
                     //  The following "kinematic condition" removes degree of freedom in the center of the element.
-                    N[9][j] += valuesCenter[j][0] - (values[j][0] + gradients[j]*diff);
+                    // N[9][j] += valuesCenter[j][0] - (values[j][0] + gradients[j]*diff);
+                    N[9][j] += 2.0*valuesCenter[j][0] - (2.0*values[j][0] + gradients[j]*diff);
                 }
             }
 

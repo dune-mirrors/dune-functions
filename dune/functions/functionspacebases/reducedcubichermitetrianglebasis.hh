@@ -91,9 +91,6 @@ namespace Dune::Functions
         void evaluateFunction(const typename Traits::DomainType &in,
                               std::vector<typename Traits::RangeType> &out) const
         {
-            auto element = lFE_->element();
-            auto geometry = element.geometry();
-
             std::vector<FieldVector<double, 1>> values;
             P3LocalFiniteElement_.localBasis().evaluateFunction(in, values);
 
@@ -121,18 +118,8 @@ namespace Dune::Functions
         void evaluateJacobian(const typename Traits::DomainType &in,
                               std::vector<typename Traits::JacobianType> &out) const
         {
-
-            auto element = lFE_->element();
-            auto geometry = element.geometry();
-
-            std::vector<FieldMatrix<double, 1, dim>> referenceGradients;
-            P3LocalFiniteElement_.localBasis().evaluateJacobian(in, referenceGradients);
-
-            const auto jacobian = element.geometry().jacobianInverseTransposed(in);
-
-            std::vector<FieldVector<R, dim>> gradients(referenceGradients.size());
-            for (size_t i = 0; i<gradients.size(); i++)
-                jacobian.mv(referenceGradients[i][0], gradients[i]);
+            std::vector<FieldMatrix<double, 1, dim>> gradients;
+            P3LocalFiniteElement_.localBasis().evaluateJacobian(in, gradients);
 
             auto transformationMatrix = (*lFE_).C_.transposed();
 
@@ -142,10 +129,7 @@ namespace Dune::Functions
             {
               out[i] = 0;
               for(std::size_t j=0; j<transformationMatrix.M(); j++)
-              {
-                  out[i][0][0] += transformationMatrix[i][j]*gradients[j][0];
-                  out[i][0][1] += transformationMatrix[i][j]*gradients[j][1];
-              }
+                out[i] += transformationMatrix[i][j]*gradients[j];
             }
         }
 

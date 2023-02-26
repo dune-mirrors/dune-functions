@@ -139,10 +139,13 @@ namespace Dune::Functions
             // Multiply Jacobian evaluation with basis transformation matrix
             out.resize(size());
             for(std::size_t i=0; i<transformationMatrix.N(); i++)
-            for(std::size_t j=0; j<transformationMatrix.M(); j++)
             {
-                out[i][0][0] += transformationMatrix[i][j]*gradients[j][0];
-                out[i][0][1] += transformationMatrix[i][j]*gradients[j][1];
+              out[i] = 0;
+              for(std::size_t j=0; j<transformationMatrix.M(); j++)
+              {
+                  out[i][0][0] += transformationMatrix[i][j]*gradients[j][0];
+                  out[i][0][1] += transformationMatrix[i][j]*gradients[j][1];
+              }
             }
         }
 

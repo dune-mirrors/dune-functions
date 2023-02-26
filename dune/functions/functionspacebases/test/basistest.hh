@@ -449,23 +449,40 @@ struct EnableVertexJacobianContinuityCheck : public EnableContinuityCheck
         DUNE_THROW(Dune::NotImplemented, "VertexContinuityCheck not implemented for nonconforming grids!");
 
       using Node = std::decay_t<decltype(insideNode)>;
-      using Range = typename Node::FiniteElement::Traits::LocalBasisType::Traits::JacobianType;
+      using ElementJacobianInverse = typename Node::Element::Geometry::JacobianInverse;
+      using ReferenceJacobian = typename Node::FiniteElement::Traits::LocalBasisType::Traits::JacobianType;
+      using Jacobian = decltype(std::declval<ReferenceJacobian>() * std::declval<ElementJacobianInverse>());
+
+      auto insideGeometry = insideNode.element().geometry();
+      auto outsideGeometry = outsideNode.element().geometry();
+
+      std::vector<ReferenceJacobian> referenceJacobians;
 
       std::vector<int> isContinuous(insideNode.size(), true);
-      std::vector<std::vector<Range>> insideValues;
-      std::vector<std::vector<Range>> outsideValues;
+      std::vector<std::vector<Jacobian>> insideJacobians;
+      std::vector<std::vector<Jacobian>> outsideJacobians;
 
       const std::size_t numberOfIntersectingVertices = (intersection.geometry()).corners();
-      insideValues.resize(numberOfIntersectingVertices);
-      outsideValues.resize(numberOfIntersectingVertices);
+      insideJacobians.resize(numberOfIntersectingVertices);
+      outsideJacobians.resize(numberOfIntersectingVertices);
 
       for (std::size_t i = 0; i < numberOfIntersectingVertices; i++)
       {
         auto localVertexCoordinate = (intersection.geometry()).local((intersection.geometry()).corner(i));
-        auto pointInElement = intersection.geometryInInside().global(localVertexCoordinate);
-        auto pointInNeighbor = intersection.geometryInOutside().global(localVertexCoordinate);
-        insideNode.finiteElement().localBasis().evaluateJacobian(pointInElement, insideValues[i]);
-        outsideNode.finiteElement().localBasis().evaluateJacobian(pointInNeighbor, outsideValues[i]);
+
+        auto pointInInside = intersection.geometryInInside().global(localVertexCoordinate);
+        insideNode.finiteElement().localBasis().evaluateJacobian(pointInInside, referenceJacobians);
+        insideJacobians[i].resize(referenceJacobians.size());
+        auto insideElementInverseJacobian = insideGeometry.jacobianInverse(pointInInside);
+        for(auto j: Dune::range(referenceJacobians.size()))
+          insideJacobians[i][j] = referenceJacobians[j] * insideElementInverseJacobian;
+
+        auto pointInOutside = intersection.geometryInOutside().global(localVertexCoordinate);
+        outsideNode.finiteElement().localBasis().evaluateJacobian(pointInOutside, referenceJacobians);
+        outsideJacobians[i].resize(referenceJacobians.size());
+        auto outsideElementInverseJacobian = outsideGeometry.jacobianInverse(pointInOutside);
+        for(auto j: Dune::range(referenceJacobians.size()))
+          outsideJacobians[i][j] = referenceJacobians[j] * outsideElementInverseJacobian;
       }
 
       // Check jump against outside basis function or zero.
@@ -473,12 +490,12 @@ struct EnableVertexJacobianContinuityCheck : public EnableContinuityCheck
       {
         for (std::size_t k = 0; k < numberOfIntersectingVertices; ++k)
         {
-          auto jump = insideValues[k][i];
+          auto jump = insideJacobians[k][i];
           auto LocalVertex = intersection.geometry().local(intersection.geometry().corner(k));
 
           if (insideToOutside[i].has_value())
           {
-            jump -= outsideValues[k][insideToOutside[i].value()];
+            jump -= outsideJacobians[k][insideToOutside[i].value()];
           }
           isContinuous[i] = isContinuous[i] and (jumpEvaluator(jump, intersection, LocalVertex) < tol);
         }

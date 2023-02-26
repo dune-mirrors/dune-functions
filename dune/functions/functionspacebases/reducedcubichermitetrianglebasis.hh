@@ -218,9 +218,9 @@ namespace Dune::Functions
         template <typename F, typename C>
         void interpolate(const F &f, std::vector<C> &out) const
         {
-            auto&& geometry = lFE_->element().geometry();
+            auto re = ReferenceElements<double, 2>::simplex();
 
-            if (geometry.type() != GeometryTypes::triangle)
+            if (lFE_->element().type() != GeometryTypes::triangle)
               DUNE_THROW(NotImplemented, "ReducedCubicHermiteTriangleLocalInterpolation is only implemented for triangle elements!");
 
             out.resize(9);
@@ -231,12 +231,12 @@ namespace Dune::Functions
             for (std::size_t i=0; i<3; i++)
             {
                 // Value-type degrees of freedom
-                out[i+0] = f(geometry.corner(i));
+                out[i+0] = f(re.position(i,2));
 
                 // Partial-derivative-type degrees of freedom
-                auto dfv = df(geometry.corner(i));
-                out[i+3] = dfv[0];
-                out[i+6] = dfv[1];
+                auto dfv = df(re.position(i,2));
+                out[i+3] = dfv[0][0];
+                out[i+6] = dfv[0][1];
             }
         }
 

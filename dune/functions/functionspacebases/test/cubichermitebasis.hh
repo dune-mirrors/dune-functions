@@ -20,6 +20,85 @@
 namespace Dune {
 namespace Functions {
 
+namespace Impl {
+
+  // Helper function returning an ordered random access range
+  // of global indices associated to the element. The ordering
+  // is derived from the LocalCoefficients object.
+  // Having this as a member of MCMGMapper would be nice.
+  // But this would introduce the LocalCoefficient in dune-grid.
+  // This is at least a soft, 'conceptual' dependency issue.
+  template<class GridView, class LocalCoefficients>
+  auto subIndexRange(const Dune::MultipleCodimMultipleGeomTypeMapper<GridView>& mapper, const typename GridView::template Codim<0>::Entity& element, const LocalCoefficients& localCoefficients)
+  {
+    // Here we make use of the 'hidden' (poorly documented) MCMGMapper feature to support
+    // multiple DOFs per subentity. However, we do not take care for any reordering.
+    return Dune::transformedRangeView(Dune::range(localCoefficients.size()), [&](auto localIndex) {
+      auto localKey = localCoefficients.localKey(localIndex);
+      return mapper.subIndex(element, localKey.subEntity(), localKey.codim()) + localKey.index();
+    });
+  }
+
+  // Helper function returning an unordered range
+  // of global indices associated to the element.
+  // This could be implemented cheaper internally in
+  // the MCMGMapper by storing a precomputed
+  // container of all subsentities addressed by the layout.
+  template<class GridView>
+  auto subIndexSet(const Dune::MultipleCodimMultipleGeomTypeMapper<GridView>& mapper, const typename GridView::template Codim<0>::Entity& element)
+  {
+    using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GridView>;
+    using Index = typename Mapper::Index;
+    constexpr auto dimension = GridView::dimension;
+    auto subIndices = std::vector<Index>();
+    auto referenceElement = Dune::referenceElement<double, dimension>(element.type());
+    for(auto codim : Dune::range(dimension+1))
+    {
+      for(auto subEntity : Dune::range(referenceElement.size(codim)))
+      {
+        std::size_t c = mapper.layout()(referenceElement.type(subEntity, codim), dimension);
+        if (c>0)
+        {
+          std::size_t firstIndex = mapper.subIndex(element, subEntity, codim);
+          for(auto j : Dune::range(firstIndex, firstIndex+c))
+          {
+            subIndices.push_back(j);
+          }
+        }
+      }
+    }
+    return subIndices;
+  }
+
+  // Helper function computing an average mesh size per subentity
+  // by averaging over the adjacent elements. This only considers
+  // the subentities handled by the given mapper and returns a
+  // vector of mesh sizes indixed according to the mapper.
+  template<class Mapper>
+  auto computeAverageSubEntityMeshSize(const Mapper& mapper)
+  {
+    constexpr auto dimension = Mapper::GridView::dimension;
+
+    std::vector<unsigned int> adjacentElements(mapper.size(), 0);
+    std::vector<double> subEntityMeshSize(mapper.size(), 0.0);
+    for(const auto& element : Dune::elements(mapper.gridView()))
+    {
+      auto A = element.geometry().volume();
+      for(auto i : Impl::subIndexSet(mapper, element))
+      {
+        subEntityMeshSize[i] += A;
+        ++(adjacentElements[i]);
+      }
+    }
+    for(auto i : Dune::range(mapper.size()))
+      subEntityMeshSize[i] = std::pow(subEntityMeshSize[i]/adjacentElements[i], 1./dimension);
+    return subEntityMeshSize;
+  }
+
+
+
+} // namespace Impl
+
 
 
 /**
@@ -105,14 +184,9 @@ public:
   template<class Node, class It>
   It indices(const Node& node, It it) const
   {
-    const auto& localCoefficients = node.finiteElement().localCoefficients();
-    const auto& element = node.element();
-    for(auto i : Dune::range(node.size()))
+    for(const auto& globalIndex : Impl::subIndexRange(mapper_, node.element(), node.finiteElement().localCoefficients()))
     {
-      // Here we make use of the 'hidden' (poorly documented) MCMGMapper feature to support
-      // multiple DOFs per subentity. However, we do not take care for any reordering.
-      Dune::LocalKey localKey = localCoefficients.localKey(i);
-      *it = {{ (size_type)(mapper_.subIndex(element, localKey.subEntity(), localKey.codim()) + localKey.index()) }};
+      *it = {{ (size_type)globalIndex }};
       ++it;
     }
     return it;
@@ -283,13 +357,18 @@ class CubicHermiteLocalBasis
   // The basis functions can be evaluated by first evaluating the monomials
   // and then transforming their values with these coefficients using
   //
-  // referenceBasisCoefficients.mv(evaluateMonomialValues(x), values);
+  //   referenceBasisCoefficients.mv(evaluateMonomialValues(x), values);
+  //
+  // Surprisingly, storing them as static constexpr member is slightly faster
+  // than using the static constexpr function directly.
   static constexpr auto referenceBasisCoefficients = makeReferenceBasisCoefficients();
 
   // This transforms the function or derivative values from the basis
   // functions on the reference element to those on the grid element.
   // Since Hermite elements do not form an affine family, the transformation
   // of derivative DOFs involves the Jacobian of the grid element transformation.
+  // To avoid blowup of condition numbers due to h-dependend basis functions,
+  // an h-dependent rescaling is applied.
   template<class LambdaRefValues, class Entry>
   void transformToElementBasis(const LambdaRefValues& refValues, std::vector<Entry>& out) const
   {
@@ -298,29 +377,31 @@ class CubicHermiteLocalBasis
       const auto& J = elementJacobian_;
       out.resize(refValues.size());
       out[0] = refValues[0];
-      out[1] = J*refValues[1];
+      out[1] = J*refValues[1] / (*localSubEntityMeshSize_)[1];
       out[2] = refValues[2];
-      out[3] = J*refValues[3];
+      out[3] = J*refValues[3] / (*localSubEntityMeshSize_)[1];;
     }
     if constexpr (dim==2)
     {
       const auto& J = elementJacobian_;
       out.resize(refValues.size());
       out[0] = refValues[0];
-      out[1] = J[0][0]*refValues[1] + J[0][1]*refValues[2];
-      out[2] = J[1][0]*refValues[1] + J[1][1]*refValues[2];
+      out[1] = (J[0][0]*refValues[1] + J[0][1]*refValues[2]) / (*localSubEntityMeshSize_)[1];
+      out[2] = (J[1][0]*refValues[1] + J[1][1]*refValues[2]) / (*localSubEntityMeshSize_)[2];
       out[3] = refValues[3];
-      out[4] = J[0][0]*refValues[4] + J[0][1]*refValues[5];
-      out[5] = J[1][0]*refValues[4] + J[1][1]*refValues[5];
+      out[4] = (J[0][0]*refValues[4] + J[0][1]*refValues[5]) / (*localSubEntityMeshSize_)[4];
+      out[5] = (J[1][0]*refValues[4] + J[1][1]*refValues[5]) / (*localSubEntityMeshSize_)[5];
       out[6] = refValues[6];
-      out[7] = J[0][0]*refValues[7] + J[0][1]*refValues[8];
-      out[8] = J[1][0]*refValues[7] + J[1][1]*refValues[8];
+      out[7] = (J[0][0]*refValues[7] + J[0][1]*refValues[8]) / (*localSubEntityMeshSize_)[7];
+      out[8] = (J[1][0]*refValues[7] + J[1][1]*refValues[8]) / (*localSubEntityMeshSize_)[8];
       if constexpr (not reduced)
         out[9] = refValues[9];
     }
   }
 
   using ElementJacobian = Dune::FieldMatrix<DF, dim,dim>;
+
+  using LocalSubEntityMeshSize = std::vector<double>;
 
 public:
 
@@ -329,9 +410,6 @@ public:
   using Jacobian = Dune::FieldMatrix<RF, 1, dim>;
   using Traits = Dune::LocalBasisTraits<DF, dim, Domain, RF, 1, Range, Jacobian>;
   using OrderArray = std::array<unsigned int, dim>;
-
-  CubicHermiteLocalBasis()
-  {}
 
   static constexpr unsigned int size()
   {
@@ -368,13 +446,15 @@ public:
   }
 
   template<class Element>
-  void bind(const Element& element) {
+  void bind(const Element& element, const LocalSubEntityMeshSize& localSubEntityMeshSize) {
+    localSubEntityMeshSize_ = &localSubEntityMeshSize;
     auto center = Dune::ReferenceElements<DF, dim>::simplex().position(0, 0);
     elementJacobian_ = element.geometry().jacobian(center);
   }
 
 private:
   ElementJacobian elementJacobian_;
+  const LocalSubEntityMeshSize* localSubEntityMeshSize_;
 };
 
 
@@ -422,7 +502,7 @@ struct CubicHermiteLocalCoefficients
 
 public:
 
-  std::size_t size()
+  std::size_t size() const
   {
     return localKeys_.size();
   }
@@ -442,11 +522,13 @@ template<class DF, class RF, unsigned int dim, bool reduced>
 class CubicHermiteLocalInterpolation
 {
   using ElementJacobianInverse = Dune::FieldMatrix<DF, dim,dim>;
+  using LocalSubEntityMeshSize = std::vector<double>;
 
 public:
 
   template<class Element>
-  void bind(const Element& element) {
+  void bind(const Element& element, const LocalSubEntityMeshSize& localSubEntityMeshSize) {
+    localSubEntityMeshSize_ = &localSubEntityMeshSize;
 #if HERMITE_INTERPOLATION_VARIANT_A
     auto center = Dune::ReferenceElements<DF, dim>::simplex().position(0, 0);
     elementJacobianInverse_ = element.geometry().jacobianInverse(center);
@@ -463,14 +545,14 @@ public:
       out.resize(4);
 #if HERMITE_INTERPOLATION_VARIANT_A
       out[0] = f(0);
-      out[1] = df(0)*elementJacobianInverse_;
+      out[1] = df(0)*elementJacobianInverse_ * (*localSubEntityMeshSize_)[1];
       out[2] = f(1);
-      out[3] = df(1)*elementJacobianInverse_;
+      out[3] = df(1)*elementJacobianInverse_ * (*localSubEntityMeshSize_)[3];
 #else
       out[0] = f(0);
-      out[1] = df(0);
+      out[1] = df(0) * (*localSubEntityMeshSize_)[1];
       out[2] = f(1);
-      out[3] = df(1);
+      out[3] = df(1) * (*localSubEntityMeshSize_)[3];
 #endif
     }
     if constexpr (dim==2)
@@ -492,18 +574,19 @@ public:
       auto J2 = df(Domain({0,1}));
 #endif
       out[0] = f(Domain({0,0}));
-      out[1] = J0[0][0];
-      out[2] = J0[0][1];
+      out[1] = J0[0][0] * (*localSubEntityMeshSize_)[1];
+      out[2] = J0[0][1] * (*localSubEntityMeshSize_)[2];
       out[3] = f(Domain({1,0}));
-      out[4] = J1[0][0];
-      out[5] = J1[0][1];
+      out[4] = J1[0][0] * (*localSubEntityMeshSize_)[4];
+      out[5] = J1[0][1] * (*localSubEntityMeshSize_)[5];
       out[6] = f(Domain({0,1}));
-      out[7] = J2[0][0];
-      out[8] = J2[0][1];
+      out[7] = J2[0][0] * (*localSubEntityMeshSize_)[7];
+      out[8] = J2[0][1] * (*localSubEntityMeshSize_)[8];
     }
   }
 private:
   ElementJacobianInverse elementJacobianInverse_;
+  const LocalSubEntityMeshSize* localSubEntityMeshSize_;
 };
 
 
@@ -521,6 +604,7 @@ class CubicHermiteLocalFiniteElement
   using LocalBasis = CubicHermiteLocalBasis<DF, RF, dim, reduced>;
   using LocalCoefficients = CubicHermiteLocalCoefficients<dim, reduced>;
   using LocalInterpolation = CubicHermiteLocalInterpolation<DF, RF, dim, reduced>;
+  using LocalSubEntityMeshSize = std::vector<double>;
 
 public:
 
@@ -546,19 +630,30 @@ public:
     return type_;
   }
 
-  template<class Element>
-  void bind(const Element& element) {
-    localBasis_.bind(element);
-    localInterpolation_.bind(element);
+  template<class Element, class Mapper, class MeshSizeContainer>
+  void bind(const Element& element, const Mapper& mapper, const MeshSizeContainer& subEntityMeshSize) {
+    // Update local mesh size cache
+    localSubEntityMeshSize_.resize(localCoefficients_.size());
+    for(auto i : Dune::range(size()))
+    {
+      auto localKey = localCoefficients_.localKey(i);
+      auto subEntityIndex = mapper.subIndex(element, localKey.subEntity(), localKey.codim());
+      localSubEntityMeshSize_[i] = subEntityMeshSize[subEntityIndex];
+    }
+
+    localBasis_.bind(element, localSubEntityMeshSize_);
+    localInterpolation_.bind(element, localSubEntityMeshSize_);
     type_ = element.type();
   }
 
 private:
+  LocalSubEntityMeshSize localSubEntityMeshSize_;
   LocalBasis localBasis_;
   LocalCoefficients localCoefficients_;
   LocalInterpolation localInterpolation_;
   GeometryType type_;
 };
+
 
 
 
@@ -584,16 +679,21 @@ class CubicHermiteNode :
   static const int gridDim = GV::dimension;
 
   using CubeFiniteElement = Impl::CubicHermiteLocalFiniteElement<typename GV::ctype, double, gridDim, reduced>;
+  using SubEntityMapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
+  using Base = LeafBasisNode;
 
 public:
 
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
   using FiniteElement = CubeFiniteElement;
+  using Base::size;
 
-  CubicHermiteNode() :
+  CubicHermiteNode(const SubEntityMapper& subEntityMapper, const std::vector<double>& subEntityMeshSize) :
     finiteElement_(),
-    element_(nullptr)
+    element_(nullptr),
+    subEntityMapper_(&subEntityMapper),
+    subEntityMeshSize_(&subEntityMeshSize)
   {}
 
   //! Return current element, throw if unbound
@@ -615,7 +715,7 @@ public:
   void bind(const Element& e)
   {
     element_ = &e;
-    finiteElement_.bind(*element_);
+    finiteElement_.bind(*element_, *subEntityMapper_, *subEntityMeshSize_);
     this->setSize(finiteElement_.size());
   }
 
@@ -623,6 +723,8 @@ protected:
 
   FiniteElement finiteElement_;
   const Element* element_;
+  const SubEntityMapper* subEntityMapper_;
+  const std::vector<double>* subEntityMeshSize_;
 };
 
 
@@ -638,6 +740,8 @@ template<typename GV, bool reduced = false>
 class CubicHermitePreBasis : public LeafPreBasisMapperMixIn<GV>
 {
   using Base = LeafPreBasisMapperMixIn<GV>;
+  using Base::mapper_;
+  using SubEntityMapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
 
   static constexpr auto cubicHermiteMapperLayout(Dune::GeometryType type, int gridDim) {
     if (type.isVertex())
@@ -648,21 +752,38 @@ class CubicHermitePreBasis : public LeafPreBasisMapperMixIn<GV>
       return 0;
   }
 
+  static constexpr auto subEntityLayout(Dune::GeometryType type, int gridDim) {
+    return (cubicHermiteMapperLayout(type, gridDim) > 0);
+  }
+
 public:
 
   using GridView = typename Base::GridView;
   using Node = CubicHermiteNode<GridView, reduced>;
 
   CubicHermitePreBasis(const GridView& gv) :
-    Base(gv, cubicHermiteMapperLayout)
+    Base(gv, cubicHermiteMapperLayout),
+    subEntityMapper_(gv, subEntityLayout)
   {
     static_assert(GridView::dimension<=2, "CubicHermitePreBasis is only implemented for dim<=2");
+    subEntityMeshSize_ = Impl::computeAverageSubEntityMeshSize(subEntityMapper_);
+  }
+
+  void update(const GridView& gv)
+  {
+    Base::update(gv);
+    subEntityMapper_.update(gv);
+    subEntityMeshSize_ = Impl::computeAverageSubEntityMeshSize(subEntityMapper_);
   }
 
   Node makeNode() const
   {
-    return Node{};
+    return Node{subEntityMapper_, subEntityMeshSize_};
   }
+
+private:
+  std::vector<double> subEntityMeshSize_;
+  SubEntityMapper subEntityMapper_;
 };
 
 

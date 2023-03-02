@@ -6,6 +6,7 @@
 
 #include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
+#include <dune/common/stringutility.hh>
 
 #include <dune/grid/onedgrid.hh>
 #include <dune/grid/uggrid.hh>
@@ -133,6 +134,44 @@ void assembleDirichletStiffnessMatrix(const Basis& basis, Dune::BCRSMatrix<K>& m
 }
 
 
+
+template<class Basis, class F>
+void benchmarkBasis(const Basis& basis, const F& f, int repeat, std::string name)
+{
+  std::cout << "------------------------------------------------------------" << std::endl;
+  std::cout << "Benchmarks for " << name << ":" << std::endl;
+  auto timer = Dune::Timer();
+
+  timer.reset();
+  auto x = std::vector<double>();
+  {
+    for (auto i : Dune::range(repeat))
+      Dune::Functions::interpolate(basis, x, f);
+  }
+  std::cout << "Time spend on doing " << Dune::formatString("%4d", repeat) << " interpolations:      " << timer.elapsed() << std::endl;
+
+  auto matrix = Dune::BCRSMatrix<double>();
+
+  timer.reset();
+  setupMatrixPattern(basis, matrix);
+  std::cout << "Time spend on setting up sparsity pattern:    " << timer.elapsed() << std::endl;
+
+  timer.reset();
+  assembleMassMatrix(basis, matrix);
+  std::cout << "Time spend on assembling mass matrix:         " << timer.elapsed() << std::endl;
+
+  writeMatrixToMatlab(matrix, std::string("massmatrix_")+name);
+
+  timer.reset();
+  assembleDirichletStiffnessMatrix(basis, matrix);
+  std::cout << "Time spend on assembling H1 stiffness matrix: " << timer.elapsed() << std::endl;
+
+  writeMatrixToMatlab(matrix, std::string("stiffmatrix_")+name);
+}
+
+
+
+
 int main (int argc, char* argv[])
 {
   Dune::MPIHelper::instance(argc, argv);
@@ -168,20 +207,8 @@ int main (int argc, char* argv[])
 
 #if NDEBUG
       auto fGridFunction = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis, coefficients);
-      auto x = std::vector<double>();
-      auto timer = Dune::Timer();
-      {
-        for (auto i : Dune::range(100))
-          Dune::Functions::interpolate(basis, x, fGridFunction);
-      }
-      std::cout << "Time spend on doing 100 self interpolations in 1d: " << timer.elapsed() << std::endl;
 
-      auto matrix = Dune::BCRSMatrix<double>();
-      setupMatrixPattern(basis, matrix);
-      assembleMassMatrix(basis, matrix);
-      writeMatrixToMatlab(matrix, "massmatrix_1d");
-      assembleDirichletStiffnessMatrix(basis, matrix);
-      writeMatrixToMatlab(matrix, "stiffmatrix_1d");
+      benchmarkBasis(basis, fGridFunction, 100, "1d");
 #endif
     }
   }
@@ -226,20 +253,8 @@ int main (int argc, char* argv[])
 
 #if NDEBUG
       auto fGridFunction = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis, coefficients);
-      auto x = std::vector<double>();
-      auto timer = Dune::Timer();
-      {
-        for (auto i : Dune::range(10))
-          Dune::Functions::interpolate(basis, x, fGridFunction);
-      }
-      std::cout << "Time spend on doing 10 self interpolations in 2d: " << timer.elapsed() << std::endl;
 
-      auto matrix = Dune::BCRSMatrix<double>();
-      setupMatrixPattern(basis, matrix);
-      assembleMassMatrix(basis, matrix);
-      writeMatrixToMatlab(matrix, "massmatrix_2d");
-      assembleDirichletStiffnessMatrix(basis, matrix);
-      writeMatrixToMatlab(matrix, "stiffmatrix_2d");
+      benchmarkBasis(basis, fGridFunction, 10, "2d");
 #endif
     }
 
@@ -254,20 +269,8 @@ int main (int argc, char* argv[])
 
 #if NDEBUG
       auto fGridFunction = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis, coefficients);
-      auto x = std::vector<double>();
-      auto timer = Dune::Timer();
-      {
-        for (auto i : Dune::range(10))
-          Dune::Functions::interpolate(basis, x, fGridFunction);
-      }
-      std::cout << "Time spend on doing 10 self interpolations in 2d: " << timer.elapsed() << std::endl;
 
-      auto matrix = Dune::BCRSMatrix<double>();
-      setupMatrixPattern(basis, matrix);
-      assembleMassMatrix(basis, matrix);
-      writeMatrixToMatlab(matrix, "massmatrix_2d_reduced");
-      assembleDirichletStiffnessMatrix(basis, matrix);
-      writeMatrixToMatlab(matrix, "stiffmatrix_2d_reduced");
+      benchmarkBasis(basis, fGridFunction, 10, "2d_reduced");
 #endif
     }
 
@@ -281,20 +284,8 @@ int main (int argc, char* argv[])
 //
 //#if NDEBUG
 //      auto fGridFunction = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis, coefficients);
-//      auto x = std::vector<double>();
-//      auto timer = Dune::Timer();
-//      {
-//        for (auto i : Dune::range(10))
-//          Dune::Functions::interpolate(basis, x, fGridFunction);
-//      }
-//      std::cout << "Time spend on doing 10 self interpolations in 2d: " << timer.elapsed() << std::endl;
 //
-//      auto matrix = Dune::BCRSMatrix<double>();
-//      setupMatrixPattern(basis, matrix);
-//      assembleMassMatrix(basis, matrix);
-//      writeMatrixToMatlab(matrix, "massmatrix_2d_reduced2");
-//      assembleDirichletStiffnessMatrix(basis, matrix);
-//      writeMatrixToMatlab(matrix, "stiffmatrix_2d_reduced2");
+//      benchmarkBasis(basis, fGridFunction, 10, "2d_reduced_397");
 //#endif
 //    }
 

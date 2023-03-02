@@ -16,13 +16,121 @@
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
 #include <dune/functions/common/differentiablefunctionfromcallables.hh>
 
+#include <dune/functions/functionspacebases/boundarydofs.hh>
 //#include <dune/functions/functionspacebases/reducedcubichermitetrianglebasis.hh>
 #include <dune/functions/functionspacebases/test/cubichermitebasis.hh>
 #include <dune/functions/functionspacebases/test/interpolatetest.hh>
 #include <dune/common/timer.hh>
 
+#include <dune/istl/matrixindexset.hh>
+#include <dune/istl/bcrsmatrix.hh>
+#include <dune/istl/io.hh>
+
+
 
 using namespace Dune::Functions;
+
+
+
+template<class Geometry>
+auto quadratureRule(const Geometry& geometry, unsigned int order)
+{
+  constexpr auto dim = Geometry::mydimension;
+  const auto& rule = Dune::QuadratureRules<double, dim>::rule(geometry.type(), order);
+  return Dune::transformedRangeView(rule, [&](auto&& qp) {
+    return std::pair(qp.position(), qp.weight());
+  });
+}
+
+
+
+template<class LocalView>
+auto indices(const LocalView& localView)
+{
+  auto size = localView.size();
+  return Dune::transformedRangeView(Dune::range(size), [&](auto localIndex) {
+    return std::pair(localIndex, localView.index(localIndex));
+  });
+}
+
+
+
+template<class Basis, class K>
+void setupMatrixPattern(const Basis& basis, Dune::BCRSMatrix<K>& matrix) {
+  auto matrixIndexSet = Dune::MatrixIndexSet(basis.size(), basis.size());
+  auto localView = basis.localView();
+  for(const auto& e : Dune::elements(basis.gridView()))
+  {
+    localView.bind(e);
+    for (auto [local_i, i] : indices(localView))
+      for (auto [local_j, j] : indices(localView))
+        matrixIndexSet.add(i,j);
+  }
+  matrixIndexSet.exportIdx(matrix);
+  matrix = 0;
+}
+
+
+
+template<class Basis, class K>
+void assembleMassMatrix(const Basis& basis, Dune::BCRSMatrix<K>& matrix) {
+  using Range = typename Basis::LocalView::Tree::FiniteElement::Traits::LocalBasisType::Traits::RangeType;
+  std::vector<Range> values;
+  auto localView = basis.localView();
+  matrix = 0;
+  for(const auto& e : Dune::elements(basis.gridView()))
+  {
+    localView.bind(e);
+    auto geometry = e.geometry();
+    const auto& localBasis = localView.tree().finiteElement().localBasis();
+    auto order = 2*localBasis.order();
+    for(auto [position, weight] : quadratureRule(geometry, order))
+    {
+      localBasis.evaluateFunction(position, values);
+      auto integrationElement = geometry.integrationElement(position);
+      for (auto [local_i, i] : indices(localView))
+        for (auto [local_j, j] : indices(localView))
+          matrix[i][j] += values[local_i] * values[local_j] * integrationElement * weight;
+    }
+  }
+}
+
+
+
+template<class Basis, class K>
+void assembleDirichletStiffnessMatrix(const Basis& basis, Dune::BCRSMatrix<K>& matrix) {
+  using Jacobian = typename Basis::LocalView::Tree::FiniteElement::Traits::LocalBasisType::Traits::JacobianType;
+  std::vector<Jacobian> jacobians;
+  auto localView = basis.localView();
+  matrix = 0;
+  for(const auto& e : Dune::elements(basis.gridView()))
+  {
+    localView.bind(e);
+    auto geometry = e.geometry();
+    const auto& localBasis = localView.tree().finiteElement().localBasis();
+    auto order = 2*localBasis.order();
+    for(auto [position, weight] : quadratureRule(geometry, order))
+    {
+      localBasis.evaluateJacobian(position, jacobians);
+      auto integrationElement = geometry.integrationElement(position);
+      auto jacobianInverse = geometry.jacobianInverse(position);
+      for (auto [local_i, i] : indices(localView))
+        for (auto [local_j, j] : indices(localView))
+          matrix[i][j] += (jacobians[local_i] * jacobianInverse)[0] * (jacobians[local_j] * jacobianInverse)[0] * integrationElement * weight;
+    }
+  }
+  auto isBoundary = std::vector<bool>(basis.size(), false);
+  Dune::Functions::forEachBoundaryDOF(basis, [&] (auto&& index) {
+    isBoundary[index] = true;
+  });
+  for(auto&& [m_i, i] : Dune::sparseRange(matrix))
+  {
+    if (isBoundary[i])
+      for(auto&& [m_ij, j] : Dune::sparseRange(m_i))
+        if (isBoundary[j])
+          m_ij = (i==j);
+  }
+}
 
 
 int main (int argc, char* argv[])
@@ -67,6 +175,13 @@ int main (int argc, char* argv[])
           Dune::Functions::interpolate(basis, x, fGridFunction);
       }
       std::cout << "Time spend on doing 100 self interpolations in 1d: " << timer.elapsed() << std::endl;
+
+      auto matrix = Dune::BCRSMatrix<double>();
+      setupMatrixPattern(basis, matrix);
+      assembleMassMatrix(basis, matrix);
+      writeMatrixToMatlab(matrix, "massmatrix_1d");
+      assembleDirichletStiffnessMatrix(basis, matrix);
+      writeMatrixToMatlab(matrix, "stiffmatrix_1d");
 #endif
     }
   }
@@ -109,7 +224,7 @@ int main (int argc, char* argv[])
       Dune::Functions::interpolate(basis, coefficients, ff);
       suite.subTest(checkInterpolateConsistency<Range>(basis, coefficients));
 
-      #if NDEBUG
+#if NDEBUG
       auto fGridFunction = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis, coefficients);
       auto x = std::vector<double>();
       auto timer = Dune::Timer();
@@ -118,7 +233,14 @@ int main (int argc, char* argv[])
           Dune::Functions::interpolate(basis, x, fGridFunction);
       }
       std::cout << "Time spend on doing 10 self interpolations in 2d: " << timer.elapsed() << std::endl;
-      #endif
+
+      auto matrix = Dune::BCRSMatrix<double>();
+      setupMatrixPattern(basis, matrix);
+      assembleMassMatrix(basis, matrix);
+      writeMatrixToMatlab(matrix, "massmatrix_2d");
+      assembleDirichletStiffnessMatrix(basis, matrix);
+      writeMatrixToMatlab(matrix, "stiffmatrix_2d");
+#endif
     }
 
     {
@@ -130,7 +252,7 @@ int main (int argc, char* argv[])
       Dune::Functions::interpolate(basis, coefficients, ff);
       suite.subTest(checkInterpolateConsistency<Range>(basis, coefficients));
 
-      #if NDEBUG
+#if NDEBUG
       auto fGridFunction = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis, coefficients);
       auto x = std::vector<double>();
       auto timer = Dune::Timer();
@@ -139,18 +261,25 @@ int main (int argc, char* argv[])
           Dune::Functions::interpolate(basis, x, fGridFunction);
       }
       std::cout << "Time spend on doing 10 self interpolations in 2d: " << timer.elapsed() << std::endl;
-      #endif
+
+      auto matrix = Dune::BCRSMatrix<double>();
+      setupMatrixPattern(basis, matrix);
+      assembleMassMatrix(basis, matrix);
+      writeMatrixToMatlab(matrix, "massmatrix_2d_reduced");
+      assembleDirichletStiffnessMatrix(basis, matrix);
+      writeMatrixToMatlab(matrix, "stiffmatrix_2d_reduced");
+#endif
     }
 
 //    {
 //      auto basis = makeBasis(grid.leafGridView(), reducedCubicHermiteTriangle());
 //      suite.subTest(checkBasis(basis, EnableContinuityCheck(), EnableVertexJacobianContinuityCheck()));
-
+//
 //      auto coefficients = std::vector<double>();
 //      Dune::Functions::interpolate(basis, coefficients, ff);
 //      suite.subTest(checkInterpolateConsistency<Range>(basis, coefficients));
-
-//      #if NDEBUG
+//
+//#if NDEBUG
 //      auto fGridFunction = Dune::Functions::makeDiscreteGlobalBasisFunction<Range>(basis, coefficients);
 //      auto x = std::vector<double>();
 //      auto timer = Dune::Timer();
@@ -159,7 +288,14 @@ int main (int argc, char* argv[])
 //          Dune::Functions::interpolate(basis, x, fGridFunction);
 //      }
 //      std::cout << "Time spend on doing 10 self interpolations in 2d: " << timer.elapsed() << std::endl;
-//      #endif
+//
+//      auto matrix = Dune::BCRSMatrix<double>();
+//      setupMatrixPattern(basis, matrix);
+//      assembleMassMatrix(basis, matrix);
+//      writeMatrixToMatlab(matrix, "massmatrix_2d_reduced2");
+//      assembleDirichletStiffnessMatrix(basis, matrix);
+//      writeMatrixToMatlab(matrix, "stiffmatrix_2d_reduced2");
+//#endif
 //    }
 
   }

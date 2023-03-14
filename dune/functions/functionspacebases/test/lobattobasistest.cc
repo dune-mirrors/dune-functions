@@ -172,11 +172,11 @@ int main (int argc, char* argv[])
   Dune::MPIHelper::instance(argc, argv);
 
   Dune::TestSuite testSuite;
-  // test<1>(testSuite);
-  // test<2>(testSuite);
-  // test<3>(testSuite);
+  test<1>(testSuite);
+  test<2>(testSuite);
+  test<3>(testSuite);
 
-  // test_quad(testSuite);
+  test_quad(testSuite);
   test_tri(testSuite);
 
   return testSuite.exit();

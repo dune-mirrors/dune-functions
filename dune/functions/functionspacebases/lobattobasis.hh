@@ -116,7 +116,10 @@ public:
 
   void debug () const
   {
-    std::cout << "orders = " << orders_ << std::endl;
+    std::cout << "orders = {" << std::endl;
+    for (auto&& o : orders_)
+      std::cout << "  " << o.first << " => " << o.second << std::endl;
+    std::cout << "}" << std::endl;
 
     std::cout << "offsets = {" << std::endl;
     for (auto&& ts : offsets_)
@@ -276,9 +279,6 @@ public:
       finiteElement_->bind(e);
     else
       Dune::Impl::visitIf([&](auto& lfe) { lfe.bind(e); }, finiteElement_->variant());
-
-    // std::cout << "element " << indexSet_->index(e) << std::endl;
-    // orientation.debug();
 
     this->setSize(finiteElement_->size());
   }

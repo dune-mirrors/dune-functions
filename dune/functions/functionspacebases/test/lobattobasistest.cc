@@ -3,6 +3,7 @@
 #include <config.h>
 
 #include <iostream>
+#include <random>
 
 #include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
@@ -67,6 +68,54 @@ void printGridView (GridView const& gridView)
   }
   std::cout << "}" << std::endl;
 }
+
+template <class Grid>
+struct PerturbedGrid
+{
+  using ctype = typename Grid::ctype ;
+  static constexpr int dimension = Grid::dimension;
+  static constexpr int dimensionworld = Grid::dimensionworld;
+};
+
+template <class Grid>
+class Dune::GridFactory<PerturbedGrid<Grid>>
+    : public GridFactory<Grid>
+{
+  using Super = GridFactory<Grid>;
+  static constexpr int dim = Grid::dimension;
+  static constexpr int dow = Grid::dimensionworld;
+  using ctype = typename Grid::ctype;
+
+public:
+  template <class... Args>
+  explicit GridFactory (Args&&... args)
+    : Super(std::forward<Args>(args)...)
+    , rd_()
+    , g_(rd_())
+  {}
+
+  void insertElement(const Dune::GeometryType& type,
+                     const std::vector<unsigned int>& vertices) override
+  {
+    std::vector<unsigned int> new_vertices(vertices);
+    std::shuffle(new_vertices.begin(), new_vertices.end(), g_);
+    Super::insertElement(type,new_vertices);
+  }
+  using Super::insertElement;
+
+  void insertBoundarySegment(const std::vector<unsigned int>& vertices)
+  {
+    std::vector<unsigned int> new_vertices(vertices);
+    std::shuffle(new_vertices.begin(), new_vertices.end(), g_);
+    Super::insertBoundarySegment(new_vertices);
+  }
+  using Super::insertBoundarySegment;
+
+private:
+  std::random_device rd_;
+  std::mt19937 g_;
+};
+
 
 
 template<int dim>
@@ -161,7 +210,47 @@ void test_tri (Dune::TestSuite& testSuite)
 
   using namespace Dune::Functions::BasisFactory;
 
-  for (unsigned int p = 3; p < 4; ++p) {
+  for (unsigned int p = 3; p < 6; ++p) {
+    auto basis = makeBasis(gridView, lobatto(p));
+    testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
+  }
+}
+
+void test_tet (Dune::TestSuite& testSuite)
+{
+  std::cout << "test_tet()" << std::endl;
+  const int dim = 3;
+  using Grid = Dune::UGGrid<dim>;
+
+  Dune::GridFactory<PerturbedGrid<Grid>> factory;
+  Dune::StructuredGridFactory<PerturbedGrid<Grid>>::createSimplexGrid(factory,{0.0,0.0,0.0},{1.0,1.0,1.0},{3u,3u,3u});
+
+  auto gridPtr = factory.createGrid();
+  auto gridView = gridPtr->leafGridView();
+
+  using namespace Dune::Functions::BasisFactory;
+
+  for (unsigned int p = 1; p < 5; ++p) {
+    auto basis = makeBasis(gridView, lobatto(p));
+    testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
+  }
+}
+
+void test_hex (Dune::TestSuite& testSuite)
+{
+  std::cout << "test_hex()" << std::endl;
+  const int dim = 3;
+  using Grid = Dune::UGGrid<dim>;
+
+  Dune::GridFactory<PerturbedGrid<Grid>> factory;
+  Dune::StructuredGridFactory<PerturbedGrid<Grid>>::createCubeGrid(factory,{0.0,0.0,0.0},{1.0,1.0,1.0},{3u,3u,3u});
+
+  auto gridPtr = factory.createGrid();
+  auto gridView = gridPtr->leafGridView();
+
+  using namespace Dune::Functions::BasisFactory;
+
+  for (unsigned int p = 4; p < 5; ++p) {
     auto basis = makeBasis(gridView, lobatto(p));
     testSuite.subTest(checkBasis(basis, EnableContinuityCheck()));
   }
@@ -176,8 +265,10 @@ int main (int argc, char* argv[])
   test<2>(testSuite);
   test<3>(testSuite);
 
-  test_quad(testSuite);
   test_tri(testSuite);
+  test_quad(testSuite);
+  test_tet(testSuite);
+  test_hex(testSuite);
 
   return testSuite.exit();
 }

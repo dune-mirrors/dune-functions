@@ -18,15 +18,16 @@
 
 /**
  * \file indextree.hh
- * \brief Lightweight representation of (hierarchic) size and blocking structure
- * The index-tree can be used to define types for data-structures, like vectors
+ * \brief Lightweight representation of (hierarchical) size and block structure.
+ *
+ * The index-tree can be used to define types for data-structures, such as vectors
  * or matrices, that can be accessed by the multi-indices provided by a basis.
  *
- * An index-tree encodes the dimensions of the index-space in a hierarchic basis.
- * This means especially, for each component of a multi-index it encodes the
+ * An index-tree encodes the dimensions of the index-space in a hierarchical basis.
+ * In particular, for each component of a multi-index, it encodes the
  * possible range of indices.
  *
- * The structure of an index-tree is as follows
+ * The structure of an index-tree is as follows:
  * \code
   struct IndexTree
   {
@@ -40,15 +41,15 @@
   };
  * \endcode
  *
- * The property `isUniform` specifies that all nodes of that tree are identical,
- * especially have the same size, the same properties and the same children.
+ * The `isUniform` property specifies that all nodes of this tree are identical,
+ * specifically that they have the same size, the same properties, and the same children.
  *
- * The property `isTypeUniform` is a bet less, it specifies that only the type
- * of all nodes of that tree are identical. This means that all static information
- * of the children are identical, e.g., the static size.
+ * The `isTypeUniform` property is a bit less restrictive. It specifies that only the type
+ * of all nodes of this tree are identical. This means that all static information
+ * of the children is identical, e.g., the static size.
  *
- * With the `operator[]` the children can be accessed. Thereby, the `Index` type
- * is either an integral value or an `integral_constant` for non-uniform nodes.
+ * With the `operator[]` you can access the children. The `Index` type is either
+ * an integral value or an `integral_constant` for non-uniform nodes.
  *
  * Size is either a static property, or a runtime value.
  **/
@@ -324,7 +325,7 @@ namespace Functions {
         },
         [&](auto id) {
           assert((o+1) < treeSize && i >= outerOffsetSize);
-          return Hybrid::ifElse(lt_(incr_(o),treeSize),
+          return Hybrid::ifElse(lt_(incr_(o),treeSize), // (o+1) < treeSize
             [&](auto id_) {
               return getEntry(id_(id(tree)), minus_(i,outerOffsetSize), incr_(o), ims);
             },
@@ -347,7 +348,7 @@ namespace Functions {
         },
         [&](auto id) {
           assert(i >= treeSize && o < treeSize);
-          return Hybrid::ifElse(lt_(o,treeSize),
+          return Hybrid::ifElse(lt_(o,treeSize), // o < treeSize
             [&](auto id_) {
               return getEntry(id_(id(tree)), minus_(i,treeSize), incr_(o), ims);
             },

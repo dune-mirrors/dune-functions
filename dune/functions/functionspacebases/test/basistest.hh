@@ -25,12 +25,20 @@
 
 struct CheckBasisFlag {};
 struct AllowZeroBasisFunctions {};
+  struct CheckBasisFlag {};
+  template<int i = 1>
+  struct CheckLocalFiniteElementFlag
+  {
+    static constexpr int diffOrder = i;
+  };
 
 template<class T, class... S>
 struct IsContained : public std::disjunction<std::is_same<T,S>...>
 {};
 
 
+  // template <template<int> class T, class... S, int... indices >
+  // struct IsContained : public std::disjunction<IsContained<T<indices>..., S...>> {};
 
 /*
  * Get string identifier of element
@@ -243,8 +251,18 @@ Dune::TestSuite checkNonZeroShapeFunctions(const LocalFiniteElement& fe, std::si
   return test;
 }
 
+  /**
+   * Check that finite Element returned by localView fullfilles properties of Local Finite Element
+   *  This is called by checkLocalView()
+   */
 
-
+  template <int diffOrder, class LocalFiniteElement, class Element>
+  Dune::TestSuite checkLocalFiniteElement(const LocalFiniteElement &fe, Element const &element)
+  {
+    Dune::TestSuite test("Local Finite Element Test");
+    test.check(testFE<diffOrder>(fe, element));
+    return test;
+  }
 /*
  * Check localView. This especially checks for
  * consistency of local indices and local size.
@@ -285,8 +303,29 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
   // Check that all basis functions are non-zero.
   if (not IsContained<AllowZeroBasisFunctions, Flags...>::value)
   {
-    Dune::TypeTree::forEachLeafNode(localView.tree(), [&](const auto& node, auto&& treePath) {
-      test.subTest(checkNonZeroShapeFunctions(node.finiteElement()));
+      Dune::TypeTree::forEachLeafNode(
+          localView.tree(), [&](const auto &node, auto &&treePath)
+          { test.subTest(checkNonZeroShapeFunctions(node.finiteElement())); });
+    }
+    if constexpr(IsContained<CheckLocalFiniteElementFlag<0>, Flags...>::value)
+    {
+      auto e = localView.element();
+      Dune::TypeTree::forEachLeafNode(
+          localView.tree(), [&](const auto &node, auto &&treePath)
+          { test.subTest(checkLocalFiniteElement<0>(node.finiteElement(), e)); });
+    } else if constexpr (IsContained<CheckLocalFiniteElementFlag<1>,
+                                Flags...>::value) {
+        auto e = localView.element();
+        Dune::TypeTree::forEachLeafNode(
+            localView.tree(), [&](const auto &node, auto &&treePath) {
+              test.subTest(checkLocalFiniteElement<1>(node.finiteElement(), e));
+            });
+    } else if constexpr (IsContained<CheckLocalFiniteElementFlag<2>,
+                                     Flags...>::value) {
+        auto e = localView.element();
+        Dune::TypeTree::forEachLeafNode(
+            localView.tree(), [&](const auto &node, auto &&treePath) {
+              test.subTest(checkLocalFiniteElement<2>(node.finiteElement(), e));
     });
   }
 
@@ -363,7 +402,7 @@ struct EnableNormalContinuityCheck : public EnableContinuityCheck
 {
   auto localContinuityCheck() const {
     auto normalJump = [](auto&&jump, auto&& intersection, auto&& x) -> double {
-      return jump * intersection.unitOuterNormal(x);
+      return (jump * intersection.unitOuterNormal(x)).two_norm();
     };
     return localJumpContinuityCheck(normalJump, order_, tol_);
   }
@@ -429,9 +468,61 @@ struct EnableCenterContinuityCheck : public EnableContinuityCheck
       return jump.infinity_norm();
     };
     return localJumpCenterContinuityCheck(jumpNorm, tol_);
-  }
-};
+  // Flag to enable a vertex continuity check for checking continuity at the vertices
+  // of an intersection within checkBasisContinuity().
+  //
+  // For each inside basis function this will compute the jump against
+  // zero or the corresponding inside basis function. The latter is then
+  // checked for being (up to a tolerance) zero in the vertices of mass
+  // of the intersection.
 
+  struct EnableVertexContinuityCheck: public EnableContinuityCheck
+  {
+    template <class JumpEvaluator>
+    auto localJumpVertexContinuityCheck(const JumpEvaluator &jumpEvaluator, double tol) const
+    {
+      return [=](const auto &intersection, const auto &treePath, const auto &insideNode,
+                 const auto &outsideNode, const auto &insideToOutside)
+      {
+        using Node = std::decay_t<decltype(insideNode)>;
+        using Range = typename Node::FiniteElement::Traits::LocalBasisType::Traits::RangeType;
+
+        std::vector<int> isContinuous(insideNode.size(), true);
+        std::vector<Range> insideValues;
+        std::vector<Range> outsideValues;
+
+        std::vector<typename std::decay_t<decltype(intersection)>::LocalCoordinate> vertices;
+
+        for (int i = 0; i < intersection.geometry().corners(); ++i)
+          vertices.push_back(intersection.geometry().local(intersection.geometry().corner(i)));
+
+        for (auto const &vertex : vertices)
+        {
+
+          insideNode.finiteElement().localBasis().evaluateFunction(
+              intersection.geometryInInside().global(vertex), insideValues);
+          outsideNode.finiteElement().localBasis().evaluateFunction(
+              intersection.geometryInOutside().global(vertex), outsideValues);
+          // Check jump against outside basis function or zero.
+          for (std::size_t i = 0; i < insideNode.size(); ++i)
+          {
+            auto jump = insideValues[i];
+            if (insideToOutside[i].has_value())
+              jump -= outsideValues[insideToOutside[i].value()];
+            isContinuous[i] = isContinuous[i] and (jumpEvaluator(jump, intersection, vertex) < tol);
+          }
+        }
+        return isContinuous;
+      };
+    }
+
+    auto localContinuityCheck() const
+    {
+      auto jumpNorm = [](auto &&jump, auto &&intersection, auto &&x) -> double
+      { return jump.infinity_norm(); };
+      return localJumpVertexContinuityCheck(jumpNorm, tol_);
+    }
+  };
 
 /*
  * Check if basis functions are continuous across faces.
@@ -531,6 +622,8 @@ Dune::TestSuite checkConstBasis(const Basis& basis, Flags... flags)
     using Flag = std::decay_t<decltype(flag)>;
     if constexpr (std::is_base_of_v<EnableContinuityCheck, Flag>)
       test.subTest(checkBasisContinuity(basis, flag.localContinuityCheck()));
+          else if constexpr (std::is_base_of_v<EnableDifferentiabilityCheck, Flag>)
+            test.subTest(checkBasisDifferentiability(basis, flag));
   });
 
   return test;

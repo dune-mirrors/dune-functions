@@ -16,7 +16,7 @@
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/istl/bcrsmatrix.hh>
 
-#include <dune/c1elements/tensormatvec.hpp>
+#include <dune/localfunctions/tensormatvec.hh>
 #include <dune/functions/functionspacebases/lineartransformedlocalfiniteelement.hh>
 
 namespace Dune {

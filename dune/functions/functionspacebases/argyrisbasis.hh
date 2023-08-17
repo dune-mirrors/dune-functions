@@ -20,7 +20,7 @@
 #include <dune/functions/functionspacebases/morleybasis.hh>
 #include <dune/functions/functionspacebases/vectorfloatcmp.hh>
 
-#include <dune/c1elements/tensormatvec.hpp>
+#include <dune/localfunctions/tensormatvec.hh>
 
 namespace Dune{
   namespace Functions{

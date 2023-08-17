@@ -18,7 +18,7 @@
 #include <dune/functions/functionspacebases/lineartransformedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/vectorfloatcmp.hh>
 
-#include <dune/c1elements/tensormatvec.hpp>
+#include <dune/localfunctions/tensormatvec.hh>
 
 /**
  * \brief Implementation of the conforming Arnold-Winther element

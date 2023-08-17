@@ -22,23 +22,20 @@
 #include <dune/geometry/quadraturerules.hh>
 
 #include <dune/functions/functionspacebases/concepts.hh>
+#include <dune/functions/functionspacebases/test/testboundlocalfe.hh>
+#include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
 
 struct CheckBasisFlag {};
 struct AllowZeroBasisFunctions {};
-  struct CheckBasisFlag {};
-  template<int i = 1>
-  struct CheckLocalFiniteElementFlag
-  {
-    static constexpr int diffOrder = i;
-  };
+template<int i = 1>
+struct CheckLocalFiniteElementFlag
+{
+  static constexpr int diffOrder = i;
+};
 
 template<class T, class... S>
 struct IsContained : public std::disjunction<std::is_same<T,S>...>
 {};
-
-
-  // template <template<int> class T, class... S, int... indices >
-  // struct IsContained : public std::disjunction<IsContained<T<indices>..., S...>> {};
 
 /*
  * Get string identifier of element
@@ -333,6 +330,7 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
 }
 
 
+
 // Flag to enable a local continuity check for checking strong
 // continuity across an intersection within checkBasisContinuity().
 //
@@ -400,9 +398,10 @@ struct EnableContinuityCheck
 // checked for being (up to a tolerance) zero on a set of quadrature points.
 struct EnableNormalContinuityCheck : public EnableContinuityCheck
 {
+  // norm is defined in testboundlocalfe.hh, corresponds to abs, two_norm or frobenius_norm
   auto localContinuityCheck() const {
     auto normalJump = [](auto&&jump, auto&& intersection, auto&& x) -> double {
-      return (jump * intersection.unitOuterNormal(x)).two_norm();
+      return norm(jump * intersection.unitOuterNormal(x));
     };
     return localJumpContinuityCheck(normalJump, order_, tol_);
   }
@@ -468,6 +467,9 @@ struct EnableCenterContinuityCheck : public EnableContinuityCheck
       return jump.infinity_norm();
     };
     return localJumpCenterContinuityCheck(jumpNorm, tol_);
+  }
+};
+
   // Flag to enable a vertex continuity check for checking continuity at the vertices
   // of an intersection within checkBasisContinuity().
   //

@@ -35,6 +35,21 @@ double TOL = 1e-9;
 // precision -- so we have to be a little bit more tolerant here.
 double jacobianTOL = 1e-5; // sqrt(TOL)
 
+template<class K, int d>
+auto norm(Dune::FieldVector<K, d> v) -> typename Dune::FieldTraits<Dune::FieldVector<K, d>>::real_type
+{
+  return v.two_norm();
+}
+
+template<class K, int n, int m>
+auto norm(Dune::FieldMatrix<K, n, m> mat) -> typename Dune::FieldTraits<Dune::FieldMatrix<K, n, m>>::real_type
+{
+  return mat.frobenius_norm();
+}
+
+template<class K>
+auto norm(K scalar) {return std::abs(scalar);}
+
 // Shapefunctions need to have a derivative
 template <class LFE, class Element>
 class ShapeFunctionDerivativeAsCallable;
@@ -206,20 +221,7 @@ private:
   Range value;
 };
 
-template<class K, int d>
-auto norm(Dune::FieldVector<K, d> v) -> typename Dune::FieldTraits<Dune::FieldVector<K, d>>::real_type
-{
-  return v.two_norm();
-}
 
-template<class K, int n, int m>
-auto norm(Dune::FieldMatrix<K, n, m> mat) -> typename Dune::FieldTraits<Dune::FieldMatrix<K, n, m>>::real_type
-{
-  return mat.frobenius_norm();
-}
-
-template<class K>
-auto norm(K scalar) {return std::abs(scalar);}
 
 template<class K, int n>
 auto getDerivativeComponent(Dune::FieldVector<K, n> v, std::size_t i)->K{return v[i];}

@@ -14,9 +14,8 @@
 #include <dune/functions/functionspacebases/argyrisbasis.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
-#include <dune/functions/functionspacebases/test/c1_basistest.hh>
+#include <dune/functions/functionspacebases/test/basistest.hh>
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
-#include <dune/functions/utility/printbasis.hh>
 #include <dune/grid/albertagrid.hh>
 #include <dune/grid/io/file/gmshreader.hh>
 #include <dune/grid/io/file/vtk/subsamplingvtkwriter.hh>
@@ -143,126 +142,66 @@ int main(int argc, char *argv[])
 
   using namespace Dune::Functions::BasisFactory;
   using Grid = UGGrid<2>;
-  if (mpiSize == 1)
+  // Test with parallelogram
   {
-    // Test with parallelogram
-    {
-      auto gridFactory = GridFactory<Grid>();
-      gridFactory.insertVertex({0., 0.});
-      gridFactory.insertVertex({1., 0.});
-      gridFactory.insertVertex({1.2, 1.});
-      gridFactory.insertVertex({0.2, 1.});
+    auto gridFactory = GridFactory<Grid>();
+    gridFactory.insertVertex({0., 0.});
+    gridFactory.insertVertex({1., 0.});
+    gridFactory.insertVertex({1.2, 1.});
+    gridFactory.insertVertex({0.2, 1.});
 
-      gridFactory.insertElement(GeometryTypes::simplex(2), {0, 1, 2});
-      gridFactory.insertElement(GeometryTypes::simplex(2), {0, 2, 3});
+    gridFactory.insertElement(GeometryTypes::simplex(2), {0, 1, 2});
+    gridFactory.insertElement(GeometryTypes::simplex(2), {0, 2, 3});
 
-      auto grid = gridFactory.createGrid();
-      auto gridView = grid->leafGridView();
-      std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
-                << " facettes and " << gridView.size(2) << " vertices" << std::endl;
-      using GridView = decltype(gridView);
-      {
-        using namespace Dune::Functions::BasisFactory;
-        auto basis = makeBasis(gridView, argyris());
-        std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
-
-        test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck{10},
-                                CheckLocalFiniteElementFlag()));
-      }
-    }
-    // Test with square
-    {
-      auto grid = StructuredGridFactory<Grid>::createSimplexGrid({0., 0.}, {1., 1.}, {{3, 3}});
-      auto gridView = grid->leafGridView();
-      std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
-                << " facettes and " << gridView.size(2) << " vertices" << std::endl;
-      // using GridView = decltype(gridView);
-      {
-        using namespace Dune::Functions::BasisFactory;
-        auto basis = makeBasis(gridView, argyris());
-        std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
-
-        test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck{10},
-                                CheckLocalFiniteElementFlag()));
-      }
-    }
-    // Test with perturbed grid
-    {
-      auto grid = createPerturbedGrid<2>(4, 0, 0.2, true);
-
-      auto gridView = grid->leafGridView();
-      std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
-                << " facettes and " << gridView.size(2) << " vertices" << std::endl;
-      using GridView = decltype(gridView);
-      {
-        using namespace Dune::Functions::BasisFactory;
-        auto basis = makeBasis(gridView, argyris());
-        std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
-
-        test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck{10},
-                                CheckLocalFiniteElementFlag()));
-      }
-    }
-  }
-  else
-  // Test parallel setup
-  {
-    Dune::GmshReader<Grid> reader;
-    auto grid = reader.read("./dune/functions/functionspacebases/test/testmesh.msh");
+    auto grid = gridFactory.createGrid();
     auto gridView = grid->leafGridView();
-
-    std::cout << "Prior loadBalance():" << std::endl
-              << "Grid on Process number " << mpiHelper.rank() << " has " << gridView.size(0)
-              << " elementes and " << gridView.size(1) << " facettes and " << gridView.size(2)
-              << " vertices" << std::endl;
-
+    std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
+              << " facettes and " << gridView.size(2) << " vertices" << std::endl;
     using GridView = decltype(gridView);
-
-    std::vector<unsigned int> part
-        = ParMetisGridPartitioner<GridView>::partition(gridView, mpiHelper);
-
-    bool hasChanged = grid->loadBalance(part, 0);
-    // grid->globalRefine(2);
-    gridView = grid->leafGridView();
-
-    constexpr bool writeGrid = false;
-    if constexpr (writeGrid)
     {
-      auto vtkWriter = Dune::VTKWriter<GridView>(gridView);
-      auto f = Dune::Functions::makeDifferentiableFunctionFromCallables(
-          Dune::Functions::SignatureTag<Dune::FieldVector<double, 1>(
-              Dune::FieldVector<double, 2>)>(),
-          [&](auto const &x) { return rank; });
-      vtkWriter.addCellData(f, VTK::FieldInfo("rank", VTK::FieldInfo::Type::scalar, 1));
-      std::cout << "Writing: "
-                << vtkWriter.pwrite("parallelMesh", "/home/maik/programms/Dune/C1Elements", "")
-                << std::endl;
+      using namespace Dune::Functions::BasisFactory;
+      auto basis = makeBasis(gridView, argyris());
+      std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
+
+      test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck{10},
+                              CheckLocalFiniteElementFlag()));
     }
-    // run this test only if there was a change aka there the grid is actually distributed
-    if (hasChanged)
-    {
-      gridView = grid->leafGridView();
-
-      std::cout << "After loadBalance(): " << std::endl
-                << "Grid on Process number " << mpiHelper.rank() << " has " << gridView.size(0)
-                << " elementes and " << gridView.size(1) << " facettes and " << gridView.size(2)
-                << " vertices" << std::endl;
-      {
-        using namespace Dune::Functions::BasisFactory;
-        auto basis = makeBasis(gridView, argyris());
-        // auto basis = makeBasis(gridView, lagrange(1));
-
-        std::cout << "Basis has on Process number " << mpiHelper.rank() << " has " << basis.size()
-                  << " Dofs" << std::endl;
-        if constexpr (writeGrid)
-        {
-          printLeafBasis(basis, mpiHelper, "distributedBasis");
-        }
-        test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck{10},
-                                CheckLocalFiniteElementFlag()));
-      }
-    } // end If grid.loadBalance
   }
+  // Test with square
+  {
+    auto grid = StructuredGridFactory<Grid>::createSimplexGrid({0., 0.}, {1., 1.}, {{3, 3}});
+    auto gridView = grid->leafGridView();
+    std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
+              << " facettes and " << gridView.size(2) << " vertices" << std::endl;
+    // using GridView = decltype(gridView);
+    {
+      using namespace Dune::Functions::BasisFactory;
+      auto basis = makeBasis(gridView, argyris());
+      std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
+
+      test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck{10},
+                              CheckLocalFiniteElementFlag()));
+    }
+  }
+  // Test with perturbed grid
+  {
+    auto grid = createPerturbedGrid<2>(4, 0, 0.2, true);
+
+    auto gridView = grid->leafGridView();
+    std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
+              << " facettes and " << gridView.size(2) << " vertices" << std::endl;
+    using GridView = decltype(gridView);
+    {
+      using namespace Dune::Functions::BasisFactory;
+      auto basis = makeBasis(gridView, argyris());
+      std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
+
+      test.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck{10},
+                              CheckLocalFiniteElementFlag()));
+    }
+  }
+
+  // TODO Test parallel setup
 
   return test.exit();
 }

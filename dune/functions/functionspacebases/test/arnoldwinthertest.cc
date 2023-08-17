@@ -15,9 +15,8 @@
 #include <dune/functions/functionspacebases/arnoldwintherbasis.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
-#include <dune/functions/functionspacebases/test/c1_basistest.hh>
+#include <dune/functions/functionspacebases/test/basistest.hh>
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
-#include <dune/functions/utility/printbasis.hh>
 #include <dune/grid/albertagrid.hh>
 #include <dune/grid/io/file/gmshreader.hh>
 #include <dune/grid/io/file/printgrid.hh>
@@ -160,7 +159,6 @@ int main(int argc, char *argv[]) {
 
       test.subTest(
           checkBasis(basis, EnableNormalContinuityCheck(), CheckLocalFiniteElementFlag<0>()));
-      printLeafBasis(basis, mpiHelper, "AW");
     }
   }
   // Test with parallelogram
@@ -194,8 +192,6 @@ int main(int argc, char *argv[]) {
     auto gridView = grid->leafGridView();
     std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
               << " facettes and " << gridView.size(2) << " vertices" << std::endl;
-    printGrid(*grid, mpiHelper, "testGrid");
-    // using GridView = decltype(gridView);
     {
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());

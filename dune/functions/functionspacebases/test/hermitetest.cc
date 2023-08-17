@@ -11,7 +11,7 @@
 #include <dune/grid/uggrid.hh>
 
 #include <dune/functions/functionspacebases/hermitebasis.hh>
-#include <dune/functions/functionspacebases/test/c1_basistest.hh>
+#include <dune/functions/functionspacebases/test/basistest.hh>
 #include <dune/grid/onedgrid.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
 #include <dune/grid/albertagrid.hh>

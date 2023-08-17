@@ -6,7 +6,7 @@
 #include <dune/common/exceptions.hh>
 #include <type_traits>
 
-#include <dune/c1elements/tensormatvec.hpp>
+#include <dune/localfunctions/tensormatvec.hh>
 #include <dune/functions/functionspacebases/lineartransformedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/vectorfloatcmp.hh>

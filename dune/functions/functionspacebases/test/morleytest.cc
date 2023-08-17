@@ -11,7 +11,7 @@
 
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/morleybasis.hh>
-#include <dune/functions/functionspacebases/test/c1_basistest.hh>
+#include <dune/functions/functionspacebases/test/basistest.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
 
 using namespace Dune;

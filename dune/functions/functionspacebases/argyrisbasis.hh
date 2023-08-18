@@ -706,7 +706,7 @@ namespace Dune{
               out[i * 6 + 1] = matrixToVector(derivativeValue)[0];
               out[i * 6 + 2] = matrixToVector(derivativeValue)[1];
               out[i * 6 + 3]
-                  = matrixToVector(hessianValue[0])[0]; // matrixToVector probably unneccessary here
+                  = matrixToVector(hessianValue[0])[0]; // matrixToVector probably unnecessary here
               out[i * 6 + 4] = matrixToVector(hessianValue[0])[1];
               out[i * 6 + 5] = matrixToVector(hessianValue[1])[1];
             }

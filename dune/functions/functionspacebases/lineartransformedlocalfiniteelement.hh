@@ -19,7 +19,7 @@ namespace Impl {
  * Focus is on linear transformations of the basisfunctions, as is the case for various Elements
  * like Hermite, Morley and Argyris.
  * The Transformation is objectified to implemenent caching of the transformation.
- * This leads to some changes in the interface in constrast to range-space transformations like
+ * This leads to some changes in the interface in contrast to range-space transformations like
  * Piola-Transformations.
  * The main contrast is, that the transformations here take the concrete structure of finite
  * elements in account and are thus specific to each finite element, unlike the Piola-
@@ -41,12 +41,12 @@ namespace Impl {
  *        2. non intepolation equivalent FEs:
  *          We cannot use the reference DOFs to interpolate into the physical FE space.
  *          Hence the LinearTransformators need to export an inner class
- *          GlobalValuedInterpolation, which fullfils the LocalInterpolation interface and fill
+ *          GlobalValuedInterpolation, which fulfils the LocalInterpolation interface and fill
  *          the coefficient vector for the transformed FE.
  *      - Exports type ElementInformation, that stores elementspecific data, like orientation
  *        or direction of vertices. Should implement the methods isDirichlet(LocalKey)/
  *        isClamped(LocalKey) which return a boolean, which true iff the localKey is intended
- *        to be used to intepolate Dirichlet/Clamped BC.
+ *        to be used to interpolate Dirichlet/Clamped BC.
  *    LinearTransformedLocalBasis:
  *      - holds a pointer to the reference basis
  *      - higher derivatives are implemented, possible throwing errors if reference basis does
@@ -264,7 +264,7 @@ class LinearTransformedLocalCoefficients : public LocalCoefficients {
     }
 
     /**
-     * \brief Wheter or not to use the ith dof when strongly incorporating Clamped Conditions. If
+     * \brief Whether or not to use the ith dof when strongly incorporating Clamped Conditions. If
      * the ElementInformation class does not implement a corresponding methods, this method will
      * always return true. Also note that this methods does not check whether this is actually a
      * boundary dof.

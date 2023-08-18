@@ -305,7 +305,7 @@ struct HermiteTransformator<1, true, R> {
         jacobianTransposed.mtv(Dune::FieldVector<R, 1>{values[i * 2 + 1][0][0]}, globalDerivative);
 
         // TODO Assumes Gradients are a container of FieldMatrix<F,1,1>. Make this viable for
-        // FieldVector<F,1> aswell
+        // FieldVector<F,1> as well
         values[i * 2 + 1][0][0] = globalDerivative[0];
       }
     }
@@ -459,7 +459,7 @@ class HermiteElementInformationMap<GV, 2, R> {
       std::get<1>(defaultInfo) = 0;
       std::vector<std::tuple<FieldMatrix<D, dim, dim>, std::bitset<2 * dim>>> directionPerVertex(
           indexSet.size(dim), defaultInfo);
-      // interate over intersections
+      // iterate over intersections
       for (const auto &element : elements(gv)) {
         for (const auto &intersection : intersections(gv, element)) {
           // fill vertex Data with linear independent tangentials
@@ -485,7 +485,7 @@ class HermiteElementInformationMap<GV, 2, R> {
         }
       }
 
-      // interate over vector and set the remaining direction to normals
+      // iterate over vector and set the remaining direction to normals
       for (auto &[dir, isSet] : directionPerVertex)
         if (isSet[0]) {
           if (isSet[1])
@@ -494,7 +494,7 @@ class HermiteElementInformationMap<GV, 2, R> {
           {
             dir[1] = Dune::FieldVector<D, dim>{-dir[0][1], dir[0][0]};
             isSet[1] = true;
-            isSet[dim + 1] = false; // unneccessary
+            isSet[dim + 1] = false;
           }
         }
       // do nothing if non was set
@@ -861,7 +861,7 @@ namespace BasisFactory {
  *
  * @tparam R RangeFieldType
  * @tparam useSpecialization whether to use the GlobalValuedLocalFiniteElement implementation
- * (faster) or LinearTransformedLocalFiniteElement implemenation (possilibily to strongly enforce
+ * (faster) or LinearTransformedLocalFiniteElement implementation (possilibily to strongly enforce
  * BC)
  * @param useTangentials whether to have directions of derivative DOFs on the boundary in tangential
  * and normal direction. Necessary for strong enforcement of BC. Ignored if \p useSpecialization is

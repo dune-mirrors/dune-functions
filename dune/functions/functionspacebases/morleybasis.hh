@@ -30,7 +30,7 @@ namespace Dune
       {
       public:
         /** \brief class holding the orientation of normal derivatives
-         * \tparam Element Element type for compability
+         * \tparam Element Element type
          */
         template <class Element>
         class ElementInformation

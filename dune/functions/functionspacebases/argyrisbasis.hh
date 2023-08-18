@@ -27,7 +27,7 @@ namespace Dune{
     namespace Impl{
       /** \brief Class implementing a transformation from pullbacks of reference basis functions to
        * global basisfunctions for Argyris elements. For more information, see
-       * c1element/dune/functions/functionspacebases/lineartransformedlocalfinitelement.hh.
+       * dune/functions/functionspacebases/lineartransformedlocalfinitelement.hh.
        * \tparam R RangeFieldType of the finite element
        */
       template <class R>
@@ -195,7 +195,7 @@ namespace Dune{
 
         ArgyrisTransformator(): mat_(21, 21, BCRSMatrix<R>::random) { setupMatrix(); }
         /**
-         * \brief Binding Method. This Method fills the Transformation matrix, including direction
+         * \brief Binding Method. This method fills the transformation matrix, including direction
          * of derivative dofs and orientation of normals
          *
          * \tparam Element Type of Element we are bound to
@@ -214,7 +214,7 @@ namespace Dune{
         }
 
         /**
-         * \brief Applies the transformation onto a vector. In constrast to the transformations used
+         * \brief Applies the transformation onto a vector. In contrast to the transformations used
          * by GlobalValuedLocalFiniteElement, this method can be called for shapevalues, Jacobians
          * and Hessians
          *
@@ -230,7 +230,7 @@ namespace Dune{
 
       private:
         void setupMatrix()
-        { // created with sympy, see argyrisTransformationMatrix.py in module directory
+        { // created with sympy, see argyrisTransformationMatrix.py in c1elements module directory
           mat_.setrowsize(0, 3);
           mat_.setrowsize(1, 4);
           mat_.setrowsize(2, 4);
@@ -432,7 +432,7 @@ namespace Dune{
             thetaDir[i][2][2] = dir[i][1][1] * dir[i][1][1];
           }
 
-          auto &[b_0, b_1, b_2] = b; // compability with sympy code below
+          auto &[b_0, b_1, b_2] = b; // compatibility with sympy code below
           auto &[dir_0, dir_1, dir_2] = dir;
           auto &[J_0, J_1, J_2] = jacobian;
           auto &[theta_0, theta_1, theta_2] = theta;
@@ -440,7 +440,7 @@ namespace Dune{
 
           std::array<Dune::FieldVector<R, 2>, 3> const &t = globalTangents;
 
-          // created with sympy, see argyrisTransformationMatrix.py in module directory
+          // created with sympy, see argyrisTransformationMatrix.py in c1elements module directory
           // note that J_i that is the transposed Jacobian, but theta_i is already incorporating
           // this and corresponds to the nontransposed Jacobian applied twice, same for direction
           // matrices
@@ -706,7 +706,7 @@ namespace Dune{
               out[i * 6 + 1] = matrixToVector(derivativeValue)[0];
               out[i * 6 + 2] = matrixToVector(derivativeValue)[1];
               out[i * 6 + 3]
-                  = matrixToVector(hessianValue[0])[0]; // matrixToVector probably unneccesary here
+                  = matrixToVector(hessianValue[0])[0]; // matrixToVector probably unneccessary here
               out[i * 6 + 4] = matrixToVector(hessianValue[0])[1];
               out[i * 6 + 5] = matrixToVector(hessianValue[1])[1];
             }
@@ -878,7 +878,7 @@ namespace Dune{
           // vector with directions and bools to indicate whether this dir was already set
           VertexDataVector directionPerVertex(indexSet.size(dim),
             {{{1., 0.}, {0., 1.}}, (unsigned long) 0, {}});
-          // interate over intersections
+          // iterate over intersections
           if (useTangentials_)
           {
             for (const auto &element : elements(gv))
@@ -951,7 +951,7 @@ namespace Dune{
               // TODO handle this case
               if (!linearIndependent(dir[0], dir[1], 1e-3))
               {
-                // Check wheter there are to similar tangentials
+                // Check whether there are to similar tangentials
                 DUNE_THROW(Dune::NotImplemented, "Almost Linear Dependent tangentials!");
               }
             }   // end for loop
@@ -1030,7 +1030,7 @@ namespace Dune{
         Dune::MultipleCodimMultipleGeomTypeMapper<GV> elementMapper_;
         std::vector<ElementInformation> elementInformation_;
         // Map that assigns a boundary point a direction (usually tangential)
-        // used to determine derivative directions at that point as tangetial and normal
+        // used to determine derivative directions at that point as tangential and normal
         std::function<GlobalCoordinate(GlobalCoordinate)> tangentialMap_;
         bool useTangentials_ = true;
 
@@ -1269,7 +1269,7 @@ namespace Dune{
        * \ingroup FunctionSpaceBasesImplementations
        *
        * \tparam Range Numbertype used for shape function values
-       *  \param useTangentials Whether to use the standart Argyris element with coordinate axis
+       *  \param useTangentials Whether to use the standard Argyris element with coordinate axis
        * oriented DOFs (false) or to orient the boundary DOFs tangential (and normal) to the
        * boundary
        *

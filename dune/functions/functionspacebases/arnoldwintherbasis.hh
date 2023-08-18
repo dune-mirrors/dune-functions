@@ -103,7 +103,7 @@ private:
   size_type end_;
 };
 
-//  TODO make this fullfill Dune interfaces
+//  TODO make this fulfill Dune interfaces
 // TODO make generic in matrix Types and sizes
 /**
  * \brief Block Diagonal Matrix with hardcoded dimensions that fit the Arnold
@@ -307,7 +307,7 @@ template <class R>
 class ArnoldWintherTransformator {
 public:
   /** \brief class holding the orientation of normal derivatives
-   * \tparam Element Element type for compability
+   * \tparam Element Element type for compatibility
    */
   template <class Element>
   class ElementInformation {

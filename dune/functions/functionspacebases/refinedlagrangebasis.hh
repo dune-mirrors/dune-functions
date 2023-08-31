@@ -11,6 +11,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/flatmultiindex.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 namespace Dune {
@@ -125,6 +126,12 @@ public:
   size_type dimension () const
   {
     return size();
+  }
+
+  //! Return a flat container descriptor for this preBasis
+  auto containerDescriptor() const
+  {
+    return ContainerDescriptors::FlatVector{dimension()};
   }
 
   //! Get the maximal number of DOFs associated to node for any element

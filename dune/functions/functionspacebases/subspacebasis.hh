@@ -102,10 +102,10 @@ public:
     return rootBasis_->size(prefix);
   }
 
-  //! Return the index-tree associated with the root-basis
-  auto indexTree() const
+  //! Return the container descriptor associated with the root-basis
+  auto containerDescriptor() const
   {
-    return rootBasis_->indexTree();
+    return rootBasis_->containerDescriptor();
   }
 
   /** \brief Return local view for basis

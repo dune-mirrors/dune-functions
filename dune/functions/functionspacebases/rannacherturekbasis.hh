@@ -14,7 +14,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/indextree.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 namespace Dune {
@@ -105,10 +105,10 @@ public:
     return (size_type)(gridView_.size(1));
   }
 
-  //! Return a flat index-tree for this preBasis
-  auto indexTree() const
+  //! Return a flat container descriptor for this preBasis
+  auto containerDescriptor() const
   {
-    return FlatIndexTree{dimension()};
+    return ContainerDescriptors::FlatVector{dimension()};
   }
 
   //! Get the maximal number of DOFs associated to node for any element

@@ -20,7 +20,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/indextree.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 namespace Dune {
 namespace Functions {
@@ -208,10 +208,10 @@ public:
     return dofsPerCodim_[0] * gridView_.size(0) + dofsPerCodim_[1] * gridView_.size(1); // only 2d
   }
 
-  //! Return a flat index-tree for this preBasis
-  auto indexTree() const
+  //! Return a flat container descriptor for this preBasis
+  auto containerDescriptor() const
   {
-    return FlatIndexTree{dimension()};
+    return ContainerDescriptors::FlatVector{dimension()};
   }
 
   size_type maxNodeSize() const

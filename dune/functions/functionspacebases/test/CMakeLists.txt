@@ -42,7 +42,7 @@ dune_add_test(SOURCES refinedlagrangebasistest.cc
               CMAKE_GUARD Alberta_FOUND)
 add_dune_alberta_flags(refinedlagrangebasistest WORLDDIM 2)
 
-dune_add_test(SOURCES indextreetest.cc LABELS quick)
+dune_add_test(SOURCES containerdescriptortest.cc LABELS quick)
 
 dune_add_test(SOURCES vectorgeneratortest.cc LABELS quick)
 

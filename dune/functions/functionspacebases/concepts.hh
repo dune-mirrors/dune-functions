@@ -9,6 +9,7 @@
 
 #include <dune/functions/common/utility.hh>
 
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 
 
@@ -52,21 +53,16 @@ struct HasIndexAccess
 };
 
 
-// Concept for an index-tree
-struct IndexTree
+// Concept for an container descriptor
+struct ContainerDescriptor
 {
-  template<class IT = UnknownIndexTree>
-  void require(const UnknownIndexTree& indexTree);
+  template<class CD = ContainerDescriptors::Value>
+  void require(const ContainerDescriptors::Value&);
 
-  template<class IT = EmptyIndexTree>
-  void require(const EmptyIndexTree& indexTree);
-
-  template<class IT>
-  auto require(const IT& indexTree) -> decltype(
-    requireConvertible<bool>(IT::isUniform),
-    requireConvertible<bool>(IT::isTypeUniform),
-    requireConvertible<std::size_t>(indexTree.size()),
-    requireConcept<IndexTree>(indexTree[index_constant<0>{}])
+  template<class CD>
+  auto require(const CD& containerDescriptor) -> decltype(
+    requireConvertible<std::size_t>(containerDescriptor.size()),
+    requireConcept<ContainerDescriptor>(containerDescriptor[index_constant<0>{}])
   );
 };
 
@@ -171,7 +167,7 @@ public:
     requireConvertible<typename PB::size_type>(preBasis.maxNodeSize()),
     requireSameType<decltype(const_cast<PB&>(preBasis).update(preBasis.gridView())),void>(),
     requireConcept<BasisTree<typename PB::GridView>>(preBasis.makeNode()),
-    requireConcept<IndexTree>(preBasis.indexTree()),
+    requireConcept<ContainerDescriptor>(preBasis.containerDescriptor()),
     requireConvertible<typename std::vector<MultiIndex<PB>>::iterator>(
       preBasis.indices(
         preBasis.makeNode(),
@@ -231,7 +227,7 @@ struct GlobalBasis
     requireConvertible<typename B::size_type>(basis.dimension()),
     requireSameType<decltype(const_cast<B&>(basis).update(basis.gridView())),void>(),
     requireConcept<LocalView<B>>(basis.localView()),
-    requireConcept<IndexTree>(basis.indexTree())
+    requireConcept<ContainerDescriptor>(basis.containerDescriptor())
   );
 };
 

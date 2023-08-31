@@ -13,7 +13,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/indextree.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 
@@ -126,22 +126,22 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
-  //! Return the associated index-tree
-  auto indexTree() const
+  //! Return the associated container descriptor
+  auto containerDescriptor() const
   {
     using namespace Dune::Functions::BasisFactory;
 
-    auto subIndexTree = subPreBasis_.indexTree();
+    auto subTree = subPreBasis_.containerDescriptor();
     if constexpr(std::is_same_v<IMS, FlatInterleaved>)
-      return Impl::mergeIndexTrees<children,FlatInterleaved>(subIndexTree);
+      return ContainerDescriptors::Impl::mergeIdenticalTrees<children,FlatInterleaved>(subTree);
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
-      return Impl::mergeIndexTrees<children,FlatLexicographic>(subIndexTree);
+      return ContainerDescriptors::Impl::mergeIdenticalTrees<children,FlatLexicographic>(subTree);
     else if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
-      return StaticUniformIndexTree<decltype(subIndexTree), children>{std::move(subIndexTree)};
+      return ContainerDescriptors::UniformArray<decltype(subTree), children>{std::move(subTree)};
     else if constexpr(std::is_same_v<IMS, BlockedInterleaved>)
-      return Impl::appendToIndexTree<children>(subIndexTree);
+      return ContainerDescriptors::Impl::appendToTree<children>(subTree);
     else
-      return UnknownIndexTree{};
+      return ContainerDescriptors::Unknown{};
   }
 
 

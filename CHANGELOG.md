@@ -22,8 +22,8 @@ corresponding version of the Dune core modules.
   have been deprecated. One now can directly use `vectorBackend.resize(globalBasis)`
   instead of `vectorBackend.resize(sizeInfo(globalBasis))`.
 - Add an abstraction of the hierarchic blocking structure of bases in terms of
-  an index-tree. Several types of index-tree nodes are provided and all existing
-  pre-bases are equipped with a corresponding `indexTree()` member function to access
+  a container descriptor. Several types of descriptors are provided and all existing
+  pre-bases are equipped with a corresponding `containerDescriptor()` member function to access
   the blocking and size information.
 - The deprecated header `common/treedata.hh` was removed.
 - The deprecated header `common/referencehelper.hh` was removed. Use the corresponding header

@@ -11,7 +11,7 @@
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/indextree.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 
@@ -132,10 +132,10 @@ public:
     DUNE_THROW(Dune::NotImplemented, "No size method for " << dim << "d grids available yet!");
   }
 
-  //! Return a flat index-tree for this preBasis
-  auto indexTree() const
+  //! Return a flat container descriptor for this preBasis
+  auto containerDescriptor() const
   {
-    return FlatIndexTree{dimension()};
+    return ContainerDescriptors::FlatVector{dimension()};
   }
 
   size_type maxNodeSize() const

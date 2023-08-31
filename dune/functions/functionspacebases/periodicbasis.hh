@@ -10,7 +10,7 @@
 #include <vector>
 
 #include <dune/functions/functionspacebases/concepts.hh>
-#include <dune/functions/functionspacebases/indextree.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 #include <dune/functions/functionspacebases/transformedindexbasis.hh>
 
 
@@ -117,11 +117,11 @@ public:
     return numIndices_;
   }
 
-  //! Return a flat index-tree for this preBasis
+  //! Return a flat container descriptor for this preBasis
   template<class PreBasis>
-  auto indexTree(const PreBasis& preBasis) const
+  auto containerDescriptor(const PreBasis& preBasis) const
   {
-    return FlatIndexTree{numIndices_};
+    return ContainerDescriptors::FlatVector{numIndices_};
   }
 
 private:

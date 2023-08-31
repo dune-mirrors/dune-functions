@@ -20,7 +20,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/indextree.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 namespace Dune {
@@ -167,22 +167,22 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
-  //! Return the associated index-tree
-  auto indexTree() const
+  //! Return the associated container descriptor
+  auto containerDescriptor() const
   {
     using namespace Dune::Functions::BasisFactory;
     if constexpr(std::is_same_v<IMS, BlockedLexicographic>) {
       return std::apply([&](auto const&... spb) {
-        return makeNonUniformIndexTree(spb.indexTree()...);
+        return ContainerDescriptors::makeDescriptor(spb.containerDescriptor()...);
       }, subPreBases_);
     }
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>) {
       return std::apply([&](auto const&... spb) {
-        return Impl::mergeIndexTrees<FlatLexicographic>(spb.indexTree()...);
+        return ContainerDescriptors::Impl::mergeTrees<FlatLexicographic>(spb.containerDescriptor()...);
       }, subPreBases_);
     }
     else
-      return UnknownIndexTree{};
+      return ContainerDescriptors::Unknown{};
   }
 
 

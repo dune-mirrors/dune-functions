@@ -7,6 +7,7 @@ install(FILES
         bsplinebasis.hh
         compositebasis.hh
         concepts.hh
+        containerdescriptor.hh
         defaultglobalbasis.hh
         defaultlocalview.hh
         defaultnodetorangemap.hh
@@ -16,7 +17,6 @@ install(FILES
         hierarchicallagrangebasis.hh
         hierarchicnodetorangemap.hh
         hierarchicvectorwrapper.hh
-        indextree.hh
         interpolate.hh
         lagrangebasis.hh
         lagrangedgbasis.hh

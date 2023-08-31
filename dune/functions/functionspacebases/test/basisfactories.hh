@@ -17,14 +17,29 @@ namespace Dune {
 
 struct StdTraits
 {
-  template <class T>
-  using DynamicVector = std::vector<T>;
+  template <class C>
+  using Vector = std::vector<C>;
 
-  template <class B, std::size_t N>
-  using PowerVector = std::array<B,N>;
+  template <class C>
+  static Vector<C> makeVector(std::size_t n) { return Vector<C>(n); }
 
-  template <class... Rows>
-  using CompositeVector = std::tuple<Rows...>;
+  template <class C>
+  static Vector<C> makeUniformVector(std::size_t n, C value) { return Vector<C>(n, std::move(value)); }
+
+  template <class C, std::size_t n>
+  using Array = std::array<C,n>;
+
+  template <class C, std::size_t n, class... Cs>
+  static Array<C,n> makeArray(Cs... values) { return Array<C,n>{values...}; }
+
+  template <std::size_t n, class C>
+  static Array<C,n> makeUniformArray(C value) { return Dune::filledArray<n,C>(std::move(value)); }
+
+  template <class... Cs>
+  using Tuple = std::tuple<Cs...>;
+
+  template <class... Cs>
+  static Tuple<Cs...> makeTuple(Cs... values) { return Tuple<Cs...>{values...}; }
 };
 
 namespace Functions {
@@ -70,7 +85,7 @@ public:
   template <class T>
   static auto vector(index_constant<0>)
   {
-    return Traits::PowerVector<Traits::DynamicVector<T>,2>{};
+    return Traits::Array<Traits::Vector<T>,2>{};
   }
 
 
@@ -88,7 +103,7 @@ public:
   template <class T>
   static auto vector(index_constant<1>)
   {
-    return Traits::PowerVector<Traits::DynamicVector<T>,2>{};
+    return Traits::Array<Traits::Vector<T>,2>{};
   }
 
 
@@ -106,9 +121,9 @@ public:
   template <class T>
   static auto vector(index_constant<2>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::DynamicVector<T>, 3>,
-      Traits::DynamicVector<T>
+    using Vector = Traits::Tuple<
+      Traits::Array<Traits::Vector<T>, 3>,
+      Traits::Vector<T>
       >;
     return Vector{};
   }
@@ -128,9 +143,9 @@ public:
   template <class T>
   static auto vector(index_constant<3>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<Dune::FieldVector<T, 3>>,
-      Traits::DynamicVector<T>
+    using Vector = Traits::Tuple<
+      Traits::Vector<Dune::FieldVector<T, 3>>,
+      Traits::Vector<T>
       >;
     return Vector{};
   }
@@ -152,7 +167,7 @@ public:
   template <class T>
   static auto vector(index_constant<4>)
   {
-    using Vector = Traits::DynamicVector<T>;
+    using Vector = Traits::Vector<T>;
     return Vector{};
   }
 
@@ -173,9 +188,9 @@ public:
   template <class T>
   static auto vector(index_constant<5>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::DynamicVector<T>, 3>,
-      Traits::PowerVector<Traits::DynamicVector<T>, 1>
+    using Vector = Traits::Tuple<
+      Traits::Array<Traits::Vector<T>, 3>,
+      Traits::Array<Traits::Vector<T>, 1>
       >;
     return Vector{};
   }
@@ -194,7 +209,7 @@ public:
   template <class T>
   static auto vector(index_constant<6>)
   {
-    using Vector = Traits::PowerVector<Traits::DynamicVector<T>, 3>;
+    using Vector = Traits::Array<Traits::Vector<T>, 3>;
     return Vector{};
   }
 
@@ -215,9 +230,9 @@ public:
   template <class T>
   static auto vector(index_constant<7>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, 3>, 1>,
-      Traits::DynamicVector<T>
+    using Vector = Traits::Tuple<
+      Traits::Array<Traits::Array<Traits::Vector<T>, 3>, 1>,
+      Traits::Vector<T>
       >;
     return Vector{};
   }
@@ -241,9 +256,9 @@ public:
   template <class T>
   static auto vector(index_constant<8>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::PowerVector<Traits::PowerVector<Traits::DynamicVector<T>, 3>, 1>,
-      Traits::PowerVector<Traits::DynamicVector<T>, 1>
+    using Vector = Traits::Tuple<
+      Traits::Array<Traits::Array<Traits::Vector<T>, 3>, 1>,
+      Traits::Array<Traits::Vector<T>, 1>
       >;
     return Vector{};
   }
@@ -265,11 +280,11 @@ public:
   template <class T>
   static auto vector(index_constant<9>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<FieldVector<T, 2>>,
-      Traits::CompositeVector<
-        Traits::DynamicVector<FieldVector<T, 3>>,
-        Traits::DynamicVector<T>
+    using Vector = Traits::Tuple<
+      Traits::Vector<FieldVector<T, 2>>,
+      Traits::Tuple<
+        Traits::Vector<FieldVector<T, 3>>,
+        Traits::Vector<T>
         >
       >;
     return Vector{};
@@ -298,12 +313,12 @@ public:
   template <class T>
   static auto vector(index_constant<10>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<T>,
-      Traits::PowerVector<Traits::DynamicVector<T>, 2>,
-      Traits::CompositeVector<
-        Traits::PowerVector<Traits::DynamicVector<T>, 3>,
-        Traits::DynamicVector<T>
+    using Vector = Traits::Tuple<
+      Traits::Vector<T>,
+      Traits::Array<Traits::Vector<T>, 2>,
+      Traits::Tuple<
+        Traits::Array<Traits::Vector<T>, 3>,
+        Traits::Vector<T>
         >
       >;
     return Vector{};
@@ -321,7 +336,7 @@ public:
   template <class T>
   static auto vector(index_constant<11>)
   {
-    using Vector = Traits::PowerVector<Traits::DynamicVector<T>, 4>;
+    using Vector = Traits::Array<Traits::Vector<T>, 4>;
     return Vector{};
   }
 
@@ -337,7 +352,7 @@ public:
   template <class T>
   static auto vector(index_constant<12>)
   {
-    using Vector = Traits::PowerVector<Traits::DynamicVector<T>, 4>;
+    using Vector = Traits::Array<Traits::Vector<T>, 4>;
     return Vector{};
   }
 
@@ -357,13 +372,13 @@ public:
   template <class T>
   static auto vector(index_constant<13>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
-      Traits::DynamicVector<Dune::FieldVector<T,2>>,
-      Traits::DynamicVector<Dune::FieldVector<T,3>>,
-      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
-      Traits::DynamicVector<Dune::FieldVector<T,2>>,
-      Traits::DynamicVector<Dune::FieldVector<T,3>>
+    using Vector = Traits::Tuple<
+      Traits::Vector<Traits::Array<Dune::FieldVector<T,1>,1>>,
+      Traits::Vector<Dune::FieldVector<T,2>>,
+      Traits::Vector<Dune::FieldVector<T,3>>,
+      Traits::Vector<Traits::Array<Dune::FieldVector<T,1>,1>>,
+      Traits::Vector<Dune::FieldVector<T,2>>,
+      Traits::Vector<Dune::FieldVector<T,3>>
       >;
     return Vector{};
   }
@@ -384,13 +399,13 @@ public:
   template <class T>
   static auto vector(index_constant<14>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
-      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
-      Traits::DynamicVector<Dune::FieldVector<T,2>>,
-      Traits::DynamicVector<Dune::FieldVector<T,2>>,
-      Traits::DynamicVector<Dune::FieldVector<T,3>>,
-      Traits::DynamicVector<Dune::FieldVector<T,3>>
+    using Vector = Traits::Tuple<
+      Traits::Vector<Traits::Array<Dune::FieldVector<T,1>,1>>,
+      Traits::Vector<Traits::Array<Dune::FieldVector<T,1>,1>>,
+      Traits::Vector<Dune::FieldVector<T,2>>,
+      Traits::Vector<Dune::FieldVector<T,2>>,
+      Traits::Vector<Dune::FieldVector<T,3>>,
+      Traits::Vector<Dune::FieldVector<T,3>>
       >;
     return Vector{};
   }
@@ -415,12 +430,12 @@ public:
   template <class T>
   static auto vector(index_constant<15>)
   {
-    using Vector = Traits::CompositeVector<
-      Traits::DynamicVector<Dune::FieldVector<T,2>>,
-      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,2>>,
-      Traits::DynamicVector<Traits::PowerVector<Dune::FieldVector<T,1>,1>>,
-      Traits::DynamicVector<Dune::FieldVector<T,2>>,
-      Traits::DynamicVector<Dune::FieldVector<T,3>>
+    using Vector = Traits::Tuple<
+      Traits::Vector<Dune::FieldVector<T,2>>,
+      Traits::Vector<Traits::Array<Dune::FieldVector<T,1>,2>>,
+      Traits::Vector<Traits::Array<Dune::FieldVector<T,1>,1>>,
+      Traits::Vector<Dune::FieldVector<T,2>>,
+      Traits::Vector<Dune::FieldVector<T,3>>
       >;
     return Vector{};
   }

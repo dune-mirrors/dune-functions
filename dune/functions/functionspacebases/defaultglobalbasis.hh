@@ -151,10 +151,10 @@ public:
     return preBasis_.size(prefix);
   }
 
-  //! Return the index-tree associated with the pre-basis
-  auto indexTree() const
+  //! Return the container descriptor associated with the pre-basis
+  auto containerDescriptor() const
   {
-    return preBasis_.indexTree();
+    return preBasis_.containerDescriptor();
   }
 
   //! Return local view for basis

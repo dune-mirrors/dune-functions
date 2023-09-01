@@ -643,8 +643,11 @@ Dune::TestSuite checkBasis(Basis& basis, Flags... flags)
   {
     Basis copy(basis);
     test.subTest(checkConstBasis(copy,flags...));
+<<<<<<< HEAD
     copy = basis;
     test.subTest(checkConstBasis(copy,flags...));
+=======
+>>>>>>> 41e1835 ([test] check that a basis is copyable)
   }
 
   // Check update of gridView

@@ -101,13 +101,13 @@ namespace Dune::Functions::ContainerDescriptors {
   };
 
   //! Generate a descriptor in case the children are not all of the same type.
-  template<class Child0, class... Childs,
-    std::enable_if_t<(sizeof...(Childs) > 0), int> = 0,
-    std::enable_if_t<(...|| (not std::is_same_v<Child0, Childs>)), int> = 0>
-  auto makeDescriptor (Child0 child0, Childs... childs)
+  template<class Child0, class... Children,
+    std::enable_if_t<(sizeof...(Children) > 0), int> = 0,
+    std::enable_if_t<(...|| (not std::is_same_v<Child0, Children>)), int> = 0>
+  auto makeDescriptor (Child0 child0, Children... children)
   {
-    using Descriptor = Tuple<Child0,Childs...>;
-    return Descriptor{std::move(child0),std::move(childs)...};
+    using Descriptor = Tuple<Child0,Children...>;
+    return Descriptor{std::move(child0),std::move(children)...};
   }
 
 
@@ -132,10 +132,10 @@ namespace Dune::Functions::ContainerDescriptors {
       : Super{Dune::filledArray<n>(std::move(child))}
     {}
 
-    template <class... Childs,
-      std::enable_if_t<(std::is_same_v<Childs,Child> &&...), int> = 0>
-    explicit Array (Childs... childs)
-      : Super{std::move(childs)...}
+    template <class... Children,
+      std::enable_if_t<(std::is_same_v<Children,Child> &&...), int> = 0>
+    explicit Array (Children... children)
+      : Super{std::move(children)...}
     {}
 
     using Super::operator[];
@@ -149,12 +149,12 @@ namespace Dune::Functions::ContainerDescriptors {
 
 
   //! Generate a descriptor in case the children are all of the same type.
-  template<class Child0, class... Childs,
-    std::enable_if_t<(...&& std::is_same_v<Child0, Childs>), int> = 0>
-  auto makeDescriptor (Child0 child, Childs... childs)
+  template<class Child0, class... Children,
+    std::enable_if_t<(...&& std::is_same_v<Child0, Children>), int> = 0>
+  auto makeDescriptor (Child0 child, Children... children)
   {
-    using Descriptor = Array<Child0,1+sizeof...(Childs)>;
-    return Descriptor{std::move(child),std::move(childs)...};
+    using Descriptor = Array<Child0,1+sizeof...(Children)>;
+    return Descriptor{std::move(child),std::move(children)...};
   }
 
 
@@ -174,7 +174,7 @@ namespace Dune::Functions::ContainerDescriptors {
     : std::true_type {};
 
 
-  //! Descriptor for an array with all childs identical and the number of children a static size.
+  //! Descriptor for an array with all children identical and the number of children a static size.
   template<class Child, std::size_t n>
   struct UniformArray
   {
@@ -397,8 +397,8 @@ namespace Dune::Functions::ContainerDescriptors {
    *
    * \param tree  Collection of nodes to be merged
    * \param size  The size of the resulting container
-   * \param isUniform  The resulting descriptor is uniform (all childs identical)
-   * \param isTypeUniform  The resulting descriptor is a container (all childs have the same type)
+   * \param isUniform  The resulting descriptor is uniform (all children identical)
+   * \param isTypeUniform  The resulting descriptor is a container (all children have the same type)
    */
   template<class IMS, class Tree, class Size, bool isUniform, bool isTypeUniform>
   auto mergeTreesImpl (const Tree& tree, Size size,

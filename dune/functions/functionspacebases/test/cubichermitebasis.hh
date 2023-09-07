@@ -20,7 +20,6 @@
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-<<<<<<< HEAD
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 
 
@@ -87,115 +86,6 @@ namespace Impl {
 
 
 
-<<<<<<< HEAD
-=======
-} // namespace Impl
-
-
-
-/**
- * \brief A generic MixIn class for PreBasis with flat indices computed from a mapper.
- *
- * This abstracts all index computations that can be implemented using a
- * MultipleCodimMultipleGeomTypeMapper with appropriate MCMGLayout..
- * In order to use this, you need to derive from this class and
- * pass the layout in the constructor. Then the mixin takes care
- * for all the index and size computation and the derived class
- * only needs to add the node creation.
- *
- * Be careful: This does not do any reordering of indices
- * if multiple basis functions are associated to the same
- * subentity.
- *
- * \tparam GV The grid view the basis is defined on.
- */
-template<typename GV>
-class LeafPreBasisMapperMixIn
-{
-  static const int gridDim = GV::dimension;
-
-public:
-
-  using GridView = GV;
-  using size_type = std::size_t;
-
-  static constexpr size_type maxMultiIndexSize = 1;
-  static constexpr size_type minMultiIndexSize = 1;
-  static constexpr size_type multiIndexBufferSize = 1;
-
-  LeafPreBasisMapperMixIn(const GridView& gv, Dune::MCMGLayout layout) :
-    gridView_(gv),
-    mapper_(gridView_, std::move(layout))
-  {}
-
-  void initializeIndices()
-  {
-    maxNodeSize_ = 0;
-    for(const GeometryType& elementType : gridView_.indexSet().types(0))
-    {
-      auto referenceElement = Dune::referenceElement<double, gridDim>(elementType);
-      for(auto codim : Dune::range(gridDim+1))
-        for(auto i : Dune::range(referenceElement.size(codim)))
-          maxNodeSize_ += mapper_.layout()(referenceElement.type(i, codim), gridDim);
-    }
-  }
-
-  const GridView& gridView() const
-  {
-    return gridView_;
-  }
-
-  void update(const GridView& gv)
-  {
-    gridView_ = gv;
-    mapper_.update(gridView_);
-  }
-
-  size_type size() const
-  {
-    return mapper_.size();
-  }
-
-  template<class SizePrefix>
-  size_type size(const SizePrefix prefix) const
-  {
-    assert(prefix.size() == 0 || prefix.size() == 1);
-    return (prefix.size() == 0) ? size() : 0;
-  }
-
-  size_type dimension() const
-  {
-    return size();
-  }
-
-  size_type maxNodeSize() const
-  {
-    return maxNodeSize_;
-  }
-
-  template<class Node, class It>
-  It indices(const Node& node, It it) const
-  {
-    for(const auto& globalIndex : Impl::subIndexRange(mapper_, node.element(), node.finiteElement().localCoefficients()))
-    {
-      *it = {{ (size_type)globalIndex }};
-      ++it;
-    }
-    return it;
-  }
-
-protected:
-  GridView gridView_;
-  Dune::MultipleCodimMultipleGeomTypeMapper<GridView> mapper_;
-  std::size_t maxNodeSize_;
-};
-
-
-
-namespace Impl {
-
-
->>>>>>> 30aa3ed ([test] Add test of global interpolate() for Hermite bases)
 // *****************************************************************************
 // * Some helper functions for building polynomial bases from monomials
 // *****************************************************************************
@@ -430,7 +320,6 @@ public:
     auto totalOrder = std::accumulate(order.begin(), order.end(), 0);
     if (totalOrder == 0)
       evaluateFunction(x, out);
-<<<<<<< HEAD
     else
     DUNE_THROW(RangeError, "partial() not implemented for given order");
   }

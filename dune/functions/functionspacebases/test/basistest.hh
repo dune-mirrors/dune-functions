@@ -543,8 +543,21 @@ Dune::TestSuite checkBasis(Basis& basis, Flags... flags)
   test.subTest(checkConstBasis(basis,flags...));
 
   // Check update of gridView
+  auto& grid = basis.gridView().grid();
+
+  // Hack: We need to unconstify the `grid` object
+  using Grid = typename Basis::GridView::Grid;
+  const_cast<Grid&>(grid).globalRefine(1);
+
+  // Hack: Strictly speaking, grid views have value semantics,
+  // and therefore asking for the grid view of the basis
+  // may give us the old, unmodified grid view.
+  // In practice this doesn't ever seem to happen though.
   auto gridView = basis.gridView();
+
   basis.update(gridView);
+
+  test.subTest(checkConstBasis(basis,flags...));
 
   return test;
 }

@@ -50,9 +50,6 @@ dune_add_test(SOURCES refinedlagrangebasistest.cc
 add_dune_alberta_flags(refinedlagrangebasistest WORLDDIM 2)
 
 dune_add_test(SOURCES hermitetest.cc)
-dune_add_test(SOURCES morleytest.cc)
-dune_add_test(SOURCES argyristest.cc)
-dune_add_test(SOURCES arnoldwinthertest.cc)
 
 
 install(

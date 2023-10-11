@@ -26,9 +26,10 @@
 #include <dune/geometry/referenceelements.hh>
 
 #include <dune/common/transpose.hh>
-#include <dune/localfunctions/common/derivative.hh>
 #include <dune/localfunctions/common/virtualinterface.hh>
 #include <dune/localfunctions/common/virtualwrappers.hh>
+
+#include <dune/functions/common/defaultderivativetraits.hh>
 
 double TOL = 1e-9;
 // The FD approximation used for checking the Jacobian uses half of the
@@ -211,7 +212,7 @@ public:
 
   Range operator()(Domain const &x) const { return value; }
 
-  friend Constant<Domain, typename Dune::Impl::DerivativeTraits<Range(Domain)>::type>
+  friend Constant<Domain, typename Dune::Functions::DefaultDerivativeTraits<Range(Domain)>::Range>
   derivative(Constant const &t)
   {
     return {0.};
@@ -252,7 +253,7 @@ bool testCanRepresentConstants(const FE &fe, unsigned order = 5)
 {
   typedef typename FE::Traits::LocalBasisType LB;
   using RangeType = typename LB::Traits::RangeType;
-  using JacobianType = typename LB::Traits::JacobianType;
+  // using JacobianType = typename LB::Traits::JacobianType;
   bool success = true;
 
   // Construct the constant '1' function
@@ -500,7 +501,7 @@ struct TestPartial
                   const std::function<bool(const typename FE::Traits::LocalBasisType::Traits::DomainType&)> derivativePointSkip = nullptr)
   {
     typedef typename FE::Traits::LocalBasisType LB;
-    typedef typename LB::Traits::RangeFieldType RangeField;
+    // typedef typename LB::Traits::RangeFieldType RangeField;
 
     bool success = true;
 

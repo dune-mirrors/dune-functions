@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 
 add_subdirectory("test")
-
+add_subdirectory("genericlocalfiniteelements")
 install(FILES
         basistags.hh
         boundarydofs.hh
@@ -18,6 +18,7 @@ install(FILES
         flatmultiindex.hh
         flatvectorview.hh
         globalvaluedlocalfiniteelement.hh
+        hermitebasis.hh
         hierarchicallagrangebasis.hh
         hierarchicnodetorangemap.hh
         hierarchicvectorwrapper.hh
@@ -27,6 +28,7 @@ install(FILES
         leafprebasismappermixin.hh
         leafprebasismixin.hh
         lfeprebasismixin.hh
+        lineartransformedlocalfiniteelement.hh
         nedelecbasis.hh
         periodicbasis.hh
         powerbasis.hh

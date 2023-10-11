@@ -320,6 +320,7 @@ public:
     auto totalOrder = std::accumulate(order.begin(), order.end(), 0);
     if (totalOrder == 0)
       evaluateFunction(x, out);
+    else
     DUNE_THROW(RangeError, "partial() not implemented for given order");
   }
 

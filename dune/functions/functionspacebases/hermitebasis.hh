@@ -339,7 +339,7 @@ class HermitePreBasis : public Impl::LeafPreBasisMapperMixIn<GV>
 
   public:
     //! Template mapping root tree path to type of created tree node
-    using Node = TransformedNode<GridView, HermiteTrafo, LocalFE>;
+    using Node = Impl::TransformedNode<GridView, HermiteTrafo, LocalFE>;
 
     static constexpr size_type maxMultiIndexSize = 1;
     static constexpr size_type minMultiIndexSize = 1;

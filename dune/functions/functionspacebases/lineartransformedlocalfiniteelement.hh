@@ -28,54 +28,35 @@ namespace Dune::Functions
  * Piola-Transformations.
  * The main contrast is, that the transformations here take the concrete
  * structure of finite elements in account and are thus specific to each finite
- * element, unlike the Piola- Transformations, which can be applied to a set of
- * admissible finite elements. Generally, we cannot use the reference dofs for
- * interpolation, so two different approaches are offered.
+ * element, unlike the Piola-transformations, which can be applied to a set of
+ * admissible finite elements.
  *
- * In particular, the interfaces differ from the "GlobalValued"-classes in the
- * following points: LinearTransformator interface:
- *      - The LinearTransformator classes implement a linear transformation from
- * one set of basisfunction onto another, that means, the transformation is
- * invariant to differentiation, and the need for methods like "applyJacobian"
- * vanishes.
- *      - The LinearTransformator classes are not static.
- *      - The LinearTransformator object are included in binding routine.
- *      - Interpolation: Instead of the inner class LocalValuedFunction, two
- * options are possible:
- *        1. affine (Piola) interpolation equivalent FEs:
- *          The LinearTransformator offers a method applyInverse, which is then
- * wrapped to a LocalValuedFunction.
- *        2. non intepolation equivalent FEs:
- *          We cannot use the reference DOFs to interpolate into the physical FE
- * space. Hence the LinearTransformators need to export an inner class
- *          GlobalValuedInterpolation, which fulfils the LocalInterpolation
- * interface and fill the coefficient vector for the transformed FE.
- *      - Exports type ElementInformation, that stores elementspecific data,
- * like orientation or direction of vertices. Should implement the methods
- * isDirichlet(LocalKey)/ isClamped(LocalKey) which return a boolean, which true
- * iff the localKey is intended to be used to interpolate Dirichlet/Clamped BC.
- *    LinearTransformedLocalBasis:
- *      - holds a pointer to the reference basis
- *      - higher derivatives are implemented, possible throwing errors if
- * reference basis does not implement at least the partial method of
- * corresponding degree
+ * Some details:
+ * Generally, we cannot use the reference dofs for interpolation, so three different
+ * approaches are offered:
+ * - Wrapping the function with the inverse of a rangespace transformation and
+ *    using the reference dofs (e.g. for Piola)
+ * - Using the reference dofs and the inverse of the basis transformation (For
+ *    interpolation affine equivalent FEs)
+ * - Using a independent global interpolation provided by the Transformator.
  *
- *    LinearTransformedLocalInterpolation:
- *      - provided by Transformator class as exported type GlobalInterpolation
- * or via CoefficientTransformingGlobalValuedInterpolation
+ * TransformedLocalBasis:
+ *  - Maintains the level of derivatives implemented by the reference basis.
+ *  - Offers access the the wrapped basis and the transformator object.
  *
- *    LinearTransformedLocalCoefficients:
- *      - wraps the LocalCoefficients of the localvalued finite element
- *      - can be bound to ElementInformation
- *      - provides an additional method isDirichlet(size_t i)/isClamped(size_t
- * i) which return boolean indicating whether the ith local DOF is to be used in
- * Dirichlet Interpolation
+ * TransformedLocalCoefficients:
+ *  - wraps the LocalCoefficients of the localvalued finite element
+ *  - can be bound to ElementInformation
  *
- *    LinearTransformedLocalFiniteElement:
- *      - holds an instance of the Transformator class
- *      - calls transformator.bind(...) whenever bound to an element
- *      - similar to GlobalValuedLocalFiniteElement with adapted typedefs and
- * additional binding operations
+ * TransformedLocalFiniteElement:
+ *  - owns transformator, generic reference FE, and transformed LocalBasis/Interpolation/Coefficients
+ *  - Binds all its bindable subobjects whenever bound to an element
+ * TransformedNode:
+ *  - Generic Implementation.
+ *
+ * Limitations:
+ * You cannot chain TransformedFiniteElements, but you can chain the transformator
+ * Currently the concept check only allows for Rangespace transformations that maintain the type
  *
  */
 
@@ -84,6 +65,18 @@ namespace Impl
 // forward declaration
 template<class Transformator, class LocalValuedLFE, class Element>
 class TransformedLocalFiniteElement;
+
+template<class FE>
+struct IsTransformedLocalFiniteElement
+{
+  static constexpr bool value = false;
+};
+
+template<class ... Args>
+struct IsTransformedLocalFiniteElement<TransformedLocalFiniteElement<Args...>>
+{
+  static constexpr bool value = true;
+};
 
 /** \brief Implementation of a dune-localfunctions LocalBasis that applies a
  * linear transformation
@@ -180,8 +173,9 @@ class TransformedLocalBasis
     /** \brief Evaluate partial derivatives of any order of all shape functions
      *
      * \param order Order of the partial derivatives, in the classic multi-index
-     * notation \param in Position where to evaluate the derivatives \param[out]
-     * out The desired partial derivatives
+     * notation
+     * \param in Position where to evaluate the derivatives
+     * \param[out] out The desired partial derivatives
      */
     void partial(std::array<unsigned int, Traits::dimDomain> const &order,
                  const typename Traits::DomainType &x,
@@ -211,8 +205,10 @@ class TransformedLocalBasis
  *    that accepts global-valued functions
  *
  * \tparam Transformator The transformation (e.g., Piola) that transforms from local to global
- * values \tparam LocalValuedLocalInterpolation The local-valued LocalInterpolation that is used for
- * the actual interpolation \tparam Element The element that the global-valued FE lives on
+ * values
+ * \tparam LocalValuedLocalInterpolation The local-valued LocalInterpolation that is used for
+ * the actual interpolation
+ * \tparam Element The element that the global-valued FE lives on
  */
 template<class Transformator, class LocalValuedLocalInterpolation, class Element>
 class RangeSpaceTransformingGlobalValuedLocalInterpolation
@@ -242,13 +238,13 @@ class RangeSpaceTransformingGlobalValuedLocalInterpolation
 };
 
 /**
- * @brief This class is a generic implementation of the GlobalValuedInterpolation
+ * \brief This class is a generic implementation of the GlobalValuedInterpolation
  * interface. After binding, it uses an invertible Basis Transformator and
  * the reference LocalInterpolation and to construct a GlobalValuedLocalInterpolation.
  *
- * @tparam Transformator
- * @tparam LocalInterpolation
- * @tparam Element
+ * \tparam Transformator
+ * \tparam LocalInterpolation
+ * \tparam Element
  */
 template<class Transformator, class LocalFE, class Element>
 class CoefficientTransformingGlobalValuedLocalInterpolation
@@ -283,6 +279,7 @@ class CoefficientTransformingGlobalValuedLocalInterpolation
     Element const *element_;
 };
 
+// Deduce Traits::LocalInterpolationType
 // The transformator class either exports a LocalValuedLocalFunction, a
 // GlobalValuedInterpolation, or implements an inverse transformation Primary
 // Template
@@ -393,6 +390,7 @@ class TransformedLocalCoefficients
 template<class Transformator, class LocalValuedLFE, class Element>
 class TransformedLocalFiniteElement
 {
+    static_assert(not IsTransformedLocalFiniteElement<LocalValuedLFE>::value);
 
     using LocalBasis = TransformedLocalBasis<Transformator, LocalValuedLFE, Element>;
     using LocalInterpolation =
@@ -478,12 +476,11 @@ class TransformedLocalFiniteElement
     typename Traits::LocalCoefficientsType globalValuedLocalCoefficients_;
     Element const *element_;
 };
-} // namespace Impl
 
 template<typename GV, class Transformator, typename LocalValuedLocalFiniteElement>
 class TransformedNode : public LeafBasisNode
 {
-
+    static_assert(not IsTransformedLocalFiniteElement<LocalValuedLocalFiniteElement>::value);
     static constexpr unsigned int dim = GV::dimension;
 
   public:
@@ -525,6 +522,7 @@ class TransformedNode : public LeafBasisNode
     FiniteElement finiteElement_;
     Element element_;
 };
+} // namespace Impl
 
 } // namespace Dune::Functions
 #endif

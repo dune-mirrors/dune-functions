@@ -32,6 +32,10 @@ namespace Dune::Functions
  * admissible finite elements.
  *
  * Some details:
+ * A transformation can reduce the size of a finite element (like in the case of the Bell element)
+ * In such case, the transformator has to implement a size() method, which will be
+ * used accordingly by all objects. Currently, this implies that the size() methods of the
+ * TransformedLocal... classes are runtime members.
  * Generally, we cannot use the reference dofs for interpolation, so three different
  * approaches are offered:
  * - Wrapping the function with the inverse of a rangespace transformation and

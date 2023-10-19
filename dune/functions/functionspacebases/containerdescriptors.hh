@@ -6,6 +6,7 @@
 #include <array>
 #include <cassert>
 #include <functional>
+#include <type_traits>
 #include <vector>
 
 #include <dune/common/filledarray.hh>
@@ -20,9 +21,9 @@
  * \file containerdescriptor.hh
  * \brief Lightweight representation of (hierarchical) size and block structure extracted
  * from a bsis, to describe data structures like containers that can be accessed by
- * the multi-indices provided by the basis.
+ * multi-indices provided by the basis.
  *
- * The structure of an container-descriptor is a reduced container interface:
+ * The structure of a container-descriptor is a reduced container interface:
  * \code
   struct [Container]Descriptor
   {
@@ -41,34 +42,50 @@
 
 namespace Dune::Functions::ContainerDescriptors {
 
-
+  //! Type-traits property of a container descriptor meaning that the types of
+  //! all sub-container-descriptors are identical. Can be specialize by any
+  //! container descriptor.
   template <class D>
   struct IsTypeUniform : std::false_type {};
 
+  //! \relates IsTypeUniform
   template <class D>
   inline constexpr bool isTypeUniform = IsTypeUniform<D>::value;
 
+
+  //! Type-traits property of a container descriptor meaning that all
+  //! sub-container-descriptors are identical. Can be specialize by any
+  //! container descriptor.
   template <class D>
   struct IsUniform : std::false_type {};
 
+  //! \relates IsUniform
   template <class D>
   inline constexpr bool isUniform = IsUniform<D>::value;
 
+
+  //! Type-traits property of a container descriptor meaning that it represents
+  //! a single value (placeholder) or a container storing single values. Can be
+  //! specialize by any container descriptor.
   template <class D>
   struct IsFlat : std::false_type {};
 
+  //! \relates IsFlat
   template <class D>
   inline constexpr bool isFlat = IsFlat<D>::value;
 
 
+  //! Fallback container descriptor if nothing else fits
   struct Unknown {};
 
   //! The node in the descriptor tree representing a value placeholder
   struct Value
   {
+    //! The child access method is only available for the interface, but should not be called.
     template <class Index>
     Value operator[] (const Index&) const { return {}; }
 
+    //! A value placeholder does not have any sub-descriptors, thus its size is zero.
     static constexpr std::size_t size () { return 0; }
   };
 
@@ -79,28 +96,34 @@ namespace Dune::Functions::ContainerDescriptors {
   struct IsUniform<Value> : std::true_type {};
 
 
-  //! Descriptor with all children of different type
+  //! Descriptor with all children of possibly different type
   template<class... Children>
   struct Tuple
       : private Dune::TupleVector<Children...>
   {
     using Super = Dune::TupleVector<Children...>;
 
+    //! Default constructor. Is enable if all children are default constructible.
     template<class C = std::tuple<Children...>,
       std::enable_if_t<std::is_default_constructible_v<C>, int> = 0>
     Tuple ()
       : Tuple{Children{}...}
     {}
 
+    //! Construct the underlying tuple from the variadic pack of children
     explicit Tuple (Children... children)
       : Super{std::move(children)...}
     {}
 
+    //! Access the i'th sub-descriptor
     using Super::operator[];
-    using Super::size;
+
+    //! The static size information, i.e., number of children
+    static inline constexpr std::integral_constant<std::size_t, sizeof...(Children)> size{};
   };
 
   //! Generate a descriptor in case the children are not all of the same type.
+  //! \relates Tuple
   template<class Child0, class... Children,
     std::enable_if_t<(sizeof...(Children) > 0), int> = 0,
     std::enable_if_t<(...|| (not std::is_same_v<Child0, Children>)), int> = 0>
@@ -118,29 +141,35 @@ namespace Dune::Functions::ContainerDescriptors {
   {
     using Super = std::array<Child, n>;
 
+    //! Default constructor. Is enable if the child-type is default constructible.
     template<class C = Child,
       std::enable_if_t<std::is_default_constructible_v<C>, int> = 0>
     Array ()
       : Array{C{}}
     {}
 
+    //! Construct `n` copies of the passed `child`.
     explicit Array (Child child)
       : Super{Dune::filledArray<n>(std::move(child))}
     {}
 
+    //! Construct `n` copies of the passed `child`. Used for CTAD.
     Array (std::integral_constant<std::size_t,n>, Child child)
       : Super{Dune::filledArray<n>(std::move(child))}
     {}
 
+    //! Construct the underlying array from the variadic pack of children.
     template <class... Children,
       std::enable_if_t<(std::is_same_v<Children,Child> &&...), int> = 0>
     explicit Array (Children... children)
       : Super{std::move(children)...}
     {}
 
+    //! Access the i'th sub-descriptor.
     using Super::operator[];
 
-    static constexpr std::size_t size () { return n; }
+    //! The static size information, i.e., number of children.
+    static inline constexpr std::integral_constant<std::size_t, n> size{};
   };
 
   template <class C, std::size_t n>
@@ -158,7 +187,7 @@ namespace Dune::Functions::ContainerDescriptors {
   }
 
 
-  //! Descriptor for a vector with all children of the same type and dynamic size.
+  //! Descriptor for vectors with all children of the same type and dynamic size.
   template<class Child>
   struct Vector
       : private std::vector<Child>
@@ -174,28 +203,33 @@ namespace Dune::Functions::ContainerDescriptors {
     : std::true_type {};
 
 
-  //! Descriptor for an array with all children identical and the number of children a static size.
+  //! Descriptor for arrays with all children identical and the number of children a static size.
   template<class Child, std::size_t n>
   struct UniformArray
   {
+    //! Default constructor. Is enable if the child-type is default constructible.
     template<class C = Child,
       std::enable_if_t<std::is_default_constructible_v<C>, int> = 0>
     UniformArray ()
       : child_{}
     {}
 
+    //! Constructor that stores a single child only.
     explicit UniformArray (Child child)
       : child_{std::move(child)}
     {}
 
+    //! Constructor that stores a single child only. Used for CTAD.
     UniformArray (std::integral_constant<std::size_t,n>, Child child)
       : child_{std::move(child)}
     {}
 
+    //! Access the i'th child that is always the same, i.e., `child_`.
     template <class Index>
-    const Child& operator[] (const Index&) const { return child_; }
+    const Child& operator[] (const Index& /*i*/) const { return child_; }
 
-    static constexpr std::size_t size () { return n; }
+    //! The static size information, i.e., number of children.
+    static inline constexpr std::integral_constant<std::size_t, n> size{};
 
   private:
     Child child_;
@@ -209,7 +243,7 @@ namespace Dune::Functions::ContainerDescriptors {
   struct IsUniform<UniformArray<C,n>>
     : std::true_type {};
 
-
+  //! Alias for a uniform array storing value placeholders
   template <std::size_t n>
   using FlatArray = UniformArray<Value,n>;
 
@@ -229,6 +263,7 @@ namespace Dune::Functions::ContainerDescriptors {
   template<class Child>
   struct UniformVector
   {
+    //! Default constructor. Is enable if the child-type is default constructible.
     template<class C = Child,
       std::enable_if_t<std::is_default_constructible_v<C>, int> = 0>
     UniformVector ()
@@ -236,6 +271,7 @@ namespace Dune::Functions::ContainerDescriptors {
       , child_{}
     {}
 
+    //! Default constructor with size. Is enable if the child-type is default constructible.
     template<class C = Child,
       std::enable_if_t<std::is_default_constructible_v<C>, int> = 0>
     explicit UniformVector (std::size_t size)
@@ -243,14 +279,17 @@ namespace Dune::Functions::ContainerDescriptors {
       , child_{}
     {}
 
+    //! Constructor that stores the size and a single child only.
     UniformVector (std::size_t size, Child child)
       : size_{size}
       , child_{std::move(child)}
     {}
 
+    //! Access the i'th child that is always the same, i.e., `child_`.
     template <class Index>
-    const Child& operator[] (const Index&) const { return child_; }
+    const Child& operator[] (const Index& /*i*/) const { return child_; }
 
+    //! The dynamic size information, i.e., number of children.
     std::size_t size () const { return size_; }
 
   private:
@@ -267,6 +306,7 @@ namespace Dune::Functions::ContainerDescriptors {
     : std::true_type {};
 
 
+  //! Alias for a uniform vector storing value placeholders
   using FlatVector = UniformVector<Value>;
 
   template <>
@@ -316,9 +356,9 @@ namespace Dune::Functions::ContainerDescriptors {
       constexpr auto operator() (T i) const { return i+1; }
     };
 
-    static constexpr auto lt_ = Hybrid::hybridFunctor(std::less<>{});
-    static constexpr auto incr_ = Hybrid::hybridFunctor(Increment{});
-    static constexpr auto minus_ = Hybrid::hybridFunctor(std::minus<>{});
+    static inline constexpr auto lt_ = Hybrid::hybridFunctor(std::less<>{});
+    static inline constexpr auto incr_ = Hybrid::hybridFunctor(Increment{});
+    static inline constexpr auto minus_ = Hybrid::hybridFunctor(std::minus<>{});
 
     // overload for Unknown node. Cannot access any component.
     template<class FlatIndex, class OuterOffsetIndex, class IMS>

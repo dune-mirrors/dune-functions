@@ -5,19 +5,20 @@
 
 
 #include <dune/common/concept.hh>
+#include <dune/common/indices.hh>
 #include <dune/common/reservedvector.hh>
 
 #include <dune/functions/common/utility.hh>
 
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 
 
 namespace Dune {
 namespace Functions {
-
-struct UnknownIndexTree;
-struct EmptyIndexTree;
+namespace ContainerDescriptors {
+  struct Value;
+  struct Unknown;
+}
 
 namespace Concept {
 
@@ -56,8 +57,11 @@ struct HasIndexAccess
 // Concept for an container descriptor
 struct ContainerDescriptor
 {
-  template<class CD = ContainerDescriptors::Value>
+  template<class CD = void>
   void require(const ContainerDescriptors::Value&);
+
+  template<class CD = void>
+  void require(const ContainerDescriptors::Unknown&);
 
   template<class CD>
   auto require(const CD& containerDescriptor) -> decltype(

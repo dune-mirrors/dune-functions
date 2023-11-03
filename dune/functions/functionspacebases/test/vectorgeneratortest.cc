@@ -64,7 +64,6 @@ struct VectorGenerator<ContainerDescriptors::UniformArray<C,n>>
   static auto apply(CD const& containerDescriptor)
   {
     auto block = [&](auto i) { return vectorGenerator<T,Traits>(containerDescriptor[i]); };
-    using Block0 = decltype(block(Dune::index_constant<0>{}));
     return Traits::template makeUniformArray<n>(block(0));
   }
 };
@@ -91,7 +90,6 @@ struct VectorGenerator<ContainerDescriptors::UniformVector<C>>
   static auto apply(CD const& containerDescriptor)
   {
     auto block = [&](auto i) { return vectorGenerator<T,Traits>(containerDescriptor[i]); };
-    using Block0 = decltype(block(Dune::index_constant<0>{}));
     return Traits::makeUniformVector(containerDescriptor.size(), block(0));
   }
 };

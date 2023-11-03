@@ -101,22 +101,22 @@ namespace Dune::Functions::ContainerDescriptors {
   struct Tuple
       : private Dune::TupleVector<Children...>
   {
-    using Super = Dune::TupleVector<Children...>;
+    using Base = Dune::TupleVector<Children...>;
 
     //! Default constructor. Is enable if all children are default constructible.
     template<class C = std::tuple<Children...>,
       std::enable_if_t<std::is_default_constructible_v<C>, int> = 0>
     Tuple ()
-      : Tuple{Children{}...}
+      : Base{Children{}...}
     {}
 
     //! Construct the underlying tuple from the variadic pack of children
     explicit Tuple (Children... children)
-      : Super{std::move(children)...}
+      : Base{std::move(children)...}
     {}
 
     //! Access the i'th sub-descriptor
-    using Super::operator[];
+    using Base::operator[];
 
     //! The static size information, i.e., number of children
     static inline constexpr std::integral_constant<std::size_t, sizeof...(Children)> size{};
@@ -139,34 +139,34 @@ namespace Dune::Functions::ContainerDescriptors {
   struct Array
       : private std::array<Child, n>
   {
-    using Super = std::array<Child, n>;
+    using Base = std::array<Child, n>;
 
     //! Default constructor. Is enable if the child-type is default constructible.
     template<class C = Child,
       std::enable_if_t<std::is_default_constructible_v<C>, int> = 0>
     Array ()
-      : Array{C{}}
+      : Base{Dune::filledArray<n>(C{})}
     {}
 
     //! Construct `n` copies of the passed `child`.
     explicit Array (Child child)
-      : Super{Dune::filledArray<n>(std::move(child))}
+      : Base{Dune::filledArray<n>(std::move(child))}
     {}
 
     //! Construct `n` copies of the passed `child`. Used for CTAD.
     Array (std::integral_constant<std::size_t,n>, Child child)
-      : Super{Dune::filledArray<n>(std::move(child))}
+      : Base{Dune::filledArray<n>(std::move(child))}
     {}
 
     //! Construct the underlying array from the variadic pack of children.
     template <class... Children,
       std::enable_if_t<(std::is_same_v<Children,Child> &&...), int> = 0>
     explicit Array (Children... children)
-      : Super{std::move(children)...}
+      : Base{std::move(children)...}
     {}
 
     //! Access the i'th sub-descriptor.
-    using Super::operator[];
+    using Base::operator[];
 
     //! The static size information, i.e., number of children.
     static inline constexpr std::integral_constant<std::size_t, n> size{};
@@ -192,10 +192,10 @@ namespace Dune::Functions::ContainerDescriptors {
   struct Vector
       : private std::vector<Child>
   {
-    using Super = std::vector<Child>;
-    using Super::Super;
-    using Super::operator[];
-    using Super::size;
+    using Base = std::vector<Child>;
+    using Base::Base;
+    using Base::operator[];
+    using Base::size;
   };
 
   template <class C>

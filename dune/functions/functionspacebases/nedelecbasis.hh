@@ -205,12 +205,6 @@ public:
     return mapper_.size();
   }
 
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
-  }
-
   size_type maxNodeSize() const
   {
     size_type result = 0;
@@ -250,6 +244,16 @@ protected:
   Mapper mapper_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV, typename Range, std::size_t kind, int order>
+struct ContainerDescriptor<NedelecPreBasis<GV,Range,kind,order>>
+{
+  static auto get(const NedelecPreBasis<GV,Range,kind,order>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.dimension()};
+  }
+};
 
 
 template<typename GV, typename Range, size_t kind, int order>

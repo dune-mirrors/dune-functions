@@ -256,12 +256,6 @@ public:
     return dofsPerCodim_[0] * gridView_.size(0) + dofsPerCodim_[1] * gridView_.size(1);
   }
 
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
-  }
-
   size_type maxNodeSize() const
   {
     size_type result = 0;
@@ -317,6 +311,16 @@ protected:
   std::array<int,dim+1> dofsPerCodim_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV, int k>
+struct ContainerDescriptor<RaviartThomasPreBasis<GV,k>>
+{
+  static auto get(const RaviartThomasPreBasis<GV,k>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.dimension()};
+  }
+};
 
 
 template<typename GV, int k>

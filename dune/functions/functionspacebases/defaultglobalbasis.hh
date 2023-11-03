@@ -12,6 +12,7 @@
 #include <dune/common/concept.hh>
 
 #include <dune/functions/common/type_traits.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 #include <dune/functions/functionspacebases/defaultlocalview.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 
@@ -151,12 +152,6 @@ public:
     return preBasis_.size(prefix);
   }
 
-  //! Return the container descriptor associated with the pre-basis
-  auto containerDescriptor() const
-  {
-    return preBasis_.containerDescriptor();
-  }
-
   //! Return local view for basis
   LocalView localView() const
   {
@@ -188,6 +183,16 @@ DefaultGlobalBasis(PreBasis&&) -> DefaultGlobalBasis<std::decay_t<PreBasis>>;
 template<class GridView, class PreBasisFactory>
 DefaultGlobalBasis(const GridView& gv, PreBasisFactory&& f) -> DefaultGlobalBasis<std::decay_t<decltype(f(gv))>>;
 
+
+// specialization of the ContainerDescriptor
+template<class PB>
+struct ContainerDescriptor<DefaultGlobalBasis<PB>>
+{
+  static auto get(const DefaultGlobalBasis<PB>& basis)
+  {
+    return ContainerDescriptor<PB>::get(basis.preBasis());
+  }
+};
 
 
 namespace BasisFactory {

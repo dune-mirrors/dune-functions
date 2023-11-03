@@ -251,8 +251,8 @@ int main (int argc, char *argv[])
     std::cout << std::size_t(i) << ") ";
     auto basis = makeBasis(grid.leafGridView(), BasisFactories::basis(i));
     std::cout << Dune::className(basis.preBasis()) << std::endl;
-    checkSize(test, basis.preBasis().containerDescriptor(), basis, TypeTree::HybridTreePath<>{});
-    checkMultiIndices(test, basis.preBasis().containerDescriptor(), basis);
+    checkSize(test, containerDescriptor(basis.preBasis()), basis, TypeTree::HybridTreePath<>{});
+    checkMultiIndices(test, containerDescriptor(basis.preBasis()), basis);
   });
 
   testMergeTrees(test);

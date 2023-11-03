@@ -212,12 +212,6 @@ public:
     return dofsPerCodim_[0] * gridView_.size(0) + dofsPerCodim_[1] * gridView_.size(1); // only 2d
   }
 
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
-  }
-
   size_type maxNodeSize() const
   {
     // The implementation currently only supports grids with a single element type.
@@ -265,6 +259,16 @@ protected:
   std::array<int,2> dofsPerCodim_ {{dim*(k-1)*3, dim+(k-1)}};
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV, int k>
+struct ContainerDescriptor<BrezziDouglasMariniPreBasis<GV,k>>
+{
+  static auto get(const BrezziDouglasMariniPreBasis<GV,k>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.dimension()};
+  }
+};
 
 
 template<typename GV, int k>

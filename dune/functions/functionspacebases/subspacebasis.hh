@@ -102,12 +102,6 @@ public:
     return rootBasis_->size(prefix);
   }
 
-  //! Return the container descriptor associated with the root-basis
-  auto containerDescriptor() const
-  {
-    return rootBasis_->containerDescriptor();
-  }
-
   /** \brief Return local view for basis
    *
    */
@@ -141,6 +135,16 @@ template<class RootRootBasis, class InnerTP, class OuterTP>
 SubspaceBasis(const SubspaceBasis<RootRootBasis, InnerTP>& rootBasis, const OuterTP& prefixPath)
   -> SubspaceBasis<std::decay_t<decltype(rootBasis.rootBasis())>, Impl::JoinTreePath_t<InnerTP, OuterTP>>;
 
+
+// specialization of the ContainerDescriptor
+template<class RB, class TP>
+struct ContainerDescriptor<SubspaceBasis<RB,TP>>
+{
+  static auto get(const SubspaceBasis<RB,TP>& basis)
+  {
+    return ContainerDescriptor<RB>::get(basis.rootBasis());
+  }
+};
 
 
 /**

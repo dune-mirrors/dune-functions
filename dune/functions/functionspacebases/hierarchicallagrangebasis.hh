@@ -117,12 +117,6 @@ namespace Dune {
         return size();
       }
 
-      //! Return a flat container descriptor for this preBasis
-      auto containerDescriptor() const
-      {
-        return ContainerDescriptors::FlatVector{dimension()};
-      }
-
       /** \brief Get the maximal number of DOFs associated to node for any element
        *
        * See https://en.wikipedia.org/wiki/Figurate_number for an explanation of the formula
@@ -177,6 +171,16 @@ namespace Dune {
       }
     };
 
+
+    // specialization of the ContainerDescriptor
+    template<typename GV, int k, typename R>
+    struct ContainerDescriptor<HierarchicalLagrangePreBasis<GV,k,R>>
+    {
+      static auto get(const HierarchicalLagrangePreBasis<GV,k,R>& preBasis)
+      {
+        return ContainerDescriptors::FlatVector{preBasis.dimension()};
+      }
+    };
 
 
     template<typename GV, int k, typename R>

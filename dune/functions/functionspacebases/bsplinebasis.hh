@@ -697,12 +697,6 @@ public:
     return Node{this};
   }
 
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
-  }
-
   //! Get the maximal number of DOFs associated to node for any element
   size_type maxNodeSize() const
   {
@@ -1226,6 +1220,16 @@ public:
   GridView gridView_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV>
+struct ContainerDescriptor<BSplinePreBasis<GV>>
+{
+  static auto get(const BSplinePreBasis<GV>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.dimension()};
+  }
+};
 
 
 template<typename GV>

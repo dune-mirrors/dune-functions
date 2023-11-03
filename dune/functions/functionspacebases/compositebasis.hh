@@ -167,24 +167,6 @@ public:
     return size(prefix, IndexMergingStrategy{});
   }
 
-  //! Return the associated container descriptor
-  auto containerDescriptor() const
-  {
-    using namespace Dune::Functions::BasisFactory;
-    if constexpr(std::is_same_v<IMS, BlockedLexicographic>) {
-      return std::apply([&](auto const&... spb) {
-        return ContainerDescriptors::makeDescriptor(spb.containerDescriptor()...);
-      }, subPreBases_);
-    }
-    else if constexpr(std::is_same_v<IMS, FlatLexicographic>) {
-      return std::apply([&](auto const&... spb) {
-        return ContainerDescriptors::Impl::mergeTrees<FlatLexicographic>(spb.containerDescriptor()...);
-      }, subPreBases_);
-    }
-    else
-      return ContainerDescriptors::Unknown{};
-  }
-
 
 private:
 
@@ -272,6 +254,18 @@ public:
     return std::get<i>(subPreBases_);
   }
 
+  //! Const access to the stored prebases
+  const auto& subPreBases() const
+  {
+    return subPreBases_;
+  }
+
+  //! Mutable access to the stored prebases
+  auto& subPreBases()
+  {
+    return subPreBases_;
+  }
+
   //! Maps from subtree index set [0..size-1] to a globally unique multi index in global basis
   template<typename It>
   It indices(const Node& node, It it) const
@@ -331,6 +325,31 @@ private:
   std::tuple<SPB...> subPreBases_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<class IMS, class... SPB>
+struct ContainerDescriptor<CompositePreBasis<IMS,SPB...>>
+{
+  //! Return the associated container descriptor
+  static auto get(const CompositePreBasis<IMS,SPB...>& preBasis)
+  {
+    using namespace Dune::Functions::BasisFactory;
+    if constexpr(std::is_same_v<IMS, BlockedLexicographic>) {
+      return std::apply([&](auto const&... spb) {
+        return ContainerDescriptors::makeDescriptor
+          (ContainerDescriptor<SPB>::get(spb)...);
+      }, preBasis.subPreBases());
+    }
+    else if constexpr(std::is_same_v<IMS, FlatLexicographic>) {
+      return std::apply([&](auto const&... spb) {
+        return ContainerDescriptors::Impl::mergeTrees<FlatLexicographic>
+          (ContainerDescriptor<SPB>::get(spb)...);
+      }, preBasis.subPreBases());
+    }
+    else
+      return ContainerDescriptors::Unknown{};
+  }
+};
 
 
 namespace BasisFactory {

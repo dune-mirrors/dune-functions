@@ -132,12 +132,6 @@ public:
     DUNE_THROW(Dune::NotImplemented, "No size method for " << dim << "d grids available yet!");
   }
 
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
-  }
-
   size_type maxNodeSize() const
   {
     return Dune::power(k+1, int(GV::dimension));
@@ -196,6 +190,16 @@ protected:
   size_t hexahedronOffset_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV, int k>
+struct ContainerDescriptor<LagrangeDGPreBasis<GV,k>>
+{
+  static auto get(const LagrangeDGPreBasis<GV,k>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.dimension()};
+  }
+};
 
 
 namespace BasisFactory {

@@ -185,6 +185,17 @@ TransformedIndexPreBasis(RPB&&, T&&) -> TransformedIndexPreBasis<std::decay_t<RP
 } // end namespace Experimental
 
 
+// specialization of the ContainerDescriptor
+template<class RPB, class T>
+struct ContainerDescriptor<Experimental::TransformedIndexPreBasis<RPB,T>>
+{
+  static auto get(const Experimental::TransformedIndexPreBasis<RPB,T>& preBasis)
+  {
+    return preBasis.containerDescriptor();
+  }
+};
+
+
 namespace BasisFactory {
 namespace Experimental {
 

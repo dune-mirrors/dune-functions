@@ -134,26 +134,6 @@ public:
     return sizeImp<useHybridIndices>(prefix);
   }
 
-  /**
-   * \brief Return an container descriptor depending on the flag `useHybridIndices`.
-   * Either return a `Tuple` if hybrid indices should be used,
-   * otherwise return an `Array`.
-   **/
-  auto containerDescriptor() const
-  {
-    if constexpr(useHybridIndices)
-      return ContainerDescriptors::Tuple{
-        ContainerDescriptors::UniformVector{pq2PreBasis_.size(),
-          ContainerDescriptors::FlatArray<dim>{}},
-        ContainerDescriptors::FlatVector{pq1PreBasis_.size()}
-      };
-    else
-      return ContainerDescriptors::Array<ContainerDescriptors::FlatVector,2>{
-        ContainerDescriptors::FlatVector{dim * pq2PreBasis_.size()},
-        ContainerDescriptors::FlatVector{pq1PreBasis_.size()}
-      };
-  }
-
 private:
 
   template<bool hi, class SizePrefix,
@@ -215,6 +195,18 @@ public:
   It indices(const Node& node, It it) const
   {
     return indicesImp<useHybridIndices>(node, it);
+  }
+
+  //! Get the stored pressure basis
+  const PQ1PreBasis& pq1PreBasis()
+  {
+    return pq1PreBasis_;
+  }
+
+  //! Get the stored velocity component basis
+  const PQ2PreBasis& pq2PreBasis()
+  {
+    return pq2PreBasis_;
   }
 
 protected:
@@ -282,6 +274,31 @@ protected:
   PQ2PreBasis pq2PreBasis_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV, bool HI>
+struct ContainerDescriptor<TaylorHoodPreBasis<GV,HI>>
+{
+  /**
+   * \brief Return an container descriptor depending on the flag `HI`.
+   * Either return a `Tuple` if hybrid indices should be used,
+   * otherwise return an `Array`.
+   **/
+  static auto get(const TaylorHoodPreBasis<GV,HI>& preBasis)
+  {
+    if constexpr(HI)
+      return ContainerDescriptors::Tuple{
+        ContainerDescriptors::UniformVector{preBasis.pq2PreBasis().size(),
+          ContainerDescriptors::FlatArray<dim>{}},
+        ContainerDescriptors::FlatVector{preBasis.pq1PreBasis().size()}
+      };
+    else
+      return ContainerDescriptors::Array<ContainerDescriptors::FlatVector,2>{
+        ContainerDescriptors::FlatVector{GV::dimension * preBasis.pq2PreBasis().size()},
+        ContainerDescriptors::FlatVector{preBasis.pq1PreBasis().size()}
+      };
+  }
+};
 
 
 template<typename GV>

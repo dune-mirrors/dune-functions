@@ -15,11 +15,6 @@
 
 namespace Dune {
 namespace Functions {
-namespace ContainerDescriptors {
-  struct Value;
-  struct Unknown;
-}
-
 namespace Concept {
 
 using namespace Dune::Concept;
@@ -50,23 +45,6 @@ struct HasIndexAccess
   template<class C, class I>
   auto require(C&& c, I&& i) -> decltype(
     c[i]
-  );
-};
-
-
-// Concept for an container descriptor
-struct ContainerDescriptor
-{
-  template<class CD = void>
-  void require(const ContainerDescriptors::Value&);
-
-  template<class CD = void>
-  void require(const ContainerDescriptors::Unknown&);
-
-  template<class CD>
-  auto require(const CD& containerDescriptor) -> decltype(
-    requireConvertible<std::size_t>(containerDescriptor.size()),
-    requireConcept<ContainerDescriptor>(containerDescriptor[index_constant<0>{}])
   );
 };
 
@@ -184,7 +162,6 @@ public:
     requireConvertible<typename PB::size_type>(preBasis.maxNodeSize()),
     requireSameType<decltype(const_cast<PB&>(preBasis).update(preBasis.gridView())),void>(),
     requireConcept<BasisTree<typename PB::GridView>>(preBasis.makeNode()),
-    requireConcept<ContainerDescriptor>(preBasis.containerDescriptor()),
     requireConvertible<typename std::vector<MultiIndex<PB>>::iterator>(
       preBasis.indices(
         preBasis.makeNode(),
@@ -243,8 +220,7 @@ struct GlobalBasis
     requireConvertible<typename B::size_type>(basis.size(std::declval<typename B::SizePrefix>())),
     requireConvertible<typename B::size_type>(basis.dimension()),
     requireSameType<decltype(const_cast<B&>(basis).update(basis.gridView())),void>(),
-    requireConcept<LocalView<B>>(basis.localView()),
-    requireConcept<ContainerDescriptor>(basis.containerDescriptor())
+    requireConcept<LocalView<B>>(basis.localView())
   );
 };
 

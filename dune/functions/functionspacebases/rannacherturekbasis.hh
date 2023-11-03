@@ -105,12 +105,6 @@ public:
     return (size_type)(gridView_.size(1));
   }
 
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
-  }
-
   //! Get the maximal number of DOFs associated to node for any element
   size_type maxNodeSize() const
   {
@@ -135,6 +129,16 @@ protected:
   GridView gridView_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV>
+struct ContainerDescriptor<RannacherTurekPreBasis<GV>>
+{
+  static auto get(const RannacherTurekPreBasis<GV>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.dimension()};
+  }
+};
 
 
 template<typename GV>

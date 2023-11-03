@@ -117,12 +117,12 @@ void test(Dune::TestSuite& testSuite, GridView const& gridView, index_constant<I
   auto basis = makeBasis(gridView, BasisFactories::basis(ii));
   auto const& preBasis = basis.preBasis();
 
-  using Vector1 = decltype(vectorGenerator<double>(preBasis.containerDescriptor()));    // generate vector
+  using Vector1 = decltype(vectorGenerator<double>(containerDescriptor(preBasis)));    // generate vector
   using Vector2 = decltype(BasisFactories::template vector<double>(ii));   // expected type
 
   std::cout << ii << ":" << std::endl;
   std::cout << Dune::className(preBasis) << std::endl;
-  std::cout << Dune::className(preBasis.containerDescriptor()) << std::endl;;
+  std::cout << Dune::className(containerDescriptor(preBasis)) << std::endl;;
   std::cout << Dune::className<Vector1>() << std::endl;;
   testSuite.check(std::is_same_v<Vector1,Vector2>);
   if (!std::is_same_v<Vector1,Vector2>) {

@@ -128,12 +128,6 @@ public:
     return size();
   }
 
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
-  }
-
   //! Get the maximal number of DOFs associated to node for any element
   size_type maxNodeSize () const
   {
@@ -233,6 +227,16 @@ protected:
   size_type tetrahedronOffset_;
 };
 
+
+// specialization of the ContainerDescriptor
+template<typename GV, int k, typename R>
+struct ContainerDescriptor<RefinedLagrangePreBasis<GV,k,R>>
+{
+  static auto get(const RefinedLagrangePreBasis<GV,k,R>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.dimension()};
+  }
+};
 
 
 template <typename GV, int k, typename R>

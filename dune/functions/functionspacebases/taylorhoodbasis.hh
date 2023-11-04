@@ -289,7 +289,7 @@ struct ContainerDescriptor<TaylorHoodPreBasis<GV,HI>>
     if constexpr(HI)
       return ContainerDescriptors::Tuple{
         ContainerDescriptors::UniformVector{preBasis.pq2PreBasis().size(),
-          ContainerDescriptors::FlatArray<dim>{}},
+          ContainerDescriptors::FlatArray<GV::dimension>{}},
         ContainerDescriptors::FlatVector{preBasis.pq1PreBasis().size()}
       };
     else

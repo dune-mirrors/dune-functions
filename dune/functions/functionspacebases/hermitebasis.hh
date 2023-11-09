@@ -45,7 +45,7 @@ struct HermiteTransformator {
     static constexpr std::size_t numberOfVertices = dim + 1;
     static constexpr std::size_t numberOfInnerDofs = reduced ? 0 : (dim - 1) * (dim - 1);
     static constexpr std::size_t numberOfVertexDofs = numberOfVertices * numberOfVertices;
-
+    using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
   public:
     using GlobalState = typename GlobalStateTraits::GlobalState;
     using LocalState = typename GlobalStateTraits::LocalState;
@@ -90,7 +90,7 @@ struct HermiteTransformator {
     * but only assume the Values to be Elements of a Vectorspace.
       We assume random access containers. */
     template<typename InputValues, typename OutputValues>
-    void transform(InputValues const &inValues, OutputValues &outValues) const
+    void transform(InputValues const &inValues, OutputValues &outValues, LocalCoordinate const& x) const
     {
       assert(inValues.size() == numberOfVertexDofs + numberOfInnerDofs);
       assert(reduced || (outValues.size() == inValues.size()));

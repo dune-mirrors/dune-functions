@@ -8,6 +8,7 @@
 #include <dune/common/std/type_traits.hh>
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/transformatorconcepts.hh>
+#include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/istl/scaledidmatrix.hh>
 #include <dune/localfunctions/common/localfiniteelementtraits.hh>
 #include <dune/localfunctions/common/localkey.hh>
@@ -134,7 +135,7 @@ class TransformedLocalBasis
       rangeBuffer_.resize(localValuedLocalBasis_->size());
       localValuedLocalBasis_->evaluateFunction(x, rangeBuffer_);
       out.resize(size());
-      transformator_->transform(rangeBuffer_, out);
+      transformator_->transform(rangeBuffer_, out, x);
     }
 
     /** \brief Evaluate Jacobian of all shape functions
@@ -150,7 +151,7 @@ class TransformedLocalBasis
       jacobianBuffer_.resize(localValuedLocalBasis_->size());
       localValuedLocalBasis_->evaluateJacobian(x, jacobianBuffer_);
       out.resize(size());
-      transformator_->transform(jacobianBuffer_, out);
+      transformator_->transform(jacobianBuffer_, out, x);
     }
 
     /** \brief Evaluate Hessian of all shape functions
@@ -171,7 +172,7 @@ class TransformedLocalBasis
       hessianBuffer_.resize(localValuedLocalBasis_->size());
       localValuedLocalBasis_->evaluateHessian(x, hessianBuffer_);
       out.resize(size());
-      transformator_->transform(hessianBuffer_, out);
+      transformator_->transform(hessianBuffer_, out, x);
     }
 
     /** \brief Evaluate partial derivatives of any order of all shape functions
@@ -190,7 +191,7 @@ class TransformedLocalBasis
       rangeBuffer_.resize(localValuedLocalBasis_->size());
       localValuedLocalBasis_->partial(order, x, rangeBuffer_);
       out.resize(size());
-      transformator_->transform(rangeBuffer_, out);
+      transformator_->transform(rangeBuffer_, out, x);
     }
 
     //! \brief Polynomial order of the shape functions
@@ -432,6 +433,7 @@ class TransformedLocalFiniteElement
       // bind the transformator, i.e. also the global State
       transformator_.bind(*element_);
       // To allow chaining, we bind the localValued fe as well
+      // In particular, this allows to wrap a FEVariant & FEMap combiniation
       if constexpr (models<Concept::BindableTo<Element>, LocalValuedLFE>())
         localValuedLFE_.bind(*element_);
       globalValuedLocalBasis_.bind(*element_, localValuedLFE_.localBasis());

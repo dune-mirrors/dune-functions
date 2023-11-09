@@ -49,14 +49,14 @@ template <class Element, class LocalFiniteElement>
 struct TransformatorBase {
   using LocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
   using JacobianType = typename LocalBasis::Traits::JacobianType;
+  using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
   template <class T>
   auto require(T &&t)
       -> decltype(t.bind(std::declval<Element>()),
                   t.transform(std::declval<std::vector<double> const &>(),
-                              std::declval<std::vector<double> &>()),
+                              std::declval<std::vector<double> &>(), std::declval<LocalCoordinate const&>()),
                   t.transform(std::declval<std::vector<JacobianType> const &>(),
-                      std::declval<std::vector<JacobianType> &>()),
-                  t.makeGlobalValuedInterpolation()
+                      std::declval<std::vector<JacobianType> &>(), std::declval<LocalCoordinate const&>() )
   );
 };
 

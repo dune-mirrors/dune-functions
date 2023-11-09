@@ -112,13 +112,15 @@ struct RangeSpaceTransformator
   using F = DifferentiableFunction<RangeType(LocalCoordinate)>;
   template <class T>
   auto require(T &&t)
-      -> decltype(std::declval<typename T::template LocalFunction<
-                      F, LocalCoordinate, Element>>(),
-                  // Here we assume that the Transformation does not change the
-                  // Type. This might not be true, e.g. on surfaces
-                  requireConcept<Function<RangeType(LocalCoordinate)>>(
-                      std::declval<typename T::template LocalFunction<
-                          F, LocalCoordinate, Element>>()));
+      -> decltype(std::declval<typename T::template LocalValuedFunction<
+                      F, LocalCoordinate>>()
+                  //     ,
+                  // // Here we assume that the Transformation does not change the
+                  // // Type. This might not be true, e.g. on surfaces
+                  // requireConcept<Function<RangeType(LocalCoordinate)>>(
+                  //     std::declval<typename T::template LocalValuedFunction<
+                  //         F, LocalCoordinate>>())
+                          );
 };
 } // namespace Concept
 } // namespace Dune::Functions

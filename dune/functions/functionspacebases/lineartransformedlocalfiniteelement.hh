@@ -325,7 +325,7 @@ struct GlobalValuedInterpolationType<
     std::enable_if_t<models<Concept::RangeSpaceTransformator<Element, LocalFE>, Transformator>(),
                      bool>> {
     using type = RangeSpaceTransformingGlobalValuedLocalInterpolation<
-        Transformator, typename LocalFE::Traits::LocalInterpolation, Element>;
+        Transformator, typename LocalFE::Traits::LocalInterpolationType, Element>;
 };
 
 /** \brief Associations of the transformed degrees of freedom to subentities of
@@ -346,7 +346,7 @@ class TransformedLocalCoefficients
     using LocalValuedLocalBasis = typename LocalValuedLFE::Traits::LocalBasisType;
 
   public:
-    using size_type = typename LocalValuedLocalCoefficients::size_type;
+    using size_type = std::size_t; // typename LocalValuedLocalCoefficients::size_type
 
   public:
     TransformedLocalCoefficients(Transformator const &transformator)
@@ -412,10 +412,10 @@ class TransformedLocalFiniteElement
     template<class GlobalState, class... Args>
     TransformedLocalFiniteElement(GlobalState &&globalState, Args &&...args)
         : transformator_(std::forward<GlobalState>(globalState)),
-          localValuedLFE_(std::forward<Args>(args)...), globalValuedLocalBasis_(transformator_),
+          localValuedLFE_(std::forward<Args>(args)...),
+          globalValuedLocalBasis_(transformator_),
           globalValuedLocalInterpolation_(transformator_),
           globalValuedLocalCoefficients_(transformator_)
-
     {
     }
     /**
@@ -496,10 +496,12 @@ class TransformedNode : public LeafBasisNode
     using FiniteElement =
         Impl::TransformedLocalFiniteElement<Transformator, LocalValuedLocalFiniteElement, Element>;
 
-    template<class GlobalState>
-    TransformedNode(GlobalState const &globalState) : finiteElement_(globalState)
+    template<class... GlobalState>
+    TransformedNode(GlobalState&&... globalState)
+    : finiteElement_(std::forward<GlobalState>(globalState)...)
     {
-      this->setSize(finiteElement_.size());
+      // finiteElement_ is not bound yet, i.e. it might not have a size
+      // this->setSize(finiteElement_.size());
     }
 
     ~TransformedNode() {}

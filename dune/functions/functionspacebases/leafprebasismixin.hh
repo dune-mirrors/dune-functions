@@ -56,6 +56,12 @@ public:
     return derived().dimension();
   }
 
+  //! Return a flat container descriptor for this preB-basis
+  auto containerDescriptor() const
+  {
+    return ContainerDescriptors::FlatVector{size()};
+  }
+
 private:
   const Derived& derived() const
   {

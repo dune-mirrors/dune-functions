@@ -24,7 +24,6 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 namespace Dune {
 namespace Functions {
@@ -254,12 +253,6 @@ public:
   size_type dimension() const
   {
     return dofsPerCodim_[0] * gridView_.size(0) + dofsPerCodim_[1] * gridView_.size(1);
-  }
-
-  //! Return a flat container descriptor for this preBasis
-  auto containerDescriptor() const
-  {
-    return ContainerDescriptors::FlatVector{dimension()};
   }
 
   size_type maxNodeSize() const

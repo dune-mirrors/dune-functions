@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <type_traits>
 
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
+
 namespace Dune::Functions {
 
 /**

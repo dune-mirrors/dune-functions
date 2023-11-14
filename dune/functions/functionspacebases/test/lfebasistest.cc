@@ -20,15 +20,15 @@ using namespace Dune::Functions;
 
 // define a pre-basis based on the LFEPreBasisMixin
 template <class GV, class R = double>
-class RefinedP0Basis :
+class RefinedP0PreBasis :
   public Dune::Functions::LFEPreBasisMixin<GV, Dune::RefinedP0LocalFiniteElement<typename GV::ctype,R,GV::dimension>>
 {
   using LFE = Dune::RefinedP0LocalFiniteElement<typename GV::ctype,R,GV::dimension>;
   using Base = LFEPreBasisMixin<GV, LFE>;
   static const int dim = GV::dimension;
 public:
-  RefinedP0Basis (const GV& gv) :
-    Base(gv, [](Dune::GeometryType gt, int) { return gt.dim() == dim ? (1 << dim) : 0; })
+  RefinedP0PreBasis (const GV& gv) :
+    Base(gv, [](Dune::GeometryType gt, int) { return (gt.dim() == dim) ? (1 << dim) : 0; })
   {}
 };
 
@@ -54,7 +54,7 @@ int main (int argc, char* argv[])
 
     // compare two bases that should be exactly identical, but that are implemented differently
     auto basis0 = makeBasis(gridView, refinedLagrange<0>());
-    auto basis1 = DefaultGlobalBasis<RefinedP0Basis<GridView>>(gridView);
+    auto basis1 = DefaultGlobalBasis<RefinedP0PreBasis<GridView>>(gridView);
 
     test.subTest(checkBasis(basis0));
     test.subTest(checkBasis(basis1));

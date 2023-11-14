@@ -35,11 +35,12 @@ class LFEPreBasisMixin;
  * \code{.cpp}
    template <class GV, class R = double>
    class RefinedP0Basis :
-      LFEPreBasisMixin<GV, RefinedP0LocalFiniteElement<typename GV::ctype,R,GV::dimension>>
+      public LFEPreBasisMixin<GV, RefinedP0LocalFiniteElement<typename GV::ctype,R,GV::dimension>>
    {
      using LFE = RefinedP0LocalFiniteElement<typename GV::ctype,R,GV::dimension>;
      using Base = LFEPreBasisMixin<GV, LFE>;
      static const int dim = GV::dimension;
+   public:
      RefinedP0Basis (const GV& gv) :
        Base(gv, [](GeometryType gt, int) { return gt.dim() == dim ? 1<<dim : 0; })
      {}

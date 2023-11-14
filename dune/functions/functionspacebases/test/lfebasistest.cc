@@ -28,7 +28,7 @@ class RefinedP0Basis :
   static const int dim = GV::dimension;
 public:
   RefinedP0Basis (const GV& gv) :
-    Base(gv, [](Dune::GeometryType gt, int) { return gt.dim() == dim ? 1<<dim : 0; })
+    Base(gv, [](Dune::GeometryType gt, int) { return gt.dim() == dim ? (1 << dim) : 0; })
   {}
 };
 
@@ -62,17 +62,17 @@ int main (int argc, char* argv[])
     auto localView0 = basis0.localView();
     auto localView1 = basis1.localView();
 
-    test.check(localView0.maxSize() == localView1.maxSize());
+    test.check(localView0.maxSize() == localView1.maxSize(), "maxSize");
 
     for (auto const& e : elements(gridView))
     {
       localView0.bind(e);
       localView1.bind(e);
 
-      test.check(localView0.size() == localView1.size());
+      test.check(localView0.size() == localView1.size(), "size");
       for (std::size_t i = 0; i < localView0.size(); ++i)
       {
-        test.check(localView0.index(i) == localView1.index(i));
+        test.check(localView0.index(i) == localView1.index(i), "index");
       }
 
       auto const& lfe0 = localView0.tree().finiteElement();

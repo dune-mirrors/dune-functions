@@ -4,6 +4,7 @@ install(FILES
         analyticgridviewfunction.hh
         composedgridfunction.hh
         discreteglobalbasisfunction.hh
+        elementgeometrygridfunction.hh
         gridfunction.hh
         gridfunction_imp.hh
         gridviewentityset.hh

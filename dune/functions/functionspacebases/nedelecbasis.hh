@@ -244,6 +244,7 @@ protected:
 };
 
 
+
 template<typename GV, typename Range, size_t kind, int order>
 class NedelecNode :
   public LeafBasisNode

@@ -129,6 +129,7 @@ protected:
 };
 
 
+
 template<typename GV>
 class RannacherTurekNode :
   public LeafBasisNode

@@ -255,6 +255,7 @@ protected:
 };
 
 
+
 template<typename GV, int k>
 class BrezziDouglasMariniNode :
   public LeafBasisNode

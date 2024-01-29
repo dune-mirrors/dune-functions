@@ -1220,6 +1220,7 @@ public:
 };
 
 
+
 template<typename GV>
 class BSplineNode :
   public LeafBasisNode

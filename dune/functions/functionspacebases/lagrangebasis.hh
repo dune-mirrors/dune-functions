@@ -364,6 +364,7 @@ protected:
 };
 
 
+
 template<typename GV, int k, typename R>
 class LagrangeNode :
   public LeafBasisNode

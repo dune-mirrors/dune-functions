@@ -12,6 +12,7 @@
 #include <dune/functions/functionspacebases/basistags.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
+#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 
@@ -360,6 +361,38 @@ protected:
 protected:
   std::size_t children_;
   SubPreBasis subPreBasis_;
+};
+
+
+// specialization of the ContainerDescriptor
+template<class IMS, class SPB>
+struct ContainerDescriptorFactory<DynamicPowerPreBasis<IMS,SPB>>
+{
+  template <class PB, class Size = std::integral_constant<std::size_t,PB::children()>>
+  static Size _size (const PB&, Dune::PriorityTag<1>) { return {}; }
+
+  template <class PB>
+  static std::size_t _size (const PB& pb, Dune::PriorityTag<0>) { return pb.children(); }
+
+  //! Return the associated container descriptor
+  template <class PowerPreBasis>
+  static auto create(const PowerPreBasis& preBasis)
+  {
+    using namespace Dune::Functions::BasisFactory;
+
+    const auto children = _size(preBasis, Dune::PriorityTag<2>{});
+    auto subTree = containerDescriptor(preBasis.subPreBasis());
+    if constexpr(std::is_same_v<IMS, FlatInterleaved>)
+      return ContainerDescriptors::Impl::mergeIdenticalTrees<FlatInterleaved>(children,subTree);
+    else if constexpr(std::is_same_v<IMS, FlatLexicographic>)
+      return ContainerDescriptors::Impl::mergeIdenticalTrees<FlatLexicographic>(children,subTree);
+    else if constexpr(std::is_same_v<IMS, BlockedLexicographic>)
+      return ContainerDescriptors::makeUniformDescriptor(children,std::move(subTree));
+    else if constexpr(std::is_same_v<IMS, BlockedInterleaved>)
+      return ContainerDescriptors::Impl::appendToTree(subTree,children);
+    else
+      return ContainerDescriptors::Unknown{};
+  }
 };
 
 

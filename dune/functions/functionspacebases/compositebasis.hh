@@ -328,22 +328,22 @@ private:
 
 // specialization of the ContainerDescriptor
 template<class IMS, class... SPB>
-struct ContainerDescriptor<CompositePreBasis<IMS,SPB...>>
+struct ContainerDescriptorFactory<CompositePreBasis<IMS,SPB...>>
 {
   //! Return the associated container descriptor
-  static auto get(const CompositePreBasis<IMS,SPB...>& preBasis)
+  static auto create(const CompositePreBasis<IMS,SPB...>& preBasis)
   {
     using namespace Dune::Functions::BasisFactory;
     if constexpr(std::is_same_v<IMS, BlockedLexicographic>) {
       return std::apply([&](auto const&... spb) {
         return ContainerDescriptors::makeDescriptor
-          (ContainerDescriptor<SPB>::get(spb)...);
+          (containerDescriptor(spb)...);
       }, preBasis.subPreBases());
     }
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>) {
       return std::apply([&](auto const&... spb) {
         return ContainerDescriptors::Impl::mergeTrees<FlatLexicographic>
-          (ContainerDescriptor<SPB>::get(spb)...);
+          (containerDescriptor(spb)...);
       }, preBasis.subPreBases());
     }
     else

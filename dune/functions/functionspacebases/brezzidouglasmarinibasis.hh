@@ -19,12 +19,7 @@
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-<<<<<<< HEAD
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/indextree.hh>
-=======
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
->>>>>>> f5098ee (Change name from indexTree to containerDescriptor as decided in the dune-functions meeting)
 
 namespace Dune {
 namespace Functions {
@@ -257,17 +252,6 @@ protected:
   FiniteElementMap finiteElementMap_;
   // Number of dofs per entity type depending on the entity's codimension and type
   std::array<int,2> dofsPerCodim_ {{dim*(k-1)*3, dim+(k-1)}};
-};
-
-
-// specialization of the ContainerDescriptor
-template<typename GV, int k>
-struct ContainerDescriptor<BrezziDouglasMariniPreBasis<GV,k>>
-{
-  static auto get(const BrezziDouglasMariniPreBasis<GV,k>& preBasis)
-  {
-    return ContainerDescriptors::FlatVector{preBasis.dimension()};
-  }
 };
 
 

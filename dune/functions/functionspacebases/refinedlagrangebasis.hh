@@ -11,7 +11,6 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/flatmultiindex.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 namespace Dune {
@@ -225,17 +224,6 @@ protected:
   size_type edgeOffset_;
   size_type triangleOffset_;
   size_type tetrahedronOffset_;
-};
-
-
-// specialization of the ContainerDescriptor
-template<typename GV, int k, typename R>
-struct ContainerDescriptor<RefinedLagrangePreBasis<GV,k,R>>
-{
-  static auto get(const RefinedLagrangePreBasis<GV,k,R>& preBasis)
-  {
-    return ContainerDescriptors::FlatVector{preBasis.dimension()};
-  }
 };
 
 

@@ -113,14 +113,14 @@ public:
 
 // specialization of the ContainerDescriptor
 template<class IMS, class SPB, std::size_t C>
-struct ContainerDescriptor<PowerPreBasis<IMS,SPB,C>>
+struct ContainerDescriptorFactory<PowerPreBasis<IMS,SPB,C>>
 {
   //! Return the associated container descriptor
-  static auto get(const PowerPreBasis<IMS,SPB,C>& preBasis)
+  static auto create(const PowerPreBasis<IMS,SPB,C>& preBasis)
   {
     using namespace Dune::Functions::BasisFactory;
 
-    auto subTree = ContainerDescriptor<SPB>::get(preBasis.subPreBasis());
+    auto subTree = containerDescriptor(preBasis.subPreBasis());
     if constexpr(std::is_same_v<IMS, FlatInterleaved>)
       return ContainerDescriptors::Impl::mergeIdenticalTrees<C,FlatInterleaved>(subTree);
     else if constexpr(std::is_same_v<IMS, FlatLexicographic>)

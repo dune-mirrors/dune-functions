@@ -186,11 +186,11 @@ DefaultGlobalBasis(const GridView& gv, PreBasisFactory&& f) -> DefaultGlobalBasi
 
 // specialization of the ContainerDescriptor
 template<class PB>
-struct ContainerDescriptor<DefaultGlobalBasis<PB>>
+struct ContainerDescriptorFactory<DefaultGlobalBasis<PB>>
 {
-  static auto get(const DefaultGlobalBasis<PB>& basis)
+  static auto create(const DefaultGlobalBasis<PB>& basis)
   {
-    return ContainerDescriptor<PB>::get(basis.preBasis());
+    return containerDescriptor(basis.preBasis());
   }
 };
 

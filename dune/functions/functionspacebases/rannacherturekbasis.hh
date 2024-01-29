@@ -14,7 +14,6 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 namespace Dune {
@@ -127,17 +126,6 @@ public:
 
 protected:
   GridView gridView_;
-};
-
-
-// specialization of the ContainerDescriptor
-template<typename GV>
-struct ContainerDescriptor<RannacherTurekPreBasis<GV>>
-{
-  static auto get(const RannacherTurekPreBasis<GV>& preBasis)
-  {
-    return ContainerDescriptors::FlatVector{preBasis.dimension()};
-  }
 };
 
 

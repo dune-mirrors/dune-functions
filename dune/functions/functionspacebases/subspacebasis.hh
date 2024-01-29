@@ -138,11 +138,11 @@ SubspaceBasis(const SubspaceBasis<RootRootBasis, InnerTP>& rootBasis, const Oute
 
 // specialization of the ContainerDescriptor
 template<class RB, class TP>
-struct ContainerDescriptor<SubspaceBasis<RB,TP>>
+struct ContainerDescriptorFactory<SubspaceBasis<RB,TP>>
 {
-  static auto get(const SubspaceBasis<RB,TP>& basis)
+  static auto create(const SubspaceBasis<RB,TP>& basis)
   {
-    return ContainerDescriptor<RB>::get(basis.rootBasis());
+    return containerDescriptor(basis.rootBasis());
   }
 };
 

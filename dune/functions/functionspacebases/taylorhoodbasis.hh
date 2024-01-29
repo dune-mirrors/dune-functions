@@ -277,14 +277,14 @@ protected:
 
 // specialization of the ContainerDescriptor
 template<typename GV, bool HI>
-struct ContainerDescriptor<TaylorHoodPreBasis<GV,HI>>
+struct ContainerDescriptorFactory<TaylorHoodPreBasis<GV,HI>>
 {
   /**
    * \brief Return an container descriptor depending on the flag `HI`.
    * Either return a `Tuple` if hybrid indices should be used,
    * otherwise return an `Array`.
    **/
-  static auto get(const TaylorHoodPreBasis<GV,HI>& preBasis)
+  static auto create(const TaylorHoodPreBasis<GV,HI>& preBasis)
   {
     if constexpr(HI)
       return ContainerDescriptors::Tuple{

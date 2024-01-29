@@ -16,7 +16,6 @@
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 namespace Dune::Functions
 {
@@ -242,17 +241,6 @@ protected:
   GridView gridView_;
   FiniteElementMap finiteElementMap_;
   Mapper mapper_;
-};
-
-
-// specialization of the ContainerDescriptor
-template<typename GV, typename Range, std::size_t kind, int order>
-struct ContainerDescriptor<NedelecPreBasis<GV,Range,kind,order>>
-{
-  static auto get(const NedelecPreBasis<GV,Range,kind,order>& preBasis)
-  {
-    return ContainerDescriptors::FlatVector{preBasis.dimension()};
-  }
 };
 
 

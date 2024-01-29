@@ -13,7 +13,6 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 namespace Dune {
@@ -362,17 +361,6 @@ protected:
   size_type prismOffset_;
   size_type hexahedronOffset_;
 
-};
-
-
-// specialization of the ContainerDescriptor
-template<typename GV, int k, typename R>
-struct ContainerDescriptor<LagrangePreBasis<GV,k,R>>
-{
-  static auto get(const LagrangePreBasis<GV,k,R>& preBasis)
-  {
-    return ContainerDescriptors::FlatVector{preBasis.dimension()};
-  }
 };
 
 

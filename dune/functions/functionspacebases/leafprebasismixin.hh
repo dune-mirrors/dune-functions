@@ -63,6 +63,17 @@ private:
   }
 };
 
+// specialization of the ContainerDescriptor
+template<class Derived>
+struct ContainerDescriptorFactory<Derived,
+  std::enable_if_t<std::is_base_of_v<LeafPreBasisMixin<Derived>, Derived>>>
+{
+  static auto create(const LeafPreBasisMixin<Derived>& preBasis)
+  {
+    return ContainerDescriptors::FlatVector{preBasis.size()};
+  }
+};
+
 
 } // end namespace Dune::Functions
 

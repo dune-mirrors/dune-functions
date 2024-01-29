@@ -174,9 +174,9 @@ namespace Dune {
 
     // specialization of the ContainerDescriptor
     template<typename GV, int k, typename R>
-    struct ContainerDescriptor<HierarchicalLagrangePreBasis<GV,k,R>>
+    struct ContainerDescriptorFactory<HierarchicalLagrangePreBasis<GV,k,R>>
     {
-      static auto get(const HierarchicalLagrangePreBasis<GV,k,R>& preBasis)
+      static auto create(const HierarchicalLagrangePreBasis<GV,k,R>& preBasis)
       {
         return ContainerDescriptors::FlatVector{preBasis.dimension()};
       }

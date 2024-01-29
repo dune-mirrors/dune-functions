@@ -24,7 +24,6 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 namespace Dune {
 namespace Functions {
@@ -309,17 +308,6 @@ protected:
   FiniteElementMap finiteElementMap_;
   // Number of dofs per entity type depending on the entity's codimension and type
   std::array<int,dim+1> dofsPerCodim_;
-};
-
-
-// specialization of the ContainerDescriptor
-template<typename GV, int k>
-struct ContainerDescriptor<RaviartThomasPreBasis<GV,k>>
-{
-  static auto get(const RaviartThomasPreBasis<GV,k>& preBasis)
-  {
-    return ContainerDescriptors::FlatVector{preBasis.dimension()};
-  }
 };
 
 

@@ -40,6 +40,43 @@
  * Size is either a static property, or a runtime value.
  **/
 
+
+
+namespace Dune::Functions {
+namespace ContainerDescriptors {
+
+//! Fallback container descriptor if nothing else fits
+struct Unknown {};
+
+} // end namespace ContainerDescriptors
+
+
+/**
+ * \brief Factory class for container descriptors based on the type of the
+ * prebasis.
+ *
+ * The class template can to be specialized for a specific pre-basis type. The
+ * default container descriptor is `Unknown`.
+ *
+ * \tparam PreBasis Type of the prebasis to construct a container descriptor for.
+ */
+template<class PreBasis, class Enabled = void>
+struct ContainerDescriptorFactory
+{
+  static auto create(const PreBasis& preBasis) { return ContainerDescriptors::Unknown{}; }
+};
+
+template<class PreBasis>
+auto containerDescriptor(const PreBasis& preBasis)
+  -> decltype(ContainerDescriptorFactory<PreBasis>::create(preBasis))
+{
+  return ContainerDescriptorFactory<PreBasis>::create(preBasis);
+}
+
+} // end namespace Dune::Functions
+
+
+
 namespace Dune::Functions::ContainerDescriptors {
 
   //! Type-traits property of a container descriptor meaning that the types of
@@ -74,9 +111,6 @@ namespace Dune::Functions::ContainerDescriptors {
   template <class D>
   inline constexpr bool isFlat = IsFlat<D>::value;
 
-
-  //! Fallback container descriptor if nothing else fits
-  struct Unknown {};
 
   //! The node in the descriptor tree representing a value placeholder
   struct Value
@@ -591,34 +625,5 @@ namespace Dune::Functions::ContainerDescriptors {
 
   } // end namespace Impl
 } // end namespace Dune::Functions::ContainerDescriptors
-
-
-namespace Dune::Functions {
-
-/**
- * \brief Factory class for container descriptors based on the type of the
- * prebasis.
- *
- * The class template needs to be specialized for each prebasis type. The
- * default container descriptor is `Unknown`.
- *
- * \tparam PreBasis Type of the prebasis to construct a container descriptor for.
- */
-template<class PreBasis>
-struct ContainerDescriptor
-{
-  static auto get(const PreBasis& preBasis)
-  {
-    return ContainerDescriptors::Unknown{};
-  }
-};
-
-template<class PreBasis>
-auto containerDescriptor(const PreBasis& preBasis)
-{
-  return ContainerDescriptor<PreBasis>::get(preBasis);
-}
-
-} // end namespace Dune::Functions
 
 #endif // DUNE_FUNCTIONS_FUNCTIONSPACEBASES_CONTAINERDESCRIPTORS_HH

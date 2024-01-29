@@ -11,7 +11,6 @@
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/containerdescriptors.hh>
 
 
 
@@ -188,17 +187,6 @@ protected:
   size_t pyramidOffset_;
   size_t prismOffset_;
   size_t hexahedronOffset_;
-};
-
-
-// specialization of the ContainerDescriptor
-template<typename GV, int k>
-struct ContainerDescriptor<LagrangeDGPreBasis<GV,k>>
-{
-  static auto get(const LagrangeDGPreBasis<GV,k>& preBasis)
-  {
-    return ContainerDescriptors::FlatVector{preBasis.dimension()};
-  }
 };
 
 

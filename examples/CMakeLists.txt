@@ -16,6 +16,11 @@ dune_target_enable_all_packages(poisson-pq2)
 set_property(TARGET poisson-pq2 PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples poisson-pq2)
 
+add_executable("stokes-mini" stokes-mini.cc)
+dune_target_enable_all_packages("stokes-mini")
+set_property(TARGET stokes-mini PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples stokes-mini)
+
 add_executable("stokes-taylorhood" stokes-taylorhood.cc)
 dune_target_enable_all_packages("stokes-taylorhood")
 set_property(TARGET stokes-taylorhood PROPERTY EXCLUDE_FROM_ALL 1)

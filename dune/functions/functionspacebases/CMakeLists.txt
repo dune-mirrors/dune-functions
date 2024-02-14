@@ -24,6 +24,7 @@ install(FILES
         leafprebasismixin.hh
         lfeprebasismixin.hh
         nedelecbasis.hh
+        p1bbasis.hh
         periodicbasis.hh
         powerbasis.hh
         rannacherturekbasis.hh

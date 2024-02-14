@@ -46,8 +46,8 @@ public:
   explicit P1BPreBasis (const GV& gv) :
     Base(gv, [](GeometryType gt, int) { return (gt.dim()==0) ? 1 : (gt.dim()==dim) ? 1 : 0; })
   {
-    assert(gv.indexSet().types().size() == 1);
-    assert(gv.indexSet().types().front() == GeometryTypes::simplex(dim));
+    assert(gv.indexSet().types(0).size() == 1);
+    assert(gv.indexSet().types(0).front() == GeometryTypes::simplex(dim));
   }
 };
 

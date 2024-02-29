@@ -1,5 +1,5 @@
-#ifndef DUNE_FUNCTIONS_PYTHON_RANGETYPE_HH
-#define DUNE_FUNCTIONS_PYTHON_RANGETYPE_HH
+#ifndef DUNE_PYTHON_FUNCTIONS_RANGETYPE_HH
+#define DUNE_PYTHON_FUNCTIONS_RANGETYPE_HH
 
 #include <tuple>
 
@@ -17,7 +17,7 @@ namespace Dune
 
     /**
      * \brief Register container types for the range type of discrete functions
-     * to the pythong bindings by calling the corresponding register functions
+     * to the python bindings by calling the corresponding register functions
      * recursively.
     */
     template <class R>
@@ -130,4 +130,4 @@ namespace Dune
   } // end namespace Python
 } // end namespace Dune
 
-#endif // DUNE_FUNCTIONS_PYTHON_RANGETYPE_HH
+#endif // DUNE_PYTHON_FUNCTIONS_RANGETYPE_HH

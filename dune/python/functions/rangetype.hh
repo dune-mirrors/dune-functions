@@ -17,7 +17,7 @@ namespace Dune
 
     /**
      * \brief Register container types for the range type of discrete functions
-     * to the pythong bindings by calling the corresponding regiser functions
+     * to the pythong bindings by calling the corresponding register functions
      * recursively.
     */
     template <class R>

@@ -13,11 +13,11 @@
 
 #include <dune/typetree/nodetags.hh>
 
-#include <dune/python/common/dimrange.hh>
 #include <dune/python/common/fmatrix.hh>
 #include <dune/python/common/fvector.hh>
 #include <dune/python/functions/discretefunction.hh>
 #include <dune/python/functions/interpolate.hh>
+#include <dune/python/functions/rangetype.hh>
 #include <dune/python/functions/tree.hh>
 
 #include <dune/python/pybind11/complex.h>
@@ -29,27 +29,6 @@ namespace Dune
 
   namespace Python
   {
-
-    namespace detail {
-
-      // specialization of the DimRange utility from dune-common
-      template <class T>
-      struct DimRange<T, std::enable_if_t<std::is_same_v<typename T::NodeTag, Dune::TypeTree::CompositeNodeTag>> >
-        : public DimRange<typename T::ChildTypes>
-      {};
-
-      template <class T>
-      struct DimRange<T, std::enable_if_t<std::is_same_v<typename T::NodeTag, Dune::TypeTree::PowerNodeTag>> >
-        : public std::integral_constant<std::size_t, T::degree() * DimRange<typename T::ChildType>::value>
-      {};
-
-      template <class T>
-      struct DimRange<T, std::enable_if_t<std::is_same_v<typename T::NodeTag, Dune::TypeTree::LeafNodeTag>> >
-        : public std::integral_constant<std::size_t, T::FiniteElement::Traits::LocalBasisType::Traits::dimRange>
-      {};
-
-    } // end namespace detail
-
 
     template <class Basis>
     struct LocalViewWrapper : public Basis::LocalView
@@ -92,22 +71,7 @@ namespace Dune
       pybind11::object obj_;
     };
 
-    template<typename K, unsigned int n>
-    struct RangeType
-    {
-      using type = Dune::FieldVector< K, n >;
-      static void registerRange(pybind11::module scope)
-      {
-        registerFieldVector<K,n>(scope);
-      }
-    };
 
-    template<typename K>
-    struct RangeType<K,1>
-    {
-      using type = K;
-      static void registerRange(pybind11::module scope) {} // nothing to register, as K is a basic type
-    };
 
     template< class GlobalBasis, class... options >
     DUNE_EXPORT void registerGlobalBasis ( pybind11::module module, pybind11::class_< GlobalBasis, options... > &cls )
@@ -116,13 +80,11 @@ namespace Dune
       using GridView = typename GlobalBasis::GridView;
       using DefaultTreePath = Dune::TypeTree::HybridTreePath<>;
 
-      const std::size_t dimRange = DimRange< typename GlobalBasis::PreBasis::Node >::value;
       const std::size_t dimWorld = GridView::dimensionworld;
 
       cls.def( pybind11::init( [] ( const GridView &gridView ) { return new GlobalBasis( gridView ); } ), pybind11::keep_alive< 1, 2 >() );
       cls.def( "__len__", [](const GlobalBasis& self) { return self.dimension(); } );
 
-      cls.def_property_readonly( "dimRange", [] ( pybind11::handle self ) { return pybind11::int_( dimRange ); } );
       cls.def_property( "gridView",
                         [](const GlobalBasis& basis) { return basis.gridView(); },
                         [](GlobalBasis& basis, const GridView& gridView) { basis.update(gridView); });
@@ -147,8 +109,8 @@ namespace Dune
       cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, bool> );
       cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, int> );
 
-      using Range = typename RangeType< double, dimRange >::type;
-      RangeType< double, dimRange >::registerRange(module);
+      using Range = typename RangeType< typename GlobalBasis::PreBasis::Node >::type;
+      RegisterRange<Range>::apply(module);
       using Domain = Dune::FieldVector< double, dimWorld >;
       registerFieldVector<double,dimWorld>(module);
       using DiscreteFunction = Dune::Functions::DiscreteGlobalBasisFunction< GlobalBasis, HierarchicPythonVector< double >, DefaultNodeToRangeMap< GlobalBasis, DefaultTreePath >, Range >;

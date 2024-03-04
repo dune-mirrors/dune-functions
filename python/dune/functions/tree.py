@@ -62,7 +62,7 @@ class Composite(Tree):
     def __init__(self, *args, **kwargs):
         assert len(args) > 0
         Tree.__init__(self, "Composite", args)
-        self.blocked = kwargs.get("blocked", False)
+        self.blocked = kwargs.get("blocked", True)
         self.layout = kwargs.get("layout", "lexicographic")
 
     def __repr__(self):
@@ -75,8 +75,8 @@ class Power(Tree):
         Tree.__init__(self, "Power", [children])
         assert len(self.children) == 1
         self.exponent = exponent
-        self.blocked = kwargs.get("blocked", False)
-        self.layout = kwargs.get("layout", "lexicographic")
+        self.blocked = kwargs.get("blocked", True)
+        self.layout = kwargs.get("layout", "interleaved")
 
     def __repr__(self):
         if self.exponent == 1:

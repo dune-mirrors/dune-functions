@@ -4,6 +4,7 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_INTERPOLATE_HH
 
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include <dune/common/exceptions.hh>
@@ -100,8 +101,37 @@ private:
 //
 // Notice that we cannot simply create the derivative in the constructor,
 // because this may throw for functions that do not implement the derivative.
-template<class F>
+
+// default implementation for functions `F` that are not differentiable.
+template<class F, class Enabled = void>
 class CachedDerivativeLocalFunction
+{
+public:
+
+  CachedDerivativeLocalFunction(F f) :
+    f_(f)
+  {}
+
+  template<class Element>
+  void bind(const Element& element)
+  {
+    Dune::resolveRef(f_).bind(element);
+  }
+
+  template<class X>
+  auto operator()(const X& x) const
+  {
+    return f_(x);
+  }
+
+private:
+  F f_;
+};
+
+// specialization for functions `F` that have a `derivative(F)`.
+template<class F>
+class CachedDerivativeLocalFunction<F,
+  std::void_t<decltype(derivative(Dune::resolveRef(std::declval<const F&>())))>>
 {
   using Derivative = std::decay_t<decltype(derivative(Dune::resolveRef(std::declval<const F&>())))>;
 

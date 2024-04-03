@@ -198,6 +198,196 @@ auto makeUniformDescriptor (std::size_t n, Child child)
   return UniformVector<Child>{n,std::move(child)};
 }
 
+
+namespace Impl {
+
+template<class InnerFunc, class LeafFunc>
+struct TreeTransform
+{
+  TreeTransform (const InnerFunc& innerFunc, const LeafFunc& leafFunc)
+    : innerFunc_(innerFunc)
+    , leafFunc_(leafFunc)
+  {}
+
+  Unknown operator() (const Unknown& tree) const
+  {
+    return tree;
+  }
+
+  auto operator() (const Value& tree) const
+  {
+    return leafFunc_(tree);
+  }
+
+  template<class... V>
+  auto operator() (const Tuple<V...>& tree) const
+  {
+    return unpackIntegerSequence([&](auto... ii) {
+      return Tuple{innerFunc_(tree,ii)...};
+    }, std::make_index_sequence<sizeof...(V)>());
+  }
+
+  template<class V, std::size_t n>
+  auto operator() (const Array<V,n>& tree) const
+  {
+    return unpackIntegerSequence([&](auto... ii) {
+      return Array{innerFunc_(tree,ii)...};
+    }, std::make_index_sequence<n>());
+  }
+
+  template<class V>
+  auto operator() (const Vector<V>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,0));
+    Vector<W> result;
+    result.reserve(tree.size());
+    for (std::size_t i = 0; i < tree.size(); ++i)
+      result.emplace_back(innerFunc_(tree,i));
+    return result;
+  }
+
+  template<class V, std::size_t n>
+  auto operator() (const UniformArray<V,n>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,Indices::_0));
+    return UniformArray<W,n>(innerFunc_(tree,Indices::_0));
+  }
+
+  template<class V>
+  auto operator() (const UniformVector<V>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,0));
+    return UniformVector<W>(tree.size(), innerFunc_(tree,0));
+  }
+
+private:
+  InnerFunc innerFunc_;
+  LeafFunc leafFunc_;
+};
+
+
+/**
+  * Append a size to the inner-most node of the tree
+  *
+  * This transf of the given tree is used to implement
+  * a blocked-interleaved index-merging strategy in a power-basis.
+  *
+  * Examples:
+  * append( Flat[Container] it, size ) -> Uniform[Container]( it.size(), Flat[Container](size) )
+  * append( Descriptor(child...), size ) -> Descriptor( append(child, size)... )
+  */
+template<class T, class Size>
+auto appendToTree (const T& tree, Size s)
+{
+  auto transform = TreeTransform(
+    [s](auto&& node, auto i) { return appendToTree(node[i], s); },
+    [s](auto&& node) { return makeUniformDescriptor(s, node); });
+  return transform(tree);
+}
+
+
+template<class AccessFunc>
+struct MergeTree
+{
+  MergeTree (const AccessFunc& innerFunc)
+    : innerFunc_(innerFunc)
+  {}
+
+  template<class... V, std::size_t m>
+  auto operator() (const UniformArray<Tuple<V...>,m>& tree) const
+  {
+    return unpackIntegerSequence([&](auto... ii) {
+      return Tuple{innerFunc_(tree,ii)...};
+    }, std::make_index_sequence<(sizeof...(V)*m)>());
+  }
+
+  template<class V, std::size_t n, std::size_t m>
+  auto operator() (const UniformArray<Array<V,n>,m>& tree) const
+  {
+    return unpackIntegerSequence([&](auto... ii) {
+      return Array{innerFunc_(tree,ii)...};
+    }, std::make_index_sequence<n*m>());
+  }
+
+  template<class V, std::size_t n>
+  auto operator() (const UniformVector<Array<V,n>>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,Indices::_0));
+    Vector<W> result;
+    result.reserve(n*tree.size());
+    for (std::size_t i = 0; i < n*tree.size(); ++i)
+      result.emplace_back(innerFunc_(tree,i));
+    return result;
+  }
+
+  template<class V, std::size_t m>
+  auto operator() (const UniformArray<Vector<V>,m>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,0));
+    Vector<W> result;
+    result.reserve(tree[0].size()*m);
+    for (std::size_t i = 0; i < tree[0].size()*m; ++i)
+      result.emplace_back(innerFunc_(tree,i));
+    return result;
+  }
+
+  template<class V>
+  auto operator() (const UniformVector<Vector<V>>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,0));
+    Vector<W> result;
+    result.reserve(tree[0].size()*tree.size());
+    for (std::size_t i = 0; i < tree[0].size()*tree.size(); ++i)
+      result.emplace_back(innerFunc_(tree,i));
+    return result;
+  }
+
+  template<class V, std::size_t n, std::size_t m>
+  auto operator() (const UniformArray<UniformArray<V,n>,m>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,Indices::_0));
+    return makeUniformDescriptor(std::integral_constant<std::size_t,n*m>{},
+      innerFunc_(tree,Indices::_0));
+  }
+
+  template<class V, std::size_t n>
+  auto operator() (const UniformVector<UniformArray<V,n>>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,Indices::_0));
+    return makeUniformDescriptor(n*tree.size(), innerFunc_(tree,Indices::_0));
+  }
+
+  template<class V, std::size_t m>
+  auto operator() (const UniformArray<UniformVector<V>,m>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,0));
+    return makeUniformDescriptor(tree[0].size()*m,innerFunc_(tree,Indices::_0));
+  }
+
+  template<class V>
+  auto operator() (const UniformVector<UniformVector<V>>& tree) const
+  {
+    using W = decltype(innerFunc_(tree,0));
+    return makeUniformDescriptor(tree[0].size()*tree.size(),innerFunc_(tree,Indices::_0));
+  }
+
+private:
+  AccessFunc innerFunc_;
+};
+
+
+// Merge `n` identical `rees
+template<class IMS, class T, class Size>
+auto mergeIdenticalTrees (const T& tree, Size n)
+{
+  auto transform = MergeTree(
+    [&](auto&&, auto i) { return FlatIndexAccess::getEntry<IMS>(tree,i); });
+  return transform(makeUniformDescriptor(n,tree));
+}
+
+
+
+} // end namespace Impl
 } // end namespace ContainerDescriptors
 } // end namespace Dune::Functions
 

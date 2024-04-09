@@ -21,43 +21,13 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
-
+#include <dune/functions/functionspacebases/hermitebasis.hh> // For subIndexSet
 
 namespace Dune {
 namespace Functions {
 
 namespace Impl {
 
-  // Helper function returning an unordered range
-  // of global indices associated to the element.
-  // This could be implemented cheaper internally in
-  // the MCMGMapper by storing a precomputed
-  // container of all subsentities addressed by the layout.
-  template<class GridView>
-  auto subIndexSet(const Dune::MultipleCodimMultipleGeomTypeMapper<GridView>& mapper, const typename GridView::template Codim<0>::Entity& element)
-  {
-    using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GridView>;
-    using Index = typename Mapper::Index;
-    constexpr auto dimension = GridView::dimension;
-    auto subIndices = std::vector<Index>();
-    auto referenceElement = Dune::referenceElement<double, dimension>(element.type());
-    for(auto codim : Dune::range(dimension+1))
-    {
-      for(auto subEntity : Dune::range(referenceElement.size(codim)))
-      {
-        std::size_t c = mapper.layout()(referenceElement.type(subEntity, codim), dimension);
-        if (c>0)
-        {
-          std::size_t firstIndex = mapper.subIndex(element, subEntity, codim);
-          for(auto j : Dune::range(firstIndex, firstIndex+c))
-          {
-            subIndices.push_back(j);
-          }
-        }
-      }
-    }
-    return subIndices;
-  }
 
   // Helper function computing an average mesh size per subentity
   // by averaging over the adjacent elements. This only considers

@@ -11,7 +11,8 @@
 namespace Dune::Functions {
 namespace Concept {
 
-template <class Element> struct BindableTo {
+template <class Element>
+struct BindableTo {
   template <class Object>
   auto require(Object &&object)
       -> decltype(
@@ -31,7 +32,8 @@ struct H2Basis {
 // Structure to decude the type of Hessians. Defaults to void if not exported by
 // LocalBasis
 namespace Impl {
-template <class LVLB, class Enabled = bool> struct HessianType {
+template <class LVLB, class Enabled = bool>
+struct HessianType {
   using type = void;
 };
 

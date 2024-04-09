@@ -295,10 +295,9 @@ auto computeAverageSubEntityMeshSize(Mapper const &mapper)
  * \note This only works for simplex grids
  */
 template<typename GV, typename R, bool reduced = false>
-class HermitePreBasis : public Impl::LeafPreBasisMapperMixIn<GV>
+class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
 {
-    using Base = Impl::LeafPreBasisMapperMixIn<GV>;
-    using Base::mapper_;
+    using Base = LeafPreBasisMapperMixin<GV>;
     using SubEntityMapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
 
     static constexpr auto cubicHermiteMapperLayout(Dune::GeometryType type, int gridDim)

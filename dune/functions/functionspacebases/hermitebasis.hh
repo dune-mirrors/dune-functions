@@ -230,7 +230,6 @@ struct HermiteTransformator {
         LocalState localState_;
     };
 
-    auto makeGlobalValuedInterpolation() const { return GlobalValuedInterpolation{*this}; }
 };
 
 // Helper function returning an unordered range

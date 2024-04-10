@@ -67,28 +67,17 @@ namespace Dune::Functions
 
 namespace Impl
 {
-// forward declaration
+  // forward declaration
 template<class Transformator, class LocalValuedLFE, class Element>
 class TransformedLocalFiniteElement;
-
-template<class FE>
-struct IsTransformedLocalFiniteElement
-{
-  static constexpr bool value = false;
-};
-
-template<class ... Args>
-struct IsTransformedLocalFiniteElement<TransformedLocalFiniteElement<Args...>>
-{
-  static constexpr bool value = true;
-};
 
 /** \brief Implementation of a dune-localfunctions LocalBasis that applies a
  * linear transformation
  *
  * \tparam Transformator The transformation that is to be applied
  * \tparam LocalValuedLocalBasis The local-valued LocalBasis that is getting
- * transformed \tparam Element The element that the global-valued FE lives on
+ * transformed
+ * \tparam Element The element that the global-valued FE lives on
  */
 template<class Transformator, class LocalValuedLFE, class Element>
 class TransformedLocalBasis
@@ -119,7 +108,7 @@ class TransformedLocalBasis
      */
     auto size() const
     {
-      if constexpr (models<Concept::SizeProvidingTransformator<Element, LocalValuedLFE>,
+      if constexpr (models<Concept::Impl::SizeProvidingTransformator<Element, LocalValuedLFE>,
                            Transformator>())
         return transformator_->size();
       else
@@ -162,7 +151,7 @@ class TransformedLocalBasis
      * all shape functions at the point x
      */
     template<class TT = LocalValuedLocalBasis,
-             std::enable_if_t<models<Concept::H2Basis, TT>(), int> = 0>
+             std::enable_if_t<models<Concept::Impl::H2Basis, TT>(), int> = 0>
     void evaluateHessian(const typename Traits::DomainType &x,
                          std::vector<typename TT::HessianType> &out) const
     {
@@ -206,135 +195,15 @@ class TransformedLocalBasis
     LocalValuedLocalBasis const *localValuedLocalBasis_;
 };
 
-/** \brief Implementation of a dune-localfunctions LocalInterpolation
- *    that accepts global-valued functions
- *
- * \tparam Transformator The transformation (e.g., Piola) that transforms from local to global
- * values
- * \tparam LocalValuedLocalInterpolation The local-valued LocalInterpolation that is used for
- * the actual interpolation
- * \tparam Element The element that the global-valued FE lives on
- */
-template<class Transformator, class LocalValuedLocalInterpolation, class Element>
-class RangeSpaceTransformingGlobalValuedLocalInterpolation
-{
-  public:
-    /** \brief Bind the local interpolation object to a particular grid element
-     */
-    void bind(Element const &element,
-              LocalValuedLocalInterpolation const &localValuedLocalInterpolation)
-    {
-      localValuedLocalInterpolation_ = &localValuedLocalInterpolation;
-      element_ = &element;
-    }
-
-    template<typename F, typename C>
-    void interpolate(const F &f, std::vector<C> &out) const
-    {
-      using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
-      typename Transformator::template LocalValuedFunction<F, LocalCoordinate, Element>
-          localValuedFunction(f, *element_);
-      localValuedLocalInterpolation_->interpolate(localValuedFunction, out);
-    }
-
-  private:
-    LocalValuedLocalInterpolation const *localValuedLocalInterpolation_;
-    Element const *element_;
-};
-
-/**
- * \brief This class is a generic implementation of the GlobalValuedInterpolation
- * interface. After binding, it uses an invertible Basis Transformator and
- * the reference LocalInterpolation and to construct a GlobalValuedLocalInterpolation.
- *
- * \tparam Transformator
- * \tparam LocalInterpolation
- * \tparam Element
- */
-template<class Transformator, class LocalFE, class Element>
-class CoefficientTransformingGlobalValuedLocalInterpolation
-{
-    friend class TransformedLocalFiniteElement<Transformator, LocalFE, Element>;
-    using LocalInterpolation = typename LocalFE::Traits::LocalInterpolationType;
-
-  public:
-    CoefficientTransformingGlobalValuedLocalInterpolation(Transformator const &t)
-        : transformator_(&t)
-    {
-    }
-
-  private:
-    void bind(Element const &e, LocalInterpolation const &lI)
-    {
-      localInterpolation_ = &lI;
-      element_ = &e;
-    }
-
-  public:
-    template<class F, class C>
-    void interpolate(const F &f, std::vector<C> &out) const
-    {
-      localInterpolation_->interpolate(f, out);
-      transformator_->applyInverse(out);
-    }
-
-  private:
-    Transformator const *transformator_;
-    LocalInterpolation const *localInterpolation_;
-    Element const *element_;
-};
-
-// Deduce Traits::LocalInterpolationType
-// The transformator class either exports a LocalValuedLocalFunction, a
-// GlobalValuedInterpolation, or implements an inverse transformation Primary
-// Template
-template<class Transformator, class LocalFE, class Element, class Enabled = bool>
-struct GlobalValuedInterpolationType;
-
-// Spezialization for Transformator class that implements a "applyInverse"
-// method. This should only be used for Finite elements which are interpolation
-// affine equivalent.
-template<class Transformator, class LocalFE, class Element>
-struct GlobalValuedInterpolationType<
-    Transformator, LocalFE, Element,
-    std::enable_if_t<
-        models<Concept::InterpolationEquivalentTransformator<Element, LocalFE>, Transformator>(),
-        bool>> {
-    using type =
-        CoefficientTransformingGlobalValuedLocalInterpolation<Transformator, LocalFE, Element>;
-};
-
-// Specialization for Transformator classes which implement a
-// GlobalValuedInterpolation class. This approach is suitable for non (!)
-// interpolation affine equivalent FEs.
-template<class Transformator, class LocalFE, class Element>
-struct GlobalValuedInterpolationType<
-    Transformator, LocalFE, Element,
-    std::enable_if_t<
-        models<Concept::InterpolationProvidingTransformator<Element, LocalFE>, Transformator>(),
-        bool>> {
-    using type = typename Transformator::GlobalValuedInterpolation;
-};
-
-// Specialization for Transformator classes which implement a
-// LocalValuedFunction class. This approach is suitable for FEs with a
-// Rangespace transforming pullback like Piola transformations.
-template<class Transformator, class LocalFE, class Element>
-struct GlobalValuedInterpolationType<
-    Transformator, LocalFE, Element,
-    std::enable_if_t<models<Concept::RangeSpaceTransformator<Element, LocalFE>, Transformator>(),
-                     bool>> {
-    using type = RangeSpaceTransformingGlobalValuedLocalInterpolation<
-        Transformator, typename LocalFE::Traits::LocalInterpolationType, Element>;
-};
-
 /** \brief Associations of the transformed degrees of freedom to subentities of
  * the reference simplex. \note We assume here, that the transformation does not
  * change the LocalCoefficients, i.e. it does not change to which subentity a
  * DoF is associated with. However, it may reduce the size (e.g. for the reduced
  * Hermite Element / DKT).
  *
- * \tparam dim Dimension of the reference simplex
+ * \tparam Transformator. The Transformation to apply to the finite element.
+ * \tparam LocalValuedLFE. The local finite element to be transformed
+ * \tparam Element. The Gridelement type
  */
 // TODO discuss whether one can include the transformedindexbasis feature in
 // here as well
@@ -346,7 +215,7 @@ class TransformedLocalCoefficients
     using LocalValuedLocalBasis = typename LocalValuedLFE::Traits::LocalBasisType;
 
   public:
-    using size_type = std::size_t; // typename LocalValuedLocalCoefficients::size_type
+    using size_type = typename LocalValuedLocalCoefficients::size_type;
 
   public:
     TransformedLocalCoefficients(Transformator const &transformator)
@@ -366,7 +235,7 @@ class TransformedLocalCoefficients
     //! number of coefficients
     size_type size() const
     {
-      if constexpr (models<Concept::SizeProvidingTransformator<Element, LocalValuedLFE>,
+      if constexpr (models<Concept::Impl::SizeProvidingTransformator<Element, LocalValuedLFE>,
                            Transformator>())
         return transformator_->size();
       else
@@ -395,7 +264,7 @@ class TransformedLocalCoefficients
 template<class Transformator, class LocalValuedLFE, class Element>
 class TransformedLocalFiniteElement
 {
-    static_assert(not IsTransformedLocalFiniteElement<LocalValuedLFE>::value);
+    static_assert(not Impl::IsTransformedLocalFiniteElement<LocalValuedLFE>::value);
 
     using LocalBasis = TransformedLocalBasis<Transformator, LocalValuedLFE, Element>;
     using LocalInterpolation =
@@ -418,6 +287,7 @@ class TransformedLocalFiniteElement
           globalValuedLocalCoefficients_(transformator_)
     {
     }
+
     /**
      * \brief Binding routine. This binds all other objects of the
      * LocalFiniteElement interface, as well as the Transformator.
@@ -426,7 +296,6 @@ class TransformedLocalFiniteElement
      * \param element
      * \param elementInfo
      */
-
     void bind(Element const &element)
     {
       element_ = &element;
@@ -434,7 +303,7 @@ class TransformedLocalFiniteElement
       transformator_.bind(*element_);
       // To allow chaining, we bind the localValued fe as well
       // In particular, this allows to wrap a FEVariant & FEMap combiniation
-      if constexpr (models<Concept::BindableTo<Element>, LocalValuedLFE>())
+      if constexpr (models<Concept::Impl::BindableTo<Element>, LocalValuedLFE>())
         localValuedLFE_.bind(*element_);
       globalValuedLocalBasis_.bind(*element_, localValuedLFE_.localBasis());
       globalValuedLocalCoefficients_.bind(*element_, localValuedLFE_.localCoefficients());
@@ -463,7 +332,7 @@ class TransformedLocalFiniteElement
     /** \brief The number of shape functions */
     std::size_t size() const
     {
-      if constexpr (models<Concept::SizeProvidingTransformator<Element, LocalValuedLFE>,
+      if constexpr (models<Concept::Impl::SizeProvidingTransformator<Element, LocalValuedLFE>,
                            Transformator>())
         return transformator_.size();
       else
@@ -501,7 +370,6 @@ class TransformedNode : public LeafBasisNode
     : finiteElement_(std::forward<GlobalState>(globalState)...)
     {
       // finiteElement_ is not bound yet, i.e. it might not have a size
-      // this->setSize(finiteElement_.size());
     }
 
     ~TransformedNode() {}
@@ -524,6 +392,7 @@ class TransformedNode : public LeafBasisNode
       this->setSize(finiteElement_.size());
     }
 
+    //! The order of the local basis.
     unsigned int order() const { return finiteElement_.localBasis().order(); }
 
   protected:

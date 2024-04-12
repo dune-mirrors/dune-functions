@@ -349,7 +349,7 @@ class TransformedLocalFiniteElement
     typename Traits::LocalBasisType globalValuedLocalBasis_;
     typename Traits::LocalInterpolationType globalValuedLocalInterpolation_;
     typename Traits::LocalCoefficientsType globalValuedLocalCoefficients_;
-    Element const *element_;
+    Element const *element_ = nullptr;
 };
 
 template<typename GV, class Transformator, typename LocalValuedLocalFiniteElement>
@@ -371,6 +371,8 @@ class TransformedNode : public LeafBasisNode
     {
       // finiteElement_ is not bound yet, i.e. it might not have a size
     }
+
+    //TODO Copy Constr, Move, assignment, etc
 
     ~TransformedNode() {}
 

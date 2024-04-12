@@ -7,15 +7,16 @@
 #include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
 #include <dune/common/timer.hh>
-#include <dune/grid/uggrid.hh>
 
-#include <dune/functions/functionspacebases/hermitebasis.hh>
-#include <dune/functions/functionspacebases/test/basistest.hh>
-#include <dune/functions/functionspacebases/test/cubichermitebasis.hh>
-#include <dune/grid/albertagrid.hh>
+#include <dune/grid/uggrid.hh>
 #include <dune/grid/onedgrid.hh>
+#include <dune/grid/albertagrid.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
-// #include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
+
+#include <dune/functions/functionspacebases/test/basistest.hh>
+#include <dune/functions/functionspacebases/hermitebasis.hh>
+#include <dune/functions/functionspacebases/test/cubichermitebasis.hh>
+#include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
 
 using namespace Dune;
 using namespace Dune::Functions;
@@ -41,7 +42,7 @@ int main(int argc, char *argv[])
 
   using namespace Dune::Functions::BasisFactory;
   bool benchmark = true;
-  int repeat = 1000;
+  int repeat = 1000000;
 
   { // 1d
     std::cout << "Hermite test in 1d" << std::endl;

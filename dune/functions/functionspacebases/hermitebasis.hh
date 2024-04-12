@@ -17,9 +17,9 @@
 #include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
+#include <dune/functions/functionspacebases/lineartransformedlocalfiniteelement.hh>
 #include <dune/istl/bcrsmatrix.hh>
 
-#include <dune/functions/functionspacebases/lineartransformedlocalfiniteelement.hh>
 
 namespace Dune
 {
@@ -28,6 +28,61 @@ namespace Functions
 namespace Impl
 {
 
+
+// Helper function returning an unordered range
+// of global indices associated to the element.
+// This could be implemented cheaper internally in
+// the MCMGMapper by storing a precomputed
+// container of all subsentities addressed by the layout.
+template<class GridView>
+auto subIndexSet(Dune::MultipleCodimMultipleGeomTypeMapper<GridView> const &mapper,
+                 const typename GridView::template Codim<0>::Entity &element)
+{
+  using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GridView>;
+  using Index = typename Mapper::Index;
+  constexpr auto dimension = GridView::dimension;
+  auto subIndices = std::vector<Index>();
+  auto referenceElement = Dune::referenceElement<double, dimension>(element.type());
+  for (auto codim : Dune::range(dimension + 1)) {
+    for (auto subEntity : Dune::range(referenceElement.size(codim))) {
+      std::size_t c = mapper.layout()(referenceElement.type(subEntity, codim), dimension);
+      if (c > 0) {
+        std::size_t firstIndex = mapper.subIndex(element, subEntity, codim);
+        for (auto j : Dune::range(firstIndex, firstIndex + c)) {
+          subIndices.push_back(j);
+        }
+      }
+    }
+  }
+  return subIndices;
+}
+
+  // Helper function computing an average mesh size per subentity
+  // by averaging over the adjacent elements. This only considers
+  // the subentities handled by the given mapper and returns a
+  // vector of mesh sizes indixed according to the mapper.
+  template<class FieldType = double, class Mapper>
+  auto computeAverageSubEntityMeshSize(const Mapper& mapper)
+  {
+    constexpr auto dimension = Mapper::GridView::dimension;
+
+    std::vector<unsigned int> adjacentElements(mapper.size(), 0);
+    std::vector<FieldType> subEntityMeshSize(mapper.size(), 0.0);
+    for(const auto& element : Dune::elements(mapper.gridView()))
+    {
+      auto A = element.geometry().volume();
+      for(auto i : Impl::subIndexSet(mapper, element))
+      {
+        subEntityMeshSize[i] += A;
+        ++(adjacentElements[i]);
+      }
+    }
+    for(auto i : Dune::range(mapper.size()))
+      subEntityMeshSize[i] = std::pow(subEntityMeshSize[i]/adjacentElements[i], 1./dimension);
+    return subEntityMeshSize;
+  }
+
+/** \brief Helper struct describing the Traits of the Global State of an Hermite Element*/
 template<class M, class R>
 struct HermiteGlobalStateTraits {
     using Mapper = M;
@@ -35,17 +90,26 @@ struct HermiteGlobalStateTraits {
     using LocalState = std::vector<R>;
 };
 
-template<unsigned int dim, class R, class Element, class GlobalStateTraits, bool reduced = false>
+
+/** \brief This class implements the Transformation for Hermite finite elements, that 'corrects' the non affine-equivalence.
+*   It is bindable to an Element, stateful and offers a transform(...) method.
+*   Its state can change upon binding and can be accessed via localState().
+*   Additionally, it offers a GlobalValuedInterpolation class to be used for interpolation.
+*   \tparam Element   The Grid Element
+*   \tparam R         The Fieldtype of the Finite Element
+*   \tparam reduced   If True, use the reduced Hermite element aka Discrete Kirchhoff Triangle
+*/
+template<class Element, class R, class GlobalStateTraits, bool reduced = false>
 struct HermiteTransformator {
 
   private:
+    static constexpr int dim = Element::mydimension;
     static_assert(dim > 0 && dim < 4);
     static_assert(!(reduced && (dim != 2))); // TODO is there a reduced 3d version ?
     static constexpr std::size_t nDofs = (dim == 1) ? 4 : (dim == 2) ? 10 : 20;
     static constexpr std::size_t numberOfVertices = dim + 1;
     static constexpr std::size_t numberOfInnerDofs = reduced ? 0 : (dim - 1) * (dim - 1);
     static constexpr std::size_t numberOfVertexDofs = numberOfVertices * numberOfVertices;
-    using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
   public:
     using GlobalState = typename GlobalStateTraits::GlobalState;
     using LocalState = typename GlobalStateTraits::LocalState;
@@ -89,7 +153,7 @@ struct HermiteTransformator {
     Scalar/Vector/Matrix Type,
     * but only assume the Values to be Elements of a Vectorspace.
       We assume random access containers. */
-    template<typename InputValues, typename OutputValues>
+    template<typename InputValues, typename OutputValues, class LocalCoordinate>
     void transform(InputValues const &inValues, OutputValues &outValues, LocalCoordinate const& x) const
     {
       assert(inValues.size() == numberOfVertexDofs + numberOfInnerDofs);
@@ -100,11 +164,13 @@ struct HermiteTransformator {
       for (auto vertex : Dune::range(dim + 1)) {
         *outIt = *inIt; // value dof is not transformed
         outIt++, inIt++;
+        // transform the gradient dofs together
         for (auto &&[row_i, i] : sparseRange(subMatrices_[vertex])) {
           outIt[i] = 0.;
           for (auto &&[val_i_j, j] : sparseRange(row_i))
             outIt[i] += val_i_j * inIt[j];
         }
+        // increase pointer by size of gradient = dim
         outIt += dim, inIt += dim;
       }
 
@@ -148,7 +214,8 @@ struct HermiteTransformator {
     /**
      * \brief Class that evaluates the push forwards of the global nodes of a
      * LocalFunction. It stretches the LocalInterpolation interface, because we
-     * evaluate the derivatives of f. \tparam Element
+     * evaluate the derivatives of f.
+     *
      */
     class GlobalValuedInterpolation
     {
@@ -163,18 +230,19 @@ struct HermiteTransformator {
       public:
         GlobalValuedInterpolation(HermiteTransformator const &t) : transformator_(&t) {}
 
+        /** \brief bind the Interpolation to an element and a localInterpolation.*/
         template<class LocalValuedLocalInterpolation>
-        void bind(Element const &element,
+        void bind([[maybe_unused]] Element const &element,
                   [[maybe_unused]] LocalValuedLocalInterpolation const &localInterpolation)
         {
-          localState_ = transformator_->localState();
+          localState_ =&( transformator_->localState());
         }
-
-        /** \brief Evaluate a given function at the Lagrange nodes
+      public:
+        /** \brief Evaluate a given function and its derivatives at the nodes
          *
          * \tparam F Type of function to evaluate
          * \tparam C Type used for the values of the function
-         * \param[in] ff Function to evaluate
+         * \param[in] f Function to evaluate
          * \param[out] out Array of function values
          */
         template<typename F, typename C>
@@ -185,13 +253,13 @@ struct HermiteTransformator {
 
           auto const &refElement = Dune::ReferenceElements<ctype, dim>::simplex();
           // Iterate over vertices, dim dofs per vertex
-          for (size_type i = 0; i < dim + 1; ++i) {
+          for (int i = 0; i < dim + 1; ++i) {
             auto x = refElement.position(i, dim);
 
             auto derivativeValue = df(x);
             out[i * numberOfVertices] = f(x);
-            for (size_type d = 0; d < dim; ++d)
-              out[i * numberOfVertices + d + 1] = getPartialDerivative(derivativeValue,d) * localState_[i];
+            for (int d = 0; d < dim; ++d)
+              out[i * numberOfVertices + d + 1] = getPartialDerivative(derivativeValue,d) * (*localState_)[i];
           }
 
           if constexpr (not reduced)
@@ -227,61 +295,11 @@ struct HermiteTransformator {
             DUNE_THROW(Dune::NotImplemented, "Derivative of scalar function is a matrix!");
         }
         HermiteTransformator const *transformator_;
-        LocalState localState_;
+        LocalState const* localState_;
     };
 
 };
 
-// Helper function returning an unordered range
-// of global indices associated to the element.
-// This could be implemented cheaper internally in
-// the MCMGMapper by storing a precomputed
-// container of all subsentities addressed by the layout.
-template<class GridView>
-auto subIndexSet(Dune::MultipleCodimMultipleGeomTypeMapper<GridView> const &mapper,
-                 const typename GridView::template Codim<0>::Entity &element)
-{
-  using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GridView>;
-  using Index = typename Mapper::Index;
-  constexpr auto dimension = GridView::dimension;
-  auto subIndices = std::vector<Index>();
-  auto referenceElement = Dune::referenceElement<double, dimension>(element.type());
-  for (auto codim : Dune::range(dimension + 1)) {
-    for (auto subEntity : Dune::range(referenceElement.size(codim))) {
-      std::size_t c = mapper.layout()(referenceElement.type(subEntity, codim), dimension);
-      if (c > 0) {
-        std::size_t firstIndex = mapper.subIndex(element, subEntity, codim);
-        for (auto j : Dune::range(firstIndex, firstIndex + c)) {
-          subIndices.push_back(j);
-        }
-      }
-    }
-  }
-  return subIndices;
-}
-
-// Helper function computing an average mesh size per subentity
-// by averaging over the adjacent elements. This only considers
-// the subentities handled by the given mapper and returns a
-// vector of mesh sizes indixed according to the mapper.
-template<class R, class Mapper>
-auto computeAverageSubEntityMeshSize(Mapper const &mapper)
-{
-  constexpr auto dimension = Mapper::GridView::dimension;
-
-  std::vector<unsigned int> adjacentElements(mapper.size(), 0);
-  std::vector<R> subEntityMeshSize(mapper.size(), 0.0);
-  for (auto const &element : Dune::elements(mapper.gridView())) {
-    auto A = element.geometry().volume();
-    for (auto i : Impl::subIndexSet(mapper, element)) {
-      subEntityMeshSize[i] += A;
-      ++(adjacentElements[i]);
-    }
-  }
-  for (auto i : Dune::range(mapper.size()))
-    subEntityMeshSize[i] = std::pow(subEntityMeshSize[i] / adjacentElements[i], 1. / dimension);
-  return subEntityMeshSize;
-}
 } // namespace Impl
 
 /**
@@ -333,7 +351,7 @@ class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
     //! Type used for the transformator which turns the generic LocalFiniteElement
     //! into a LocalFiniteElement that is affine equivalent to the global
     //! FiniteElement
-    using HermiteTrafo = Impl::HermiteTransformator<dim, R, Element, GlobalStateTraits, reduced>;
+    using HermiteTrafo = Impl::HermiteTransformator<Element, R, GlobalStateTraits, reduced>;
 
   public:
     //! Template mapping root tree path to type of created tree node

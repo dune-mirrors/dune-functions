@@ -291,7 +291,7 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
   for(std::size_t i=0; i<localView.size(); ++i)
   {
     if (localIndices[i])
-    test.check(localIndices[i]>=1)
+      test.check(localIndices[i]>=1)
       << "Local index " << i << " did not appear";
     test.check(localIndices[i]<=1)
       << "Local index " << i << " appears multiple times";
@@ -303,27 +303,25 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
       Dune::TypeTree::forEachLeafNode(
           localView.tree(), [&](const auto &node, auto &&treePath)
           { test.subTest(checkNonZeroShapeFunctions(node.finiteElement())); });
-    }
-    if constexpr(IsContained<CheckLocalFiniteElementFlag<0>, Flags...>::value)
-    {
+  }
+  if constexpr(IsContained<CheckLocalFiniteElementFlag<0>, Flags...>::value)
+  {
+    auto e = localView.element();
+    Dune::TypeTree::forEachLeafNode(
+        localView.tree(), [&](const auto &node, auto &&treePath)
+        { test.subTest(checkLocalFiniteElement<0>(node.finiteElement(), e)); });
+  } else if constexpr (IsContained<CheckLocalFiniteElementFlag<1>,
+                              Flags...>::value) {
       auto e = localView.element();
       Dune::TypeTree::forEachLeafNode(
           localView.tree(), [&](const auto &node, auto &&treePath)
-          { test.subTest(checkLocalFiniteElement<0>(node.finiteElement(), e)); });
-    } else if constexpr (IsContained<CheckLocalFiniteElementFlag<1>,
-                                Flags...>::value) {
-        auto e = localView.element();
-        Dune::TypeTree::forEachLeafNode(
-            localView.tree(), [&](const auto &node, auto &&treePath) {
-              test.subTest(checkLocalFiniteElement<1>(node.finiteElement(), e));
-            });
-    } else if constexpr (IsContained<CheckLocalFiniteElementFlag<2>,
-                                     Flags...>::value) {
-        auto e = localView.element();
-        Dune::TypeTree::forEachLeafNode(
-            localView.tree(), [&](const auto &node, auto &&treePath) {
-              test.subTest(checkLocalFiniteElement<2>(node.finiteElement(), e));
-    });
+          { test.subTest(checkLocalFiniteElement<1>(node.finiteElement(), e)); });
+  } else if constexpr (IsContained<CheckLocalFiniteElementFlag<2>,
+                                    Flags...>::value) {
+      auto e = localView.element();
+      Dune::TypeTree::forEachLeafNode(
+          localView.tree(), [&](const auto &node, auto &&treePath)
+          { test.subTest(checkLocalFiniteElement<2>(node.finiteElement(), e)); });
   }
 
   return test;
@@ -398,10 +396,9 @@ struct EnableContinuityCheck
 // checked for being (up to a tolerance) zero on a set of quadrature points.
 struct EnableNormalContinuityCheck : public EnableContinuityCheck
 {
-  // norm is defined in testboundlocalfe.hh, corresponds to abs, two_norm or frobenius_norm
   auto localContinuityCheck() const {
     auto normalJump = [](auto&&jump, auto&& intersection, auto&& x) -> double {
-      return norm(jump * intersection.unitOuterNormal(x));
+      return jump * intersection.unitOuterNormal(x);
     };
     return localJumpContinuityCheck(normalJump, order_, tol_);
   }

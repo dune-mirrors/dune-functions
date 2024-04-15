@@ -90,7 +90,7 @@ namespace Dune::Functions {
         auto xPowers = Dune::FieldVector<RF, size>{};
         Impl::computePowers<int(maxOrder)-1>(x, xPowers);
         for(auto order : Dune::range(std::size_t(1), maxOrder+1))
-          y[order][2] = order*xPowers[order-1];
+          y[order][0] = order*xPowers[order-1];
         return y;
       }
 

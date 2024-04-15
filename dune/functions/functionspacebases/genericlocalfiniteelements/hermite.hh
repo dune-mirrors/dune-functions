@@ -555,7 +555,7 @@ class HermiteLocalInterpolation
 } // namespace Impl
 
 /** \brief Hermite finite element for simplices, as defined on the reference Element.
- * Note, that this is a non affine-equivalent finite element, that requires an additional transfromation.
+ * Note, that this is a non affine-equivalent finite element, that requires an additional transformation to the relate reference basis with the pullbacks of global basis.
  * For more Details, see <dune/functions/functionspacebases/hermitebasis.hh>.
  *
  * \tparam D Type used for domain coordinates

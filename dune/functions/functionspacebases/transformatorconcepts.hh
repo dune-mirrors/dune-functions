@@ -67,7 +67,7 @@ struct BindableTo {
   );
 };
 
-/** \brief A class fullfils the TransformatorBase concept for an Element and a LFE, if it is
+/** \brief A class fulfills the TransformatorBase concept for an Element and a LFE, if it is
     - Bindable to Element
     - offers transform(...) methods for the LFEs RangeType and JacobianType*/
 template <class Element, class LocalFiniteElement>

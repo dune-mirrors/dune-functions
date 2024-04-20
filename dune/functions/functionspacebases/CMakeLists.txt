@@ -27,6 +27,7 @@ install(FILES
         nedelecbasis.hh
         periodicbasis.hh
         powerbasis.hh
+        prismaticlfeproductbasis.hh
         rannacherturekbasis.hh
         raviartthomasbasis.hh
         refinedlagrangebasis.hh

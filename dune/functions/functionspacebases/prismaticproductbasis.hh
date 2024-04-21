@@ -18,6 +18,12 @@ namespace Dune::Functions {
 template <class N1, class N2>
 class PrismaticProductNode;
 
+template<class GB>
+class PrismaticProductLocalView;
+
+template<class PB1, class PB2>
+class PrismaticProductGlobalBasis;
+
 /**
  * \brief A pre-basis for a prismatic product of two prebases
  *
@@ -41,15 +47,21 @@ public:
   using Node = PrismaticProductNode<typename PreBasis1::Node, typename PreBasis2::Node>;
   using size_type = std::common_type_t<typename PreBasis1::size_type, typename PreBasis2::size_type>;
 
-  using MI1 = typename DefaultGlobalBasis<PreBasis1>::MultiIndex;
-  using MI2 = typename DefaultGlobalBasis<PreBasis2>::MultiIndex;
+  // using MI1 = typename DefaultGlobalBasis<PreBasis1>::MultiIndex;
+  // using MI2 = typename DefaultGlobalBasis<PreBasis2>::MultiIndex;
+
+  template<class>
+  friend class PrismaticProductLocalView;
+
+  template<class, class>
+  friend class PrismaticProductGlobalBasis;
 
 public:
   PrismaticProductPreBasis (const PreBasis1& preBasis1, const PreBasis2& preBasis2)
     : preBasis1_(preBasis1)
     , preBasis2_(preBasis2)
-    , indices1_(preBasis1_.maxNodeSize())
-    , indices2_(preBasis2_.maxNodeSize())
+    // , indices1_(preBasis1_.maxNodeSize())
+    // , indices2_(preBasis2_.maxNodeSize())
   {}
 
   //! Export the stored GridView
@@ -68,8 +80,8 @@ public:
   {
     preBasis1_.update(gv1);
     preBasis2_.update(gv2);
-    indices1_.resize(preBasis1_.maxNodeSize());
-    indices2_.resize(preBasis2_.maxNodeSize());
+    // indices1_.resize(preBasis1_.maxNodeSize());
+    // indices2_.resize(preBasis2_.maxNodeSize());
   }
 
   void initializeIndices()
@@ -96,30 +108,30 @@ public:
   }
 
   //! Fill cache with global indices of DOFs associated to the given bound node
-  template<class Node, class It>
-  It indices(const Node& node, It it) const
-  {
-    const auto& node1 = node.subNode1();
-    const auto& node2 = node.subNode2();
+  // template<class Node, class It>
+  // It indices(const Node& node, It it) const
+  // {
+  //   const auto& node1 = node.subNode1();
+  //   const auto& node2 = node.subNode2();
 
-    indices1_.resize(node1.size());
-    indices2_.resize(node2.size());
-    preBasis1_.indices(node1, indices1_.begin());
-    preBasis2_.indices(node2, indices2_.begin());
+  //   indices1_.resize(node1.size());
+  //   indices2_.resize(node2.size());
+  //   preBasis1_.indices(node1, indices1_.begin());
+  //   preBasis2_.indices(node2, indices2_.begin());
 
-    for (const auto& idx1 : indices1_) {
-      for (const auto& idx2 : indices2_) {
-        *it++ = {{ idx1 * preBasis2_.dimension() + idx2 }};
-      }
-    }
-    return it;
-  }
+  //   for (const auto& idx1 : indices1_) {
+  //     for (const auto& idx2 : indices2_) {
+  //       *it++ = {{ idx1 * preBasis2_.dimension() + idx2 }};
+  //     }
+  //   }
+  //   return it;
+  // }
 
 protected:
   PreBasis1 preBasis1_;
   PreBasis2 preBasis2_;
-  mutable std::vector<MI1> indices1_;
-  mutable std::vector<MI2> indices2_;
+  // mutable std::vector<MI1> indices1_;
+  // mutable std::vector<MI2> indices2_;
 };
 
 
@@ -141,6 +153,9 @@ public:
   using LFE2 = typename Node2::FiniteElement;
   using FiniteElement = Dune::PrismaticProduct<LFE1,LFE2>;
 
+  template<class>
+  friend class PrismaticProductLocalView;
+
 public:
   //! Constructor from two individual prebasis nodes
   PrismaticProductNode (const Node1& node1, const Node2& node2)
@@ -161,13 +176,28 @@ public:
     return *finiteElement_;
   }
 
+  void bind1(const Element1& e1)
+  {
+    node1_.bind(e1);
+  }
+
+  void bind2(const Element2& e2)
+  {
+    node2_.bind(e2);
+  }
+
+  void setup()
+  {
+    finiteElement_.emplace(node1_.finiteElement(), node2_.finiteElement());
+    this->setSize(finiteElement_->size());
+  }
+
   //! Bind to element.
   void bind(const Element1& e1, const Element2& e2)
   {
-    node1_.bind(e1);
-    node2_.bind(e2);
-    finiteElement_.emplace(node1_.finiteElement(), node2_.finiteElement());
-    this->setSize(finiteElement_->size());
+    bind1(e1);
+    bind2(e2);
+    setup();
   }
 
   template <class Element>
@@ -176,8 +206,8 @@ public:
     bind(std::get<0>(e), std::get<1>(e));
   }
 
-  const Node1& subNode1() const { return node1_; }
-  const Node2& subNode2() const { return node2_; }
+  // const Node1& subNode1() const { return node1_; }
+  // const Node2& subNode2() const { return node2_; }
 
 private:
   Node1 node1_;
@@ -185,10 +215,6 @@ private:
   std::optional<FiniteElement> finiteElement_ = std::nullopt;
 };
 
-
-// forward declaration
-template<class GB>
-class PrismaticProductLocalView;
 
 template<class PB1, class PB2>
 class PrismaticProductGlobalBasis
@@ -254,6 +280,12 @@ public:
   {
     return preBasis_;
   }
+
+  const PreBasis1& preBasis1() const { return preBasis_.preBasis1_; }
+  PreBasis1& preBasis1() { return preBasis_.preBasis1_; }
+
+  const PreBasis2& preBasis2() const { return preBasis_.preBasis2_; }
+  PreBasis2& preBasis2() { return preBasis_.preBasis2_; }
 
   /**
    * \brief Update the stored grid view
@@ -330,18 +362,22 @@ public:
 
   //! Tree of local finite elements / local shape function sets
   using Tree = typename GlobalBasis::PreBasis::Node;
+  using Tree1 = typename GlobalBasis::PreBasis1::Node;
+  using Tree2 = typename GlobalBasis::PreBasis2::Node;
 
 protected:
 
   using PreBasis = typename GlobalBasis::PreBasis;
 
-  // Type used to store the multi indices of the basis vectors.
-  // In contrast to MultiIndex this always has dynamic size.
-  // It's guaranteed, that you can always cast it to MultiIndex
-  using MultiIndexStorage =
-      std::conditional_t<(PreBasis::minMultiIndexSize == PreBasis::maxMultiIndexSize),
-        OverflowArray<StaticMultiIndex<size_type, PreBasis::maxMultiIndexSize>, PreBasis::multiIndexBufferSize>,
-        Dune::ReservedVector<size_type, PreBasis::multiIndexBufferSize>>;
+  template <class PB>
+  using MultiIndexStorage_t =
+      std::conditional_t<(PB::minMultiIndexSize == PB::maxMultiIndexSize),
+        OverflowArray<StaticMultiIndex<size_type, PB::maxMultiIndexSize>, PB::multiIndexBufferSize>,
+        Dune::ReservedVector<size_type, PB::multiIndexBufferSize>>;
+
+  using MultiIndexStorage = MultiIndexStorage_t<typename GlobalBasis::PreBasis>;
+  using MultiIndexStorage1 = MultiIndexStorage_t<typename GlobalBasis::PreBasis1>;
+  using MultiIndexStorage2 = MultiIndexStorage_t<typename GlobalBasis::PreBasis2>;
 
 public:
 
@@ -361,6 +397,38 @@ public:
     initializeTree(tree_);
   }
 
+  void bind1(const Element1& e1)
+  {
+    element1_ = e1;
+    bindTree(tree_.node1_, *element1_);
+    indices1_.resize(tree1().size());
+    globalBasis_->preBasis1().indices(tree1(), indices1_.begin());
+  }
+
+  void bind2(const Element2& e2)
+  {
+    element2_ = e2;
+    bindTree(tree_.node2_, *element2_);
+    indices2_.resize(tree2().size());
+    globalBasis_->preBasis2().indices(tree2(), indices2_.begin());
+  }
+
+  void setup()
+  {
+    assert(!!element1_);
+    assert(!!element2_);
+    tree_.setup();
+    indices_.resize(size());
+    assert(indices_.size() == indices1_.size() * indices2_.size());
+    std::size_t stride = indices2_.size();
+    std::size_t i = 0;
+    for (const auto& idx1 : indices1_) {
+      for (const auto& idx2 : indices2_) {
+        indices_[i++] = MultiIndexStorage{ idx1[0] * stride + idx2[0] };
+      }
+    }
+  }
+
   /** \brief Bind the view to a grid element
    *
    * Having to bind the view to an element before being able to actually access any of its data members
@@ -368,11 +436,9 @@ public:
    */
   void bind(const Element1& e1, const Element2& e2)
   {
-    element1_ = e1;
-    element2_ = e2;
-    bindTree(tree_, std::tie(*element1_, *element2_));
-    indices_.resize(size());
-    globalBasis_->preBasis().indices(tree_, indices_.begin());
+    bind1(e1);
+    bind2(e1);
+    setup();
   }
 
   template <class Element>
@@ -416,6 +482,9 @@ public:
     return tree_;
   }
 
+  const Tree1& tree1() const { return tree_.node1_; }
+  const Tree2& tree2() const { return tree_.node2_; }
+
   /** \brief Total number of degrees of freedom on this element
    */
   size_type size() const
@@ -457,6 +526,9 @@ protected:
   std::optional<Element1> element1_;
   std::optional<Element2> element2_;
   Tree tree_;
+
+  std::vector<MultiIndexStorage1> indices1_;
+  std::vector<MultiIndexStorage2> indices2_;
   std::vector<MultiIndexStorage> indices_;
 };
 

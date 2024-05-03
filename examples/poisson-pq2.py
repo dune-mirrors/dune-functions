@@ -173,6 +173,43 @@ def printIndicesPython(basis):
     k += 1
   print()
 
+def printElementsCpp(gridView):
+  print()
+  print("printElementsCpp")
+  code="""
+  #include<iostream>
+  #include<utility>
+  #include<functional>
+  #include<dune/common/rangeutilities.hh>
+  template<class GridView>
+  void run(const GridView& gridView)
+  {
+    {
+      std::cout << "Number of elements " << gridView.indexSet().size(0) << std::endl;
+      std::size_t k=0;
+      for(const auto& e : elements(gridView))
+      {
+        std::cout << "Element " << k;
+        std::cout << " index=" << gridView.indexSet().index(e) << std::endl;
+        ++k;
+      }
+    }
+  }
+  """
+  dune.generator.algorithm.run("run",StringIO(code), gridView)
+  print()
+
+def printElementsPython(gridView):
+  print()
+  print("printElementsPython")
+  print("Number of elements "+str(gridView.indexSet.size(0)))
+  k=0;
+  for element in gridView.elements:
+    print("Element "+str(k), end='')
+    print(" index= "+str(gridView.indexSet.index(element)))
+    k += 1
+  print()
+
 ############################  main program  ###################################
 
 # Number of grid elements in one direction
@@ -181,7 +218,11 @@ def printIndicesPython(basis):
 # Create a grid of the unit square
 #grid = grid.structuredGrid([0,0],[1,1],[gridSize,gridSize])
 grid = dune.grid.ugGrid( (dune.grid.reader.gmsh, "square_triangles.msh"), dimgrid=2 )
-grid.hierarchicalGrid.globalRefine(1)
+grid.hierarchicalGrid.globalRefine(2)
+
+printElementsPython(grid)
+printElementsCpp(grid)
+
 
 # Create a second-order Lagrange FE basis
 basis = functions.defaultGlobalBasis(grid, functions.Lagrange(order=2))

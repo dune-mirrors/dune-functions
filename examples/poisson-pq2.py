@@ -111,28 +111,10 @@ def markBoundaryDOFs(basis, vector):
     #include<utility>
     #include<functional>
     #include<dune/functions/functionspacebases/boundarydofs.hh>
-    #include<dune/common/rangeutilities.hh>
 
     template<class Basis, class Vector>
     void run(const Basis& basis, Vector& vector)
     {
-      {
-        std::cout << basis.gridView().indexSet().size(0) << std::endl;
-        auto localView = basis.localView();
-        std::size_t k=0;
-        for(const auto& e : elements(basis.gridView()))
-        {
-          localView.bind(e);
-          std::cout << "Element " << k;
-          std::cout << " index=" << basis.gridView().indexSet().index(e);
-          std::cout << " dof indices [ ";
-          for(auto i: Dune::range(localView.tree().size()))
-            std::cout << localView.index(i) << " ";
-          std::cout << " ]" << std::endl;
-          ++k;
-        }
-      }
-
       auto vectorBackend = vector.mutable_unchecked();
       Dune::Functions::forEachBoundaryDOF(basis, [&] (auto&& index) {
           vectorBackend[index] = true;
@@ -141,6 +123,55 @@ def markBoundaryDOFs(basis, vector):
     """
     dune.generator.algorithm.run("run",StringIO(code), basis, vector)
 
+def printIndicesCpp(basis):
+  print()
+  print("printIndicesCpp")
+  code="""
+  #include<iostream>
+  #include<utility>
+  #include<functional>
+  #include<dune/common/rangeutilities.hh>
+  template<class Basis>
+  void run(const Basis& basis)
+  {
+    {
+      std::cout << "Number of elements " << basis.gridView().indexSet().size(0) << std::endl;
+      auto localView = basis.localView();
+      std::size_t k=0;
+      for(const auto& e : elements(basis.gridView()))
+      {
+        localView.bind(e);
+        std::cout << "Element " << k;
+        std::cout << " index=" << basis.gridView().indexSet().index(e);
+        std::cout << " dof indices [ ";
+        for(auto i: Dune::range(localView.tree().size()))
+          std::cout << localView.index(i) << " ";
+        std::cout << " ]" << std::endl;
+        ++k;
+      }
+    }
+  }
+  """
+  dune.generator.algorithm.run("run",StringIO(code), basis)
+  print()
+
+def printIndicesPython(basis):
+  print()
+  print("printIndicesPython")
+  print("Number of elements "+str(basis.gridView.indexSet.size(0)))
+  k=0;
+  grid = basis.gridView
+  localView = basis.localView()
+  for element in grid.elements:
+    localView.bind(element)
+    print("Element "+str(k), end='')
+    print(" index= "+str(basis.gridView.indexSet.index(element)), end='')
+    print(" dof indices [ ", end='')
+    for i in range(len(localView)):
+      print(" "+str(localView.index(i)[0]), end='')
+    print(" ]")
+    k += 1
+  print()
 
 ############################  main program  ###################################
 
@@ -168,6 +199,10 @@ isDirichlet = np.zeros(len(basis))
 #  return np.abs(a-b) <= 1e-10
 #isDirichletIndicator = lambda x : isNear(x[0], 0) or isNear(x[0], 1) or isNear(x[1], 0) or isNear(x[1], 1)
 #basis.interpolate(isDirichlet,isDirichletIndicator)
+
+printIndicesPython(basis)
+printIndicesCpp(basis)
+printIndicesPython(basis)
 
 markBoundaryDOFs(basis, isDirichlet)
 

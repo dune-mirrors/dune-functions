@@ -111,9 +111,28 @@ def markBoundaryDOFs(basis, vector):
     #include<utility>
     #include<functional>
     #include<dune/functions/functionspacebases/boundarydofs.hh>
+    #include<dune/common/rangeutilities.hh>
+
     template<class Basis, class Vector>
     void run(const Basis& basis, Vector& vector)
     {
+      {
+        std::cout << basis.gridView().indexSet().size(0) << std::endl;
+        auto localView = basis.localView();
+        std::size_t k=0;
+        for(const auto& e : elements(basis.gridView()))
+        {
+          localView.bind(e);
+          std::cout << "Element " << k;
+          std::cout << " index=" << basis.gridView().indexSet().index(e);
+          std::cout << " dof indices [ ";
+          for(auto i: Dune::range(localView.tree().size()))
+            std::cout << localView.index(i) << " ";
+          std::cout << " ]" << std::endl;
+          ++k;
+        }
+      }
+
       auto vectorBackend = vector.mutable_unchecked();
       Dune::Functions::forEachBoundaryDOF(basis, [&] (auto&& index) {
           vectorBackend[index] = true;
@@ -126,10 +145,12 @@ def markBoundaryDOFs(basis, vector):
 ############################  main program  ###################################
 
 # Number of grid elements in one direction
-gridSize = 32
+#gridSize = 32
 
 # Create a grid of the unit square
-grid = grid.structuredGrid([0,0],[1,1],[gridSize,gridSize])
+#grid = grid.structuredGrid([0,0],[1,1],[gridSize,gridSize])
+grid = dune.grid.ugGrid( (dune.grid.reader.gmsh, "square_triangles.msh"), dimgrid=2 )
+grid.hierarchicalGrid.globalRefine(1)
 
 # Create a second-order Lagrange FE basis
 basis = functions.defaultGlobalBasis(grid, functions.Lagrange(order=2))
@@ -142,6 +163,12 @@ A,b = assembleLaplaceMatrix(basis, rightHandSide)
 
 # Determine all coefficients that are on the boundary
 isDirichlet = np.zeros(len(basis))
+
+#def isNear(a,b):
+#  return np.abs(a-b) <= 1e-10
+#isDirichletIndicator = lambda x : isNear(x[0], 0) or isNear(x[0], 1) or isNear(x[1], 0) or isNear(x[1], 1)
+#basis.interpolate(isDirichlet,isDirichletIndicator)
+
 markBoundaryDOFs(basis, isDirichlet)
 
 # The function that implements the Dirichlet values

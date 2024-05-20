@@ -116,7 +116,7 @@ public:
   LocalFunction(F&& f) :
     Base(std::forward<F>(f))
   {
-    static_assert(Dune::Functions::Concept::isLocalFunction<F, Range(Domain), LocalContext>(), "Trying to construct a LocalFunction from type that does not model the LocalFunction concept");
+    static_assert(Dune::Functions::Concept::isLocalFunction<std::decay_t<F>, Range(Domain), LocalContext>(), "Trying to construct a LocalFunction from type that does not model the LocalFunction concept");
   }
 
   LocalFunction() = default;

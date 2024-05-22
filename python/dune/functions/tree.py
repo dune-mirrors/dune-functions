@@ -166,7 +166,7 @@ class Power(Tree):
 
         if isinstance(item[0], int):
             if item[0] in range(self.exponent):
-                return self.children[0]
+                return self.children[0][item[1:]]
             else:
                 raise KeyError("Index must be between 0 and %s but was %s" % (self.exponent-1, item))
         else:

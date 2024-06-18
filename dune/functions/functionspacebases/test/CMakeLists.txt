@@ -50,4 +50,5 @@ install(
   FILES
   basistest.hh
   interpolatetest.hh
+  enabledifferentiabilitycheck.hh
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/test)

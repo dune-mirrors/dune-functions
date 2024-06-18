@@ -18,9 +18,15 @@
 #include <dune/geometry/quadraturerules.hh>
 
 #include <dune/functions/functionspacebases/concepts.hh>
+#include <dune/functions/functionspacebases/test/testboundlocalfe.hh>
 
 struct CheckBasisFlag {};
 struct AllowZeroBasisFunctions {};
+template<int i = 1>
+struct CheckLocalFiniteElementFlag
+{
+  static constexpr int diffOrder = i;
+};
 
 template<class T, class... S>
 struct IsContained : public std::disjunction<std::is_same<T,S>...>
@@ -239,8 +245,18 @@ Dune::TestSuite checkNonZeroShapeFunctions(const LocalFiniteElement& fe, std::si
   return test;
 }
 
+  /**
+   * Check that finite Element returned by localView fullfilles properties of Local Finite Element
+   *  This is called by checkLocalView()
+   */
 
-
+  template <int diffOrder, class LocalFiniteElement, class Element>
+  Dune::TestSuite checkLocalFiniteElement(const LocalFiniteElement &fe, Element const &element)
+  {
+    Dune::TestSuite test("Local Finite Element Test");
+    test.check(testFE<diffOrder>(fe, element));
+    return test;
+  }
 /*
  * Check localView. This especially checks for
  * consistency of local indices and local size.
@@ -284,6 +300,25 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
     Dune::TypeTree::forEachLeafNode(localView.tree(), [&](const auto& node, auto&& treePath) {
       test.subTest(checkNonZeroShapeFunctions(node.finiteElement()));
     });
+  }
+  if constexpr(IsContained<CheckLocalFiniteElementFlag<0>, Flags...>::value)
+  {
+    auto e = localView.element();
+    Dune::TypeTree::forEachLeafNode(
+        localView.tree(), [&](const auto &node, auto &&treePath)
+        { test.subTest(checkLocalFiniteElement<0>(node.finiteElement(), e)); });
+  } else if constexpr (IsContained<CheckLocalFiniteElementFlag<1>,
+                              Flags...>::value) {
+      auto e = localView.element();
+      Dune::TypeTree::forEachLeafNode(
+          localView.tree(), [&](const auto &node, auto &&treePath)
+          { test.subTest(checkLocalFiniteElement<1>(node.finiteElement(), e)); });
+  } else if constexpr (IsContained<CheckLocalFiniteElementFlag<2>,
+                                    Flags...>::value) {
+      auto e = localView.element();
+      Dune::TypeTree::forEachLeafNode(
+          localView.tree(), [&](const auto &node, auto &&treePath)
+          { test.subTest(checkLocalFiniteElement<2>(node.finiteElement(), e)); });
   }
 
   return test;

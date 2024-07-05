@@ -27,13 +27,13 @@ namespace Dune::Functions {
   * \tparam GV        The grid view that the FE basis is defined on.
   * \tparam dimRange  Dimension of the basis function range type. (TODO: needs further explanation)
   */
-template<class GV, int dimRange = 1>
+template<class GV, RangeClass rangeClass>
 class BasixPreBasis
     : public LeafPreBasisMapperMixin<GV>
 {
   using Base = LFEPreBasisMixin<GV>;
   using Geometry = typename GV::template Codim<0>::Entity::Geometry;
-  using FiniteElement = BasixFiniteElement<Geometry,typename GV::ctype,GV::dimension,dimRange>;
+  using FiniteElement = BasixFiniteElement<Geometry,rangeClass,typename GV::ctype>;
   using Basix = typename FiniteElement::Basix;
 
   static auto makeLayout (const Basix& b)
@@ -98,15 +98,14 @@ class BasixPreBasis<GV,dimRange>::Node
   : public LeafBasisNode
 {
   static constexpr int dim = GV::dimension;
-  using FE = typename BasixPreBasis<GV,dimRange>::LFE;
 
 public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
-  using FiniteElement = FE;
+  using FiniteElement = typename BasixPreBasis<GV,dimRange>::FiniteElement;
 
   //! Constructor; stores a pointer to the passed local finite-element `fe`.
-  explicit Node (const FE& fe)
+  explicit Node (const FiniteElement& fe)
     : fe_{&fe}
     , element_{nullptr}
   {}
@@ -141,7 +140,6 @@ protected:
   const FiniteElement* fe_;
   const Element* element_;
 };
-
 
 
 namespace BasisFactory {

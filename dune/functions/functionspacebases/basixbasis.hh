@@ -25,7 +25,7 @@ namespace Dune::Functions {
   * \ingroup FunctionSpaceBasesImplementations
   *
   * \tparam GV        The grid view that the FE basis is defined on.
-  * \tparam dimRange  Dimension of the basis function range type. (TODO: needs further explanation)
+  * \tparam rangeClass  The class of the basis function range, i.e., RangeClass:scalar, vector or matrix.
   */
 template<class GV, RangeClass rangeClass>
 class BasixPreBasis
@@ -81,6 +81,7 @@ public:
     if (fe_.basix().dof_transformations_are_permutations())
     {
       // TODO: encodes bitwise (from right to left) whether the i'th edge is flipped in the real element.
+      // cold be extracted from the nedelec basis, for example.
       std::uint32_t cell_info = 0;
       fe_.basix().permute(std::span{&*first, node.size()}, cell_info);
     }

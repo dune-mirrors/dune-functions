@@ -87,21 +87,21 @@ public:
 
   //! Fill cache with global indices of DOFs associated to the given bound node
   template<class Node, class It>
-  It indices (const Node& node, It it) const
+  It indices(const Node& node, It it) const
   {
-    static_assert(std::is_same_v<typename std::iterator_traits<It>::iterator_category, std::random_access_iterator_tag>);
+    auto globalIndexRange = subIndexRange(Base::mapper_, node.element(), node.finiteElement().localCoefficients());
+    std::vector<std::int32_t> globalIndices(globalIndexRange.begin(), globalIndexRange.end());
 
-    auto first = it;
-    auto last = Base::indices(node, it);
-    assert(last - first == std::ptrdiff_t(node.size()));
-
-    if (basix_.dof_transformations_are_permutations())
-    {
-      // basix_.permute(std::span{&*first, node.size()}, fe_.cellInfo());
-      // NOTE: cannot pass a span over the indices into permute, since indices are not int32_t
+    if (basix_.dof_transformations_are_permutations() && node.finiteElement().cellInfo()) {
+      basix_.permute(globalIndices, node.finiteElement().cellInfo());
     }
 
-    return last;
+    for(const auto& globalIndex : globalIndices)
+    {
+      *it = {{ (size_type)globalIndex }};
+      ++it;
+    }
+    return it;
   }
 
 protected:
@@ -114,7 +114,6 @@ protected:
     int jj0 = indexSet.subIndex(e,ii0,Element::dimension);
     int jj1 = indexSet.subIndex(e,ii1,Element::dimension);
     int flipOrientation = (ii0 < ii1) != (jj0 < jj1);
-
     return flipOrientation;
   }
 
@@ -124,7 +123,7 @@ protected:
     std::array<int,4> ii{99,99,99,99};
     std::array<std::size_t,4> jj{std::size_t(-1),std::size_t(-1),std::size_t(-1),std::size_t(-1)};
 
-    for (int j = 0; j < e.subEntities(i,c,Element::dimension); ++j) {
+    for (int j = 0; j < r.size(i,c,Element::dimension); ++j) {
       ii[j] = r.subEntity(i,c,j,Element::dimension);
       jj[j] = indexSet.subIndex(e,ii[j],Element::dimension);
     }
@@ -150,10 +149,11 @@ protected:
       if constexpr(GridView::dimension > 1) {
         for (int i = 0; i < r.size(1); ++i)
         {
+          int j = Dune::Impl::entityIndex(Dune::Impl::cellType(e.type()),GridView::dimension-1,i);
           if constexpr(GridView::dimension == 2)
-            cellInfo |= computeEdgeInfo(indexSet,e,r,i,1)<<(pos++);
+            cellInfo |= computeEdgeInfo(indexSet,e,r,j,1)<<(pos++);
           else if constexpr(GridView::dimension == 3) {
-            cellInfo |= computeFaceInfo(indexSet,e,r,i,1)<<pos;
+            cellInfo |= computeFaceInfo(indexSet,e,r,j,1)<<pos;
             pos += 3;
           }
         }
@@ -162,8 +162,9 @@ protected:
       if constexpr(GridView::dimension > 2) {
         for (int i = 0; i < r.size(2); ++i)
         {
+          int j = Dune::Impl::entityIndex(Dune::Impl::cellType(e.type()),GridView::dimension-2,i);
           if constexpr(GridView::dimension == 3)
-            cellInfo |= computeEdgeInfo(indexSet,e,r,i,2)<<(pos++);
+            cellInfo |= computeEdgeInfo(indexSet,e,r,j,2)<<(pos++);
         }
       }
 

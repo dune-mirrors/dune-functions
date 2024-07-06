@@ -6,6 +6,10 @@
 # Path to the example grid files in dune-grid
 add_definitions(-DDUNE_GRID_EXAMPLE_GRIDS_PATH=\"${DUNE_GRID_EXAMPLE_GRIDS_PATH}\")
 
+dune_add_test(SOURCES basixbasistest.cc
+  LINK_LIBRARIES dunefunctions
+  CMAKE_GUARD HAVE_BASIX)
+
 dune_add_test(SOURCES brezzidouglasmarinibasistest.cc LABELS quick)
 
 dune_add_test(SOURCES bsplinebasistest.cc LABELS quick)

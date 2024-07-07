@@ -43,7 +43,7 @@ class BasixPreBasis
   template <class Types>
   static auto makeLayout (const Factory& factory, const Types& types)
   {
-    std::array<std::size_t, Dune::Impl::number_of_cell_types> maxSizes{};
+    std::array<std::size_t, Dune::Impl::number_of_cell_types> sizes{};
     for (const GeometryType& type : types)
     {
       ::basix::cell::type cell_type = Dune::Impl::cellType(type);
@@ -52,7 +52,6 @@ class BasixPreBasis
       auto& entity_dofs = b.entity_dofs();
       auto subentity_types =  ::basix::cell::subentity_types(cell_type);
 
-      std::array<std::size_t, Dune::Impl::number_of_cell_types> sizes{};
       for (std::size_t d = 0; d < entity_dofs.size(); ++d) {
         for (std::size_t s = 0; s < entity_dofs[d].size(); ++s) {
           int i = d+1 < entity_dofs.size() ? (int)(subentity_types[d][s]) : (int)(cell_type);
@@ -61,11 +60,8 @@ class BasixPreBasis
           sizes[i] = entity_dofs[d][s].size();
         }
       }
-
-      for (std::size_t i = 0; i < maxSizes.size(); ++i)
-        maxSizes[i] = std::max(maxSizes[i], sizes[i]);
     }
-    return [maxSizes](GeometryType gt, int) -> std::size_t { return maxSizes[(int)(Dune::Impl::cellType(gt))]; };
+    return [sizes](GeometryType gt, int) -> std::size_t { return sizes[(int)(Dune::Impl::cellType(gt))]; };
   }
 
 

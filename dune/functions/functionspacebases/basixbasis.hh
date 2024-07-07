@@ -22,7 +22,11 @@
 
 #include <dune/geometry/type.hh>
 
+#include <basix/e-hhj.h>
 #include <basix/e-lagrange.h>
+#include <basix/e-nedelec.h>
+#include <basix/e-raviart-thomas.h>
+#include <basix/e-regge.h>
 
 namespace Dune::Functions {
 
@@ -313,6 +317,7 @@ auto basix (Basix basix)
   };
 }
 
+/** \brief A factory to create a Lagrange Basix pre-basis. */
 template<class F = double>
 auto basix_lagrange (int degree,
   ::basix::element::lagrange_variant variant = ::basix::element::lagrange_variant::equispaced)
@@ -325,6 +330,7 @@ auto basix_lagrange (int degree,
   };
 }
 
+/** \brief A factory to create a discontinuous Lagrange Basix pre-basis. */
 template<class F = double>
 auto basix_lagrangedg (int degree,
   ::basix::element::lagrange_variant variant = ::basix::element::lagrange_variant::equispaced)
@@ -334,6 +340,62 @@ auto basix_lagrangedg (int degree,
       return ::basix::element::create_lagrange<F>(cell_type, degree, variant, true);
     };
     return BasixPreBasis<GridView, RangeClass::scalar, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+/** \brief A factory to create a Nedelect Basix pre-basis of first kind. */
+template<class F = double>
+auto basix_nedelec (int degree,
+  ::basix::element::lagrange_variant variant = ::basix::element::lagrange_variant::equispaced)
+{
+  return [degree,variant]<class GridView>(const GridView& gridView) {
+    auto factory = [degree,variant](::basix::cell::type cell_type) {
+      return ::basix::element::create_nedelec<F>(cell_type, degree, variant, false);
+    };
+    return BasixPreBasis<GridView, RangeClass::vector, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+/** \brief A factory to create a Raviart-Thomas Basix pre-basis */
+template<class F = double>
+auto basix_rt (int degree,
+  ::basix::element::lagrange_variant variant = ::basix::element::lagrange_variant::equispaced)
+{
+  return [degree,variant]<class GridView>(const GridView& gridView) {
+    auto factory = [degree,variant](::basix::cell::type cell_type) {
+      return ::basix::element::create_rt<F>(cell_type, degree, variant, false);
+    };
+    return BasixPreBasis<GridView, RangeClass::vector, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+/**
+ * \brief A factory to create a Regge Basix pre-basis.
+ * \note This element is restricted to simplex elements.
+ */
+template<class F = double>
+auto basix_regge (int degree)
+{
+  return [degree]<class GridView>(const GridView& gridView) {
+    auto factory = [degree](::basix::cell::type cell_type) {
+      return ::basix::element::create_regge<F>(cell_type, degree, false);
+    };
+    return BasixPreBasis<GridView, RangeClass::matrix, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+/**
+ * \brief A factory to create a Hellan-Herrmann-Johnson Basix pre-basis.
+ * \note This element is restricted to triangles.
+ */
+template<class F = double>
+auto basix_hhj (int degree)
+{
+  return [degree]<class GridView>(const GridView& gridView) {
+    auto factory = [degree](::basix::cell::type cell_type) {
+      return ::basix::element::create_hhj<F>(cell_type, degree, false);
+    };
+    return BasixPreBasis<GridView, RangeClass::matrix, decltype(factory)>(gridView, std::move(factory));
   };
 }
 

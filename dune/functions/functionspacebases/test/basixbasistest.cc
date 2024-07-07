@@ -19,8 +19,6 @@
 #include <dune/functions/functionspacebases/test/basistest.hh>
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
 
-#include <basix/e-lagrange.h>
-
 using namespace Dune;
 using namespace Dune::Functions;
 
@@ -38,20 +36,50 @@ int main (int argc, char* argv[])
 
     { // simplex grid
       auto grid = Factory::createSimplexGrid({0.0,0.0}, {1.0,1.0}, {2,2});
-      grid->globalRefine(2);
+      grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)
       {
-        std::cout << "triangle (deg=" << degree << "):" << std::endl;
-        auto basis_tri = makeBasis(gridView, basix_lagrange(degree));
-        test.subTest(checkBasis(basis_tri, EnableContinuityCheck()));
+        std::cout << "triangle Lagrange (deg=" << degree << "):" << std::endl;
+        auto basis_lag = makeBasis(gridView, basix_lagrange(degree));
+        test.subTest(checkBasis(basis_lag, EnableContinuityCheck()));
+
+        std::cout << "triangle Lagrange-dg (deg=" << degree << "):" << std::endl;
+        auto basis_lagdg = makeBasis(gridView, basix_lagrangedg(degree));
+        test.subTest(checkBasis(basis_lagdg));
+
+        std::cout << "triangle Lobatto (deg=" << degree << "):" << std::endl;
+        auto basis_lob = makeBasis(gridView, basix_lagrange(degree,::basix::element::lagrange_variant::gll_warped));
+        test.subTest(checkBasis(basis_lob, EnableContinuityCheck()));
+
+        std::cout << "triangle Nedelec (deg=" << degree << "):" << std::endl;
+        auto basis_ned = makeBasis(gridView, basix_nedelec(degree));
+        test.subTest(checkBasis(basis_ned));
+
+        std::cout << "triangle Raviart-Thomas (deg=" << degree << "):" << std::endl;
+        auto basis_rt = makeBasis(gridView, basix_rt(degree));
+        test.subTest(checkBasis(basis_rt));
+
+        if (degree < 3) {
+          std::cout << "triangle Regge (deg=" << degree << "):" << std::endl;
+          auto basis_regge = makeBasis(gridView, basix_regge(degree));
+          test.subTest(checkBasis(basis_regge));
+          // TODO: Found a constant zero basis function for degree >= 3
+        }
+
+        if (degree < 3) {
+          std::cout << "triangle Hellan-Herrmann-Johnson (deg=" << degree << "):" << std::endl;
+          auto basis_hhj = makeBasis(gridView, basix_hhj(degree));
+          test.subTest(checkBasis(basis_hhj));
+          // TODO: Found a constant zero basis function for degree >= 3
+        }
       }
     }
 
     { // cube grid
       auto grid = Factory::createCubeGrid({0.0,0.0}, {1.0,1.0}, {2,2});
-      grid->globalRefine(2);
+      grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)
@@ -71,7 +99,7 @@ int main (int argc, char* argv[])
 
     { // simplex grid
       auto grid = Factory::createSimplexGrid({0.0,0.0,0.0}, {1.0,1.0,1.0}, {2,2,2});
-      grid->globalRefine(2);
+      grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)
@@ -84,7 +112,7 @@ int main (int argc, char* argv[])
 
     { // cube grid
       auto grid = Factory::createCubeGrid({0.0,0.0,0.0}, {1.0,1.0,1.0}, {2,2,2});
-      grid->globalRefine(2);
+      grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)

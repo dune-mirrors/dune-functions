@@ -2,25 +2,70 @@
 // vi: set et ts=4 sw=2 sts=2:
 #include <config.h>
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <random>
 
 #include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
 
-#include <dune/grid/yaspgrid.hh>
-#include <dune/grid/uggrid.hh>
-#include <dune/grid/onedgrid.hh>
-#include <dune/grid/io/file/vtk/subsamplingvtkwriter.hh>
-#include <dune/grid/utility/structuredgridfactory.hh>
-
 #include <dune/functions/functionspacebases/basixbasis.hh>
-
 #include <dune/functions/functionspacebases/test/basistest.hh>
-#include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
+
+#include <dune/grid/uggrid.hh>
+#include <dune/grid/common/gridfactory.hh>
+#include <dune/grid/utility/structuredgridfactory.hh>
 
 using namespace Dune;
 using namespace Dune::Functions;
+
+template <class Grid>
+struct PerturbedGrid
+{
+  using ctype = typename Grid::ctype ;
+  static constexpr int dimension = Grid::dimension;
+  static constexpr int dimensionworld = Grid::dimensionworld;
+};
+
+template <class Grid>
+class Dune::GridFactory<PerturbedGrid<Grid>>
+    : public GridFactory<Grid>
+{
+  using Super = GridFactory<Grid>;
+  static constexpr int dim = Grid::dimension;
+  static constexpr int dow = Grid::dimensionworld;
+  using ctype = typename Grid::ctype;
+
+public:
+  template <class... Args>
+  explicit GridFactory (Args&&... args)
+    : Super(std::forward<Args>(args)...)
+    , rd_()
+    , g_(rd_())
+  {}
+
+  void insertElement(const Dune::GeometryType& type,
+                     const std::vector<unsigned int>& vertices) override
+  {
+    std::vector<unsigned int> new_vertices(vertices);
+    std::shuffle(new_vertices.begin(), new_vertices.end(), g_);
+    Super::insertElement(type,new_vertices);
+  }
+  using Super::insertElement;
+
+  void insertBoundarySegment(const std::vector<unsigned int>& vertices)
+  {
+    std::vector<unsigned int> new_vertices(vertices);
+    std::shuffle(new_vertices.begin(), new_vertices.end(), g_);
+    Super::insertBoundarySegment(new_vertices);
+  }
+  using Super::insertBoundarySegment;
+
+private:
+  std::random_device rd_;
+  std::mt19937 g_;
+};
 
 int main (int argc, char* argv[])
 {
@@ -32,10 +77,13 @@ int main (int argc, char* argv[])
   { // dim = 2
     const int dim = 2;
     using Grid = Dune::UGGrid<dim>;
-    using Factory = Dune::StructuredGridFactory<Grid>;
+    using GridFactory = Dune::GridFactory<PerturbedGrid<Grid>>;
+    using Factory = Dune::StructuredGridFactory<PerturbedGrid<Grid>>;
 
     { // simplex grid
-      auto grid = Factory::createSimplexGrid({0.0,0.0}, {1.0,1.0}, {2,2});
+      auto gridFactory = GridFactory{};
+      Factory::createSimplexGrid(gridFactory, {0.0,0.0}, {1.0,1.0}, {2,2});
+      auto grid = gridFactory.createGrid();
       grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
@@ -78,7 +126,9 @@ int main (int argc, char* argv[])
     }
 
     { // cube grid
-      auto grid = Factory::createCubeGrid({0.0,0.0}, {1.0,1.0}, {2,2});
+      auto gridFactory = GridFactory{};
+      Factory::createCubeGrid(gridFactory, {0.0,0.0}, {1.0,1.0}, {2,2});
+      auto grid = gridFactory.createGrid();
       grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
@@ -95,10 +145,13 @@ int main (int argc, char* argv[])
   { // dim = 3
     const int dim = 3;
     using Grid = Dune::UGGrid<dim>;
-    using Factory = Dune::StructuredGridFactory<Grid>;
+    using GridFactory = Dune::GridFactory<PerturbedGrid<Grid>>;
+    using Factory = Dune::StructuredGridFactory<PerturbedGrid<Grid>>;
 
     { // simplex grid
-      auto grid = Factory::createSimplexGrid({0.0,0.0,0.0}, {1.0,1.0,1.0}, {2,2,2});
+      auto gridFactory = GridFactory{};
+      Factory::createSimplexGrid(gridFactory, {0.0,0.0,0.0}, {1.0,1.0,1.0}, {2,2,2});
+      auto grid = gridFactory.createGrid();
       grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
@@ -111,8 +164,10 @@ int main (int argc, char* argv[])
     }
 
     { // cube grid
-      auto grid = Factory::createCubeGrid({0.0,0.0,0.0}, {1.0,1.0,1.0}, {2,2,2});
-      grid->globalRefine(1);
+      auto gridFactory = GridFactory{};
+      Factory::createCubeGrid(gridFactory, {0.0,0.0,0.0}, {1.0,1.0,1.0}, {3,3,3});
+      auto grid = gridFactory.createGrid();
+      // grid->globalRefine(1);  // Crashes UGGrid
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)

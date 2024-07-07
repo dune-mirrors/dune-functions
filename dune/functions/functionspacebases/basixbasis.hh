@@ -98,16 +98,23 @@ public:
   It indices(const Node& node, It it) const
   {
     auto globalIndexRange = subIndexRange(Base::mapper_, node.element(), node.finiteElement().localCoefficients());
-    std::vector<std::int32_t> globalIndices(globalIndexRange.begin(), globalIndexRange.end());
+    if (node.finiteElement().basix().dof_transformations_are_identity()) {
+      for(const auto& globalIndex : globalIndexRange)
+      {
+        *it = {{ (size_type)globalIndex }};
+        ++it;
+      }
+    } else {
+      // global indices must be permuted to match the neighboring elements
+      std::vector<std::int32_t> globalIndices(globalIndexRange.begin(), globalIndexRange.end());
+      if (node.finiteElement().basix().dof_transformations_are_permutations() && node.finiteElement().cellInfo())
+        node.finiteElement().basix().permute(globalIndices, node.finiteElement().cellInfo());
 
-    if (node.finiteElement().basix().dof_transformations_are_permutations() && node.finiteElement().cellInfo()) {
-      node.finiteElement().basix().permute(globalIndices, node.finiteElement().cellInfo());
-    }
-
-    for(const auto& globalIndex : globalIndices)
-    {
-      *it = {{ (size_type)globalIndex }};
-      ++it;
+      for(const auto& globalIndex : globalIndices)
+      {
+        *it = {{ (size_type)globalIndex }};
+        ++it;
+      }
     }
     return it;
   }

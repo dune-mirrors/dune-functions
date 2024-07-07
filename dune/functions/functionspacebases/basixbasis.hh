@@ -41,6 +41,8 @@ class BasixPreBasis
 {
   using Base = LeafPreBasisMapperMixin<GV>;
 
+  static_assert(std::is_invocable_v<Factory, ::basix::cell::type>);
+
   // Define a mapper layout by counting the entity-dofs per (sub-)entity type.
   template <class Types>
   static auto makeLayout (const Factory& factory, const Types& types)

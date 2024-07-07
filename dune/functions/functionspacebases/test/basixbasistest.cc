@@ -38,7 +38,7 @@ int main (int argc, char* argv[])
 
     { // simplex grid
       auto grid = Factory::createSimplexGrid({0.0,0.0}, {1.0,1.0}, {2,2});
-      grid->globalRefine(1);
+      grid->globalRefine(2);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)
@@ -51,7 +51,7 @@ int main (int argc, char* argv[])
 
     { // cube grid
       auto grid = Factory::createCubeGrid({0.0,0.0}, {1.0,1.0}, {2,2});
-      grid->globalRefine(1);
+      grid->globalRefine(2);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)
@@ -71,7 +71,7 @@ int main (int argc, char* argv[])
 
     { // simplex grid
       auto grid = Factory::createSimplexGrid({0.0,0.0,0.0}, {1.0,1.0,1.0}, {2,2,2});
-      grid->globalRefine(1);
+      grid->globalRefine(2);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)
@@ -84,7 +84,7 @@ int main (int argc, char* argv[])
 
     { // cube grid
       auto grid = Factory::createCubeGrid({0.0,0.0,0.0}, {1.0,1.0,1.0}, {2,2,2});
-      grid->globalRefine(1);
+      grid->globalRefine(2);
       auto gridView = grid->leafGridView();
 
       for (int degree = 1; degree < 5; ++degree)

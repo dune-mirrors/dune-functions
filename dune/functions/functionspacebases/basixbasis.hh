@@ -139,7 +139,9 @@ protected:
       ii[j] = r.subEntity(i,c,j,Element::dimension);
       jj[j] = indexSet.subIndex(e,ii[j],Element::dimension);
     }
-    int flipOrientation = (ii[0] < ii[1]) != (jj[0] < jj[1]);
+    int flipOrientation =(((ii[0] < ii[1]) != (jj[0] < jj[1]))
+                        + ((ii[0] < ii[2]) != (jj[0] < jj[2]))
+                        + ((ii[1] < ii[2]) != (jj[1] < jj[2]))) % 2;
 
     int iimin = std::distance(ii.begin(),std::min_element(ii.begin(), ii.end()));
     int jjmin = std::distance(jj.begin(),std::min_element(jj.begin(), jj.end()));

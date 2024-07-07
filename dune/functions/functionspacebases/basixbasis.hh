@@ -11,6 +11,8 @@
 #include <span>
 #include <type_traits>
 
+
+#include <dune/common/copyableoptional.hh>
 #include <dune/localfunctions/basix/globalbasix.hh>
 #include <dune/localfunctions/basix/utility.hh>
 
@@ -19,6 +21,8 @@
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 
 #include <dune/geometry/type.hh>
+
+#include <basix/e-lagrange.h>
 
 namespace Dune::Functions {
 
@@ -30,30 +34,38 @@ namespace Dune::Functions {
   * \tparam GV        The grid view that the FE basis is defined on.
   * \tparam rangeClass  The class of the basis function range, i.e., RangeClass:scalar, vector or matrix.
   */
-template<class GV, RangeClass rangeClass>
+template<class GV, RangeClass rangeClass, class Factory>
 class BasixPreBasis
     : public LeafPreBasisMapperMixin<GV>
 {
   using Base = LeafPreBasisMapperMixin<GV>;
-  using Geometry = typename GV::template Codim<0>::Entity::Geometry;
-  using FiniteElement = BasixFiniteElement<Geometry,rangeClass,typename GV::ctype>;
-  using Basix = typename FiniteElement::Basix;
 
-  static auto makeLayout (const Basix& b)
+  template <class Types>
+  static auto makeLayout (const Factory& factory, const Types& types)
   {
-    auto& entity_dofs = b.entity_dofs();
-    auto subentity_types =  basix::cell::subentity_types(b.cell_type());
+    std::array<std::size_t, Dune::Impl::number_of_cell_types> maxSizes{};
+    for (const GeometryType& type : types)
+    {
+      ::basix::cell::type cell_type = Dune::Impl::cellType(type);
+      auto b = factory(cell_type); // TODO: we construct the basix object multiple times. Better: use a cache.
 
-    std::array<std::size_t, Dune::Impl::number_of_cell_types> sizes{};
-    for (std::size_t d = 0; d < entity_dofs.size(); ++d) {
-      for (std::size_t s = 0; s < entity_dofs[d].size(); ++s) {
-        int i = d+1 < entity_dofs.size() ? (int)(subentity_types[d][s]) : (int)(b.cell_type());
-        assert(i >= 0 && i < int(sizes.size()));
-        assert(sizes[i] == 0 || sizes[i] == entity_dofs[d][s].size());
-        sizes[i] = entity_dofs[d][s].size();
+      auto& entity_dofs = b.entity_dofs();
+      auto subentity_types =  ::basix::cell::subentity_types(cell_type);
+
+      std::array<std::size_t, Dune::Impl::number_of_cell_types> sizes{};
+      for (std::size_t d = 0; d < entity_dofs.size(); ++d) {
+        for (std::size_t s = 0; s < entity_dofs[d].size(); ++s) {
+          int i = d+1 < entity_dofs.size() ? (int)(subentity_types[d][s]) : (int)(cell_type);
+          assert(i >= 0 && i < int(sizes.size()));
+          assert(sizes[i] == 0 || sizes[i] == entity_dofs[d][s].size());
+          sizes[i] = entity_dofs[d][s].size();
+        }
       }
+
+      for (std::size_t i = 0; i < maxSizes.size(); ++i)
+        maxSizes[i] = std::max(maxSizes[i], sizes[i]);
     }
-    return [sizes](GeometryType gt, int) -> std::size_t { return sizes[(int)(Dune::Impl::cellType(gt))]; };
+    return [maxSizes](GeometryType gt, int) -> std::size_t { return maxSizes[(int)(Dune::Impl::cellType(gt))]; };
   }
 
 
@@ -63,9 +75,9 @@ public:
   using size_type = typename Base::size_type;
 
 public:
-  BasixPreBasis (const GV& gridView, const Basix& basix)
-    : Base(gridView, makeLayout(basix))
-    , basix_{basix}
+  BasixPreBasis (const GV& gridView, const Factory& factory)
+    : Base(gridView, makeLayout(factory,gridView.indexSet().types(0)))
+    , factory_{factory}
   {
     computeCellInfos(gridView);
   }
@@ -75,10 +87,10 @@ public:
   //! Create tree node
   Node makeNode () const
   {
-    return Node(basix_, gridView().indexSet(), cellInfos_);
+    return Node(*factory_, gridView().indexSet(), cellInfos_);
   }
 
-  //! Update the stored GridView
+  //! Update the stored GridView and cell infos
   void update (const GridView& gv)
   {
     Base::update(gv);
@@ -92,8 +104,8 @@ public:
     auto globalIndexRange = subIndexRange(Base::mapper_, node.element(), node.finiteElement().localCoefficients());
     std::vector<std::int32_t> globalIndices(globalIndexRange.begin(), globalIndexRange.end());
 
-    if (basix_.dof_transformations_are_permutations() && node.finiteElement().cellInfo()) {
-      basix_.permute(globalIndices, node.finiteElement().cellInfo());
+    if (node.finiteElement().basix().dof_transformations_are_permutations() && node.finiteElement().cellInfo()) {
+      node.finiteElement().basix().permute(globalIndices, node.finiteElement().cellInfo());
     }
 
     for(const auto& globalIndex : globalIndices)
@@ -173,30 +185,30 @@ protected:
   }
 
 protected:
-  Basix basix_;
+  CopyableOptional<Factory> factory_; // TODO: maybe store the fe cache directly here in the prebasis?
   std::vector<std::uint32_t> cellInfos_;
 };
 
 
-template <class GV, RangeClass rangeClass>
-class BasixPreBasis<GV,rangeClass>::Node
+template <class GV, RangeClass rangeClass, class Factory>
+class BasixPreBasis<GV,rangeClass,Factory>::Node
   : public LeafBasisNode
 {
   static constexpr int dim = GV::dimension;
+
+  class FiniteElementCache;
 
 public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
   using IndexSet = typename GV::IndexSet;
-  using Basix = typename BasixPreBasis::Basix;
-  using FiniteElement = typename BasixPreBasis::FiniteElement;
+  using FiniteElement = typename FiniteElementCache::FiniteElement;
 
   //! Constructor; stores a pointer to the passed local finite-element `fe`.
-  explicit Node (const Basix& basix, const IndexSet& indexSet, const std::vector<std::uint32_t>& cellInfos)
-    : fe_{basix}
+  explicit Node (const Factory& factory, const IndexSet& indexSet, const std::vector<std::uint32_t>& cellInfos)
+    : cache_(factory, indexSet.types(0))
     , indexSet_(&indexSet)
     , cellInfos_(&cellInfos)
-    , element_{nullptr}
   {}
 
   //! Return current element; might raise an error if unbound
@@ -213,24 +225,55 @@ public:
    */
   const FiniteElement& finiteElement () const
   {
-    return fe_;
+    return *fe_;
   }
 
   //! Bind to element. Stores a pointer to the passed element reference.
   void bind (const Element& e)
   {
     element_ = &e;
-    fe_.bind(element_->geometry(), (*cellInfos_)[indexSet_->index(e)]);
-    this->setSize(fe_.size());
+    fe_ = &(cache_.get(element_->type()));
+    fe_->bind(element_->geometry(), (*cellInfos_)[indexSet_->index(e)]);
+    this->setSize(fe_->size());
   }
 
 protected:
-  FiniteElement fe_;
+  FiniteElementCache cache_;
   const IndexSet* indexSet_;
   const std::vector<std::uint32_t>* cellInfos_;
-  const Element* element_;
+
+  FiniteElement* fe_ = nullptr;
+  const Element* element_ = nullptr;
 };
 
+
+template <class GV, RangeClass rangeClass, class Factory>
+class BasixPreBasis<GV,rangeClass,Factory>::Node::FiniteElementCache
+{
+  using Geometry = typename GV::template Codim<0>::Entity::Geometry;
+
+public:
+  using FiniteElement = BasixFiniteElement<Geometry,rangeClass,typename GV::ctype>;
+
+public:
+  template <class Types>
+  FiniteElementCache (const Factory& factory, const Types& types)
+  {
+    for (const GeometryType& type : types)
+      map_.emplace(type, factory(Dune::Impl::cellType(type)));
+  }
+
+  FiniteElement& get (const GeometryType& type)
+  {
+    auto it = map_.find(type);
+    if (it == map_.end())
+      DUNE_THROW(Dune::RangeError,"There is no FiniteElement of the requested GeometryType.");
+    return it->second;
+  }
+
+private:
+  std::map<GeometryType::Id, FiniteElement> map_ = {};
+};
 
 namespace BasisFactory {
 
@@ -245,8 +288,36 @@ namespace BasisFactory {
 template<RangeClass rangeClass, class Basix>
 auto basix (Basix basix)
 {
-  return [basix=std::move(basix)](const auto& gridView) {
-    return BasixPreBasis<std::decay_t<decltype(gridView)>, rangeClass>(gridView, std::move(basix));
+  return [basix=std::move(basix)]<class GridView>(const GridView& gridView) {
+    auto factory = [basix=std::move(basix)](::basix::cell::type cell_type) {
+      assert(basix.cell_type() == cell_type);
+      return basix;
+    };
+    return BasixPreBasis<GridView, rangeClass, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+template<class F = double>
+auto basix_lagrange (int degree,
+  ::basix::element::lagrange_variant variant = ::basix::element::lagrange_variant::equispaced)
+{
+  return [degree,variant]<class GridView>(const GridView& gridView) {
+    auto factory = [degree,variant](::basix::cell::type cell_type) {
+      return ::basix::element::create_lagrange<F>(cell_type, degree, variant, false);
+    };
+    return BasixPreBasis<GridView, RangeClass::scalar, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+template<class F = double>
+auto basix_lagrangedg (int degree,
+  ::basix::element::lagrange_variant variant = ::basix::element::lagrange_variant::equispaced)
+{
+  return [degree,variant]<class GridView>(const GridView& gridView) {
+    auto factory = [degree,variant](::basix::cell::type cell_type) {
+      return ::basix::element::create_lagrange<F>(cell_type, degree, variant, true);
+    };
+    return BasixPreBasis<GridView, RangeClass::scalar, decltype(factory)>(gridView, std::move(factory));
   };
 }
 

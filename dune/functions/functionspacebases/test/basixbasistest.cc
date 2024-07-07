@@ -44,9 +44,7 @@ int main (int argc, char* argv[])
       for (int degree = 1; degree < 5; ++degree)
       {
         std::cout << "triangle (deg=" << degree << "):" << std::endl;
-        auto lagrange_tri = ::basix::element::create_lagrange<double>(::basix::cell::type::triangle, degree,
-          ::basix::element::lagrange_variant::equispaced, false);
-        auto basis_tri = makeBasis(gridView, BasisFactory::basix<RangeClass::scalar>(std::move(lagrange_tri)));
+        auto basis_tri = makeBasis(gridView, basix_lagrange(degree));
         test.subTest(checkBasis(basis_tri, EnableContinuityCheck()));
       }
     }
@@ -59,9 +57,7 @@ int main (int argc, char* argv[])
       for (int degree = 1; degree < 5; ++degree)
       {
         std::cout << "quadrilateral (deg=" << degree << "):" << std::endl;
-        auto lagrange_quad = ::basix::element::create_lagrange<double>(::basix::cell::type::quadrilateral, degree,
-          ::basix::element::lagrange_variant::equispaced, false);
-        auto basis_quad= makeBasis(gridView, BasisFactory::basix<RangeClass::scalar>(std::move(lagrange_quad)));
+        auto basis_quad= makeBasis(gridView, basix_lagrange(degree));
         test.subTest(checkBasis(basis_quad, EnableContinuityCheck()));
       }
     }
@@ -81,9 +77,7 @@ int main (int argc, char* argv[])
       for (int degree = 1; degree < 5; ++degree)
       {
         std::cout << "tetrahedron (deg=" << degree << "):" << std::endl;
-        auto lagrange_tet = ::basix::element::create_lagrange<double>(::basix::cell::type::tetrahedron, degree,
-          ::basix::element::lagrange_variant::equispaced, false);
-        auto basis_tet = makeBasis(gridView, BasisFactory::basix<RangeClass::scalar>(std::move(lagrange_tet)));
+        auto basis_tet = makeBasis(gridView, basix_lagrange(degree));
         test.subTest(checkBasis(basis_tet, EnableContinuityCheck()));
       }
     }
@@ -96,9 +90,7 @@ int main (int argc, char* argv[])
       for (int degree = 1; degree < 5; ++degree)
       {
         std::cout << "hexahedron (deg=" << degree << "):" << std::endl;
-        auto lagrange_hex = ::basix::element::create_lagrange<double>(::basix::cell::type::hexahedron, degree,
-          ::basix::element::lagrange_variant::equispaced, false);
-        auto basis_hex = makeBasis(gridView, BasisFactory::basix<RangeClass::scalar>(std::move(lagrange_hex)));
+        auto basis_hex = makeBasis(gridView, basix_lagrange(degree));
         test.subTest(checkBasis(basis_hex, EnableContinuityCheck()));
       }
     }

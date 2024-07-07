@@ -31,8 +31,9 @@ namespace Dune::Functions {
   *
   * \ingroup FunctionSpaceBasesImplementations
   *
-  * \tparam GV        The grid view that the FE basis is defined on.
+  * \tparam GV          The grid view that the FE basis is defined on.
   * \tparam rangeClass  The class of the basis function range, i.e., RangeClass:scalar, vector or matrix.
+  * \tparam Factory     A basix-finite-element factory that gets a basix cell-type as input.
   */
 template<class GV, RangeClass rangeClass, class Factory>
 class BasixPreBasis
@@ -40,6 +41,7 @@ class BasixPreBasis
 {
   using Base = LeafPreBasisMapperMixin<GV>;
 
+  // Define a mapper layout by counting the entity-dofs per (sub-)entity type.
   template <class Types>
   static auto makeLayout (const Factory& factory, const Types& types)
   {
@@ -71,6 +73,7 @@ public:
   using size_type = typename Base::size_type;
 
 public:
+  /** \brief Construct the pre-basis and index-mapping based on a mcmgmapper. */
   BasixPreBasis (const GV& gridView, const Factory& factory)
     : Base(gridView, makeLayout(factory,gridView.indexSet().types(0)))
     , factory_{factory}
@@ -78,22 +81,20 @@ public:
     computeCellInfos(gridView);
   }
 
-  using Base::gridView;
-
-  //! Create tree node
+  /** \brief Create tree node and the node finite-element. */
   Node makeNode () const
   {
-    return Node(*factory_, gridView().indexSet(), cellInfos_);
+    return Node(*factory_, Base::gridView().indexSet(), cellInfos_);
   }
 
-  //! Update the stored GridView and cell infos
+  /** \brief Update the stored GridView and cell infos. */
   void update (const GridView& gv)
   {
     Base::update(gv);
     computeCellInfos(gv);
   }
 
-  //! Fill cache with global indices of DOFs associated to the given bound node
+  /** \brief Fill cache with global indices of DOFs associated to the given bound node. */
   template<class Node, class It>
   It indices(const Node& node, It it) const
   {
@@ -142,10 +143,13 @@ protected:
       ii[j] = r.subEntity(i,c,j,Element::dimension);
       jj[j] = indexSet.subIndex(e,ii[j],Element::dimension);
     }
+
+    // The face must be reflected if the number of flipped edges is odd
     int flipOrientation =(((ii[0] < ii[1]) != (jj[0] < jj[1]))
                         + ((ii[0] < ii[2]) != (jj[0] < jj[2]))
                         + ((ii[1] < ii[2]) != (jj[1] < jj[2]))) % 2;
 
+    // Compute how many rotations after the reflection are necessary
     int iimin = std::distance(ii.begin(),std::min_element(ii.begin(), ii.end()));
     int jjmin = std::distance(jj.begin(),std::min_element(jj.begin(), jj.end()));
     int rotations = std::abs(iimin - jjmin);
@@ -153,6 +157,7 @@ protected:
     return flipOrientation | rotations<<1;
   }
 
+  // Fill the internal `cellInfos_` vector with an encoded edge/face permutation
   void computeCellInfos (const GridView& gv)
   {
     auto& indexSet = gv.indexSet();
@@ -209,14 +214,15 @@ public:
   using IndexSet = typename GV::IndexSet;
   using FiniteElement = typename FiniteElementCache::FiniteElement;
 
-  //! Constructor; stores a pointer to the passed local finite-element `fe`.
+public:
+  /** \brief Constructor; stores a pointer to the passed local finite-element `fe`. */
   explicit Node (const Factory& factory, const IndexSet& indexSet, const std::vector<std::uint32_t>& cellInfos)
     : cache_(factory, indexSet.types(0))
     , indexSet_(&indexSet)
     , cellInfos_(&cellInfos)
   {}
 
-  //! Return current element; might raise an error if unbound
+  /** \brief Return current element; might raise an error if unbound */
   const Element& element () const
   {
     assert(!!element_);
@@ -224,16 +230,17 @@ public:
   }
 
   /**
-   * \brief Return the LocalFiniteElement for the element we are bound to; might raise an error if unbound.
+   * \brief Return the FiniteElement for the element we are bound to; might raise an error if unbound.
    *
-   * The LocalFiniteElement implements the corresponding interfaces of the dune-localfunctions module
+   * The FiniteElement implements the corresponding interfaces of the dune-localfunctions module.
    */
   const FiniteElement& finiteElement () const
   {
+    assert(!!fe_);
     return *fe_;
   }
 
-  //! Bind to element. Stores a pointer to the passed element reference.
+  /** \brief Bind to element. Stores a pointer to the passed element reference. */
   void bind (const Element& e)
   {
     element_ = &e;
@@ -261,6 +268,7 @@ public:
   using FiniteElement = BasixFiniteElement<Geometry,rangeClass,typename GV::ctype>;
 
 public:
+  /** \brief Construct the cache by instantiating all finite-elements on the GeometryType in the type-list `types`. */
   template <class Types>
   FiniteElementCache (const Factory& factory, const Types& types)
   {
@@ -268,6 +276,7 @@ public:
       map_.emplace(type, factory(Dune::Impl::cellType(type)));
   }
 
+  /** \brief Return a reference to the finite-element on the given GeometryType `type`. */
   FiniteElement& get (const GeometryType& type)
   {
     auto it = map_.find(type);

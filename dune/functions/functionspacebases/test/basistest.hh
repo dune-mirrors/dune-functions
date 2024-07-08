@@ -27,6 +27,8 @@
 
 struct CheckBasisFlag {};
 struct AllowZeroBasisFunctions {};
+
+// Enable Checks that compare evaluateJacobian/partial methods up to order diffOrder with a finite Difference approximation
 template<int i = 1>
 struct CheckLocalFiniteElementFlag
 {
@@ -250,6 +252,7 @@ Dune::TestSuite checkNonZeroShapeFunctions(const LocalFiniteElement& fe, std::si
 
   /**
    * Check that finite Element returned by localView fullfilles properties of Local Finite Element
+   * This test corresponds to a dune-localfunctions test, but for a bound, i.e. possibly transformed, FE
    *  This is called by checkLocalView()
    */
 

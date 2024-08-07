@@ -12,7 +12,8 @@ endif()
 
 #find dune-common and set the module path
 find_package(dune-common REQUIRED)
-list(APPEND CMAKE_MODULE_PATH ${dune-common_MODULE_PATH})
+list(APPEND CMAKE_MODULE_PATH ${dune-common_MODULE_PATH}
+  "${PROJECT_SOURCE_DIR}/cmake/modules")
 
 #include the dune macros
 include(DuneMacros)
@@ -26,6 +27,11 @@ dune_add_library(dunefunctions INTERFACE
 add_subdirectory("dune")
 add_subdirectory("doc")
 add_subdirectory("examples")
+
+if(HAVE_BASIX)
+  target_compile_definitions(dunefunctions INTERFACE HAVE_BASIX=1 MDSPAN_USE_PAREN_OPERATOR=1)
+  target_link_libraries(dunefunctions INTERFACE Basix::basix)
+endif()
 
 if( DUNE_ENABLE_PYTHONBINDINGS )
   add_subdirectory(python)

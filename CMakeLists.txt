@@ -24,6 +24,7 @@ dune_add_library(dunefunctions INTERFACE
   EXPORT_NAME Functions
   LINK_LIBRARIES ${DUNE_LIBS})
 
+add_subdirectory("cmake/modules")
 add_subdirectory("dune")
 add_subdirectory("doc")
 add_subdirectory("examples")

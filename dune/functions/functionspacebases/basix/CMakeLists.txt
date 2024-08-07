@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception
 
 install(FILES
-  basis.hh
+  prebasis.hh
   finiteelement.hh
   localfiniteelement.hh
   utility.hh

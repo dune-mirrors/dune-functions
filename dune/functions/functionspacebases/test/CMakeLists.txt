@@ -10,6 +10,10 @@ dune_add_test(SOURCES basixbasistest.cc
   LINK_LIBRARIES dunefunctions
   CMAKE_GUARD HAVE_BASIX)
 
+dune_add_test(SOURCES basixfiniteelementtest.cc
+  LINK_LIBRARIES dunefunctions
+  CMAKE_GUARD HAVE_BASIX)
+
 dune_add_test(SOURCES brezzidouglasmarinibasistest.cc LABELS quick)
 
 dune_add_test(SOURCES bsplinebasistest.cc LABELS quick)

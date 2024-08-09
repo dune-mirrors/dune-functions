@@ -11,6 +11,7 @@
 #include <numeric>
 
 #include <dune/common/fmatrix.hh>
+#include <dune/common/ftraits.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/math.hh>
 #include <dune/common/rangeutilities.hh>
@@ -58,6 +59,23 @@ namespace Dune::Functions::Impl
       }
     }
 
+    template<typename LocalValues, typename LocalCoordinate, typename Geometry, typename GlobalValues>
+    static auto apply(const LocalValues& localValues,
+                      const LocalCoordinate& xi,
+                      const Geometry& geometry,
+                      GlobalValues& globalValues)
+    {
+      auto jacobianTransposed = geometry.jacobianTransposed(xi);
+      auto integrationElement = geometry.integrationElement(xi);
+
+      globalValues.resize(localValues.size());
+      for (std::size_t i = 0; i < localValues.size(); ++i)
+      {
+        jacobianTransposed.mtv(localValues[i], globalValues[i]);
+        globalValues[i] /= integrationElement;
+      }
+    }
+
     /** \brief Piola-transform a set of shape-function derivatives
      *
      * \param[in,out] gradients The shape function derivatives to be Piola-transformed
@@ -84,6 +102,28 @@ namespace Dune::Functions::Impl
             for(auto&& [jacobianTransposed_l_j, j] : sparseRange(jacobianTransposed[l]))
               gradient[j][k] += jacobianTransposed_l_j * tmp[l][k];
         gradient /= integrationElement;
+      }
+    }
+
+    template<typename LocalGradients, typename LocalCoordinate, typename Geometry, typename GlobalGradients>
+    static auto applyJacobian(const LocalGradients& localGradients,
+                              const LocalCoordinate& xi,
+                              const Geometry& geometry,
+                              GlobalGradients& globalGradients)
+    {
+      auto jacobianTransposed = geometry.jacobianTransposed(xi);
+      auto integrationElement = geometry.integrationElement(xi);
+
+      globalGradients.resize(localGradients.size());
+      for (std::size_t i = 0; i < localGradients.size(); ++i)
+      {
+        globalGradients[i] = 0;
+        for (size_t k=0; k<globalGradients[i].M(); k++)
+          for (size_t l=0; l<localGradients[i].N(); l++)
+            // Use sparseRange because jacobianTransposed may be a sparse DiagonalMatrix
+            for(auto&& [jacobianTransposed_l_j, j] : sparseRange(jacobianTransposed[l]))
+              globalGradients[i][j][k] += jacobianTransposed_l_j * localGradients[i][l][k];
+        globalGradients[i] /= integrationElement;
       }
     }
 
@@ -158,6 +198,26 @@ namespace Dune::Functions::Impl
       }
     }
 
+    /** \brief Piola-transform a set of shape-function values
+     *
+     * \param[in] localValues The values to be Piola-transformed
+     * \param[out] globalValues The values to be Piola-transformed
+     */
+    template<typename LocalValues, typename LocalCoordinate, typename Geometry, typename GlobalValues>
+    static auto apply(const LocalValues& localValues,
+                      const LocalCoordinate& xi,
+                      const Geometry& geometry,
+                      GlobalValues& globalValues)
+    {
+      auto jacobianInverseTransposed = geometry.jacobianInverseTransposed(xi);
+
+      globalValues.resize(localValues.size());
+      for (std::size_t i = 0; i < localValues.size(); ++i)
+      {
+        jacobianInverseTransposed.mv(localValues[i], globalValues[i]);
+      }
+    }
+
     /** \brief Piola-transform a set of shape-function derivatives
      *
      * \param[in,out] gradients The shape function derivatives to be Piola-transformed
@@ -186,6 +246,26 @@ namespace Dune::Functions::Impl
       }
     }
 
+    template<typename LocalGradients, typename LocalCoordinate, typename Geometry, typename GlobalGradients>
+    static auto applyJacobian(const LocalGradients& localGradients,
+                              const LocalCoordinate& xi,
+                              const Geometry& geometry,
+                              GlobalGradients& globalGradients)
+    {
+      auto jacobianInverseTransposed = geometry.jacobianInverseTransposed(xi);
+
+      globalGradients.resize(localGradients.size());
+      for (std::size_t i = 0; i < localGradients.size(); ++i)
+      {
+        globalGradients[i] = 0;
+        for (size_t j=0; j<globalGradients[i].N(); j++)
+          for (size_t k=0; k<globalGradients[i].M(); k++)
+            // Use sparseRange because jacobianTransposed may be a sparse DiagonalMatrix
+            for(auto&& [jacobianInverseTransposed_j_l, l] : sparseRange(jacobianInverseTransposed[j]))
+              globalGradients[i][j][k] += jacobianInverseTransposed_j_l * localGradients[i][l][k];
+      }
+    }
+
     /** \brief Wrapper around a callable that applies the inverse Piola transform
      *
      * The LocalInterpolation implementations in dune-localfunctions expect local-valued
@@ -208,11 +288,14 @@ namespace Dune::Functions::Impl
       auto operator()(const LocalCoordinate& xi) const
       {
         auto globalValue = f_(xi);
+        using GlobalValue = decltype(globalValue);
 
         // Apply the inverse Piola transform
         auto jacobianTransposed = element_.geometry().jacobianTransposed(xi);
+        using JacobianTransposed = decltype(jacobianTransposed);
 
-        auto localValue = globalValue;
+        using F = typename FieldTraits<GlobalValue>::field_type;
+        FieldVector<F, JacobianTransposed::rows> localValue(0);
         jacobianTransposed.mv(globalValue, localValue);
 
         return localValue;

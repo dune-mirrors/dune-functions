@@ -121,6 +121,47 @@ namespace Dune::Functions::Basix {
     return indexing(orders);
   }
 
+  template <class T>
+  std::array<std::size_t,1> extents (const std::vector<T>& range)
+  {
+    return {range.size()};
+  }
+
+  template <class T, int n>
+  std::array<std::size_t,1> extents (const FieldVector<T,n>& range)
+  {
+    return {std::size_t(n)};
+  }
+
+  template <class T, int n, int m>
+  std::array<std::size_t,2> extents (const FieldMatrix<T,n,m>& range)
+  {
+    return {std::size_t(n), std::size_t(m)};
+  }
+
+  template <class T, std::enable_if_t<std::is_floating_point_v<T>, int> = 0>
+  std::array<std::size_t,1> extents (const T& range)
+  {
+    return {1};
+  }
+
+  template <std::size_t n>
+  inline std::size_t prod (const std::array<std::size_t,n>& shape)
+  {
+    std::size_t result = 1;
+    for (std::size_t s : shape)
+      result *= s;
+    return result;
+  }
+
+  inline std::size_t prod (const std::vector<std::size_t>& shape)
+  {
+    std::size_t result = 1;
+    for (std::size_t s : shape)
+      result *= s;
+    return result;
+  }
+
 } // end namespace Dune::Functions::Basix
 
 #endif // HAVE_BASIX

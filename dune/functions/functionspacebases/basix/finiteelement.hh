@@ -16,6 +16,7 @@
 #include <dune/common/fvector.hh>
 #include <dune/common/fmatrix.hh>
 #include <dune/common/shared_ptr.hh>
+#include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/basix/localfiniteelement.hh>
 #include <dune/geometry/type.hh>
 #include <dune/localfunctions/common/localbasis.hh>
@@ -79,130 +80,115 @@ public:
     /// \brief Evaluate all shape functions in a point x
     void evaluateFunction (const Domain& x, std::vector<Range>& out) const
     {
-      out.resize(size());
+      if (lb_->basix().map_type() == ::basix::maps::type::identity)
+      { // for simple finite-elements we do not need any transformation
 
-      using GlobalRange = Std::mdspan<F, Std::extents<std::size_t,Std::dynamic_extent,dimRange()>>;
-#if USE_OUT_VECTOR_FOR_MDSPAN
-      GlobalRange _global{&out[0][0], out.size()};
-#else
-      globalEvaluationBuffer_.resize(out.size() * dimRange());
-      GlobalRange _global{globalEvaluationBuffer_.data(), out.size()};
-#endif
-
-      if constexpr (rangeClass == RangeClass::scalar)
-      {
         if constexpr(std::is_same_v<Range, typename LocalBasis::Range>)
-          lb_->evaluateFunction(x, _global);
+          lb_->evaluateFunction(x, out);
         else
           DUNE_THROW(Dune::Exception, "Range type of global and local finite-element must match.");
       }
       else
-      {
-        localEvaluationBuffer_.resize(out.size() * LocalBasis::dimRange());
-        using LocalRange = Std::mdspan<F, Std::extents<std::size_t,Std::dynamic_extent,LocalBasis::dimRange()>>;
-        LocalRange _local{localEvaluationBuffer_.data(), out.size()};
-        lb_->evaluateFunction(x, _local);
+      { // transform the individual basis functions
 
-        auto J = geometry_->jacobian(x);
-        auto K = geometry_->jacobianInverse(x);
-        auto detJ = geometry_->integrationElement(x);
+        lb_->evaluateFunction(x, localFunction_);
 
-        using Jacobian = Std::mdspan<typename Geometry::ctype, Std::extents<std::size_t,Geometry::coorddimension,Geometry::mydimension>>;
-        Jacobian _J{&J[0][0]};
+        out.resize(size());
+        switch (lb_->basix().map_type())
+        {
+          case ::basix::maps::type::covariantPiola:
+            Dune::Functions::Impl::CovariantPiolaTransformator::apply(localFunction_, x, *geometry_, out);
+            break;
 
-        using JacobianInverse = Std::mdspan<typename Geometry::ctype, Std::extents<std::size_t,Geometry::mydimension,Geometry::coorddimension>>;
-        JacobianInverse _K{&K[0][0]};
+          case ::basix::maps::type::contravariantPiola:
+            Dune::Functions::Impl::ContravariantPiolaTransformator::apply(localFunction_, x, *geometry_, out);
+            break;
 
-        auto map = lb_->basix().template map_fn<GlobalRange, LocalRange, Jacobian, JacobianInverse>();
-        map(_global, _local, _J, detJ, _K);
+          case ::basix::maps::type::doubleCovariantPiola:
+          case ::basix::maps::type::doubleContravariantPiola:
+          default:
+          {
+            // TODO: Transformation needs to be implemented.
+            DUNE_THROW(Dune::NotImplemented, "Transform not yet implemented.");
+          }
+        }
       }
-
-#if !USE_OUT_VECTOR_FOR_MDSPAN
-      // copy the output values back into the output variable
-      for (std::size_t i = 0; i < out.size(); ++i)
-        for (std::size_t j = 0; j < dimRange(); ++j)
-          out[i][j] = _global(i,j);
-#endif
     }
 
-    /// \brief Evaluate all shape function jacobians in a point x
+    /// \brief Evaluate all shape function Jacobians in a point x
     void evaluateJacobian (const Domain& x, std::vector<Jacobian>& out) const
     {
-      out.resize(size());
+      if (lb_->basix().map_type() == ::basix::maps::type::identity)
+      { // for simple finite-elements we do not need any transformation
 
-      using GlobalJacobian = Std::mdspan<F, Std::extents<std::size_t,Std::dynamic_extent,dimRange(),dimDomain>>;
-#if USE_OUT_VECTOR_FOR_MDSPAN
-      GlobalJacobian _global{&out[0][0][0], out.size()};
-#else
-      globalEvaluationBuffer_.resize(out.size() * dimRange() * dimDomain);
-      GlobalJacobian _global{globalEvaluationBuffer_.data(), out.size()};
-#endif
-
-      if constexpr (rangeClass == RangeClass::scalar)
-      {
         if constexpr(std::is_same_v<Jacobian, typename LocalBasis::Jacobian>)
-          lb_->evaluateJacobian(x, _global);
+          lb_->evaluateJacobian(x, out);
         else
           DUNE_THROW(Dune::Exception, "Jacobian type of global and local finite-element must match.");
       }
       else
       {
-        localEvaluationBuffer_.resize(out.size() * LocalBasis::dimRange() * dimDomain);
-        using LocalJacobian = Std::mdspan<F, Std::extents<std::size_t,Std::dynamic_extent,LocalBasis::dimRange(),dimDomain>>;
-        LocalJacobian _local{localEvaluationBuffer_.data(), out.size()};
-        lb_->evaluateJacobian(x, _local);
+        lb_->evaluateJacobian(x, localJacobian_);
 
-        // TODO: Transformation needs to be implemented.
-        DUNE_THROW(Dune::NotImplemented, "Transform not yet implemented.");
+        out.resize(size());
+        switch (lb_->basix().map_type())
+        {
+          case ::basix::maps::type::covariantPiola:
+            Dune::Functions::Impl::CovariantPiolaTransformator::applyJacobian(localJacobian_, x, *geometry_, out);
+            break;
+
+          case ::basix::maps::type::contravariantPiola:
+            Dune::Functions::Impl::ContravariantPiolaTransformator::applyJacobian(localJacobian_, x, *geometry_, out);
+            break;
+
+          case ::basix::maps::type::doubleCovariantPiola:
+          case ::basix::maps::type::doubleContravariantPiola:
+          default:
+          {
+            // TODO: Transformation needs to be implemented.
+            DUNE_THROW(Dune::NotImplemented, "Transform not yet implemented.");
+          }
+        }
       }
-
-#if !USE_OUT_VECTOR_FOR_MDSPAN
-      // copy the output values back into the output variable
-      for (std::size_t i = 0; i < out.size(); ++i)
-        for (std::size_t j = 0; j < dimRange(); ++j)
-          for (std::size_t k = 0; k < dimDomain; ++k)
-            out[i][j][k] = _global(i,j,k);
-#endif
     }
 
     /// \brief Evaluate all shape function partial derivatives with given orders in a point x
     void partial (const std::array<unsigned int,dimDomain>& order,
                   const Domain& x, std::vector<Range>& out) const
     {
-      out.resize(size());
+      if (lb_->basix().map_type() == ::basix::maps::type::identity)
+      { // for simple finite-elements we do not need any transformation
 
-      using GlobalPartials = Std::mdspan<F, Std::extents<std::size_t,Std::dynamic_extent,dimRange()>>;
-#if USE_OUT_VECTOR_FOR_MDSPAN
-      GlobalPartials _global{&out[0][0], out.size()};
-#else
-      globalEvaluationBuffer_.resize(out.size() * dimRange());
-      GlobalPartials _global{globalEvaluationBuffer_.data(), out.size()};
-#endif
-
-      if constexpr (rangeClass == RangeClass::scalar)
-      {
         if constexpr(std::is_same_v<Range, typename LocalBasis::Range>)
-          lb_->partial(order, x, _global);
+          lb_->partial(order, x, out);
         else
           DUNE_THROW(Dune::Exception, "Range type of global and local finite-element must match.");
       }
       else
       {
-        localEvaluationBuffer_.resize(out.size() * LocalBasis::dimRange());
-        using LocalPartials = Std::mdspan<F, Std::extents<std::size_t,Std::dynamic_extent,LocalBasis::dimRange()>>;
-        LocalPartials _local{localEvaluationBuffer_.data(), out.size()};
-        lb_->partial(order, x, _local);
+        auto totalOrder = std::accumulate(order.begin(), order.end(), 0);
+        if (totalOrder == 0)
+        {
+          evaluateFunction(x, out);
+        }
+        else if (totalOrder == 1)
+        {
+          unsigned int direction = std::distance(order.begin(), std::find(order.begin(), order.end(), 1));
 
-        // TODO: Transformation needs to be implemented.
-        DUNE_THROW(Dune::NotImplemented, "Transform not yet implemented.");
-      }
+          // TODO: The following is wasteful:  We compute the full Jacobian and then return
+          // only a part of it.  While we need the full Jacobian of the underlying local-valued LFE,
+          // it should be possible to compute only a partial Piola transform for the requested
+          // partial derivatives.
+          evaluateJacobian(x, globalJacobian_);
 
-#if !USE_OUT_VECTOR_FOR_MDSPAN
-      // copy the output values back into the output variable
-      for (std::size_t i = 0; i < out.size(); ++i)
-        for (std::size_t j = 0; j < dimRange(); ++j)
-          out[i][j] = _global(i,j);
-#endif
+          out.resize(size());
+          for (std::size_t i=0; i<out.size(); i++)
+            for (std::size_t j=0; j<out[i].size(); j++)
+              out[i][j] = globalJacobian_[i][j][direction];
+        }
+        else
+          DUNE_THROW(NotImplemented, "Partial derivatives of order 2 or higher");
+        }
     }
 
     void bind (const Geometry& geometry)
@@ -212,8 +198,11 @@ public:
 
     const LocalBasis* lb_;
     const Geometry* geometry_ = nullptr;
-    mutable std::vector<F> localEvaluationBuffer_ = {};
-    mutable std::vector<F> globalEvaluationBuffer_ = {};
+
+    // some buffers used during the evaluation
+    mutable std::vector<typename LocalBasis::Range> localFunction_ = {};
+    mutable std::vector<typename LocalBasis::Jacobian> localJacobian_ = {};
+    mutable std::vector<Jacobian> globalJacobian_ = {};
   };
 
 
@@ -247,12 +236,50 @@ public:
   {
     using LocalInterpolation = typename LocalFiniteElement::Traits::LocalInterpolationType;
 
+    struct ElementWithGeometry
+    {
+      const Geometry& geometry () const { return *geometry_; }
+      const Geometry* geometry_ = nullptr;
+    };
+
+
     /// \brief Determine coefficients interpolating a given function `f`
     /// and store them in the output vector `out`.
     template<class Func, class C>
     void interpolate (const Func& f, std::vector<C>& out) const
     {
-      li_->interpolate(f,out);
+      using LocalCoordinate = typename Geometry::LocalCoordinate;
+      switch (li_->basix().map_type()) {
+        case ::basix::maps::type::identity:
+          li_->interpolate(f,out);
+        break;
+
+        case ::basix::maps::type::covariantPiola:
+        {
+          using LocalFunc = typename Dune::Functions::Impl::CovariantPiolaTransformator::template LocalValuedFunction<Func,LocalCoordinate,ElementWithGeometry>;
+          ElementWithGeometry element{geometry_};
+          LocalFunc localValuedFunction(f, element);
+          li_->interpolate(localValuedFunction, out);
+        }
+        break;
+
+        case ::basix::maps::type::contravariantPiola:
+        {
+          using LocalFunc = typename Dune::Functions::Impl::ContravariantPiolaTransformator::template LocalValuedFunction<Func,LocalCoordinate,ElementWithGeometry>;
+          ElementWithGeometry element{geometry_};
+          LocalFunc localValuedFunction(f, element);
+          li_->interpolate(localValuedFunction, out);
+        }
+        break;
+
+        case ::basix::maps::type::doubleCovariantPiola:
+        case ::basix::maps::type::doubleContravariantPiola:
+        default:
+        {
+          // TODO: Transformation needs to be implemented.
+          DUNE_THROW(Dune::NotImplemented, "Transform not yet implemented.");
+        }
+      }
     }
 
     void bind (const Geometry& geometry)

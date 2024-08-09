@@ -261,17 +261,19 @@ public:
       using Points = Std::mdspan<const F, Std::extents<int, Std::dynamic_extent, dimDomain>>;
       Points points{p.first.data(), p.second[0]};
 
-      // TODO: What is the proper type for the values-vector? It depends on the type of
-      // the interpolation matrix.
-      Std::mdarray<F,Std::dextents<int,1>> values{points.extent(0)};
+      using D = FieldVector<F,dimDomain>;
+      std::size_t valueExtent = Basix::prod(Basix::extents(f(D{})));
+
+      Std::mdarray<F,Std::dextents<int,1>> values{points.extent(0) * valueExtent};
       for (int i = 0; i < points.extent(0); ++i)
       {
-        FieldVector<F,dimDomain> x;
+        D x;
         for (int j = 0; j < dimDomain; ++j)
           x[j] = points(i,j);
 
-        values(i) = f(x);
-        // TODO: we need to handle non-scalar return types
+        auto value = f(x);
+        for (std::size_t k = 0; k < valueExtent; ++k)
+          values(i + k*points.extent(0)) = value[k];
       }
 
       auto& m = basix_->interpolation_matrix();
@@ -286,6 +288,8 @@ public:
           out[i] += interpolationMatrix(i,j) * values(j);
       }
     }
+
+    const BasixType& basix () const { return *basix_; }
 
     const BasixType* basix_;
   };

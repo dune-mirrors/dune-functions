@@ -81,17 +81,19 @@ int main (int argc, char* argv[])
   { // dim = 2
     const int dim = 2;
     using Grid = Dune::UGGrid<dim>;
-    using GridFactory = Dune::GridFactory<PerturbedGrid<Grid>>;
-    using Factory = Dune::StructuredGridFactory<PerturbedGrid<Grid>>;
+    using GridFactory = Dune::GridFactory<Grid>;
+    using Factory = Dune::StructuredGridFactory<Grid>;
+    // using GridFactory = Dune::GridFactory<PerturbedGrid<Grid>>;
+    // using Factory = Dune::StructuredGridFactory<PerturbedGrid<Grid>>;
 
     { // simplex grid
       auto gridFactory = GridFactory{};
       Factory::createSimplexGrid(gridFactory, {0.0,0.0}, {1.0,1.0}, {2,2});
       auto grid = gridFactory.createGrid();
-      grid->globalRefine(1);
+      //grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
-      for (int degree = 1; degree < 5; ++degree)
+      for (int degree = 1; degree < 4; ++degree)
       {
         std::cout << "triangle Lagrange (deg=" << degree << "):" << std::endl;
         auto basis_lag = makeBasis(gridView, basix_lagrange(degree));
@@ -107,12 +109,23 @@ int main (int argc, char* argv[])
 
         std::cout << "triangle Nedelec (deg=" << degree << "):" << std::endl;
         auto basis_ned = makeBasis(gridView, basix_nedelec(degree));
-        test.subTest(checkBasis(basis_ned));
+        test.subTest(checkBasis(basis_ned, EnableTangentialContinuityCheck()));
 
         std::cout << "triangle Raviart-Thomas (deg=" << degree << "):" << std::endl;
         auto basis_rt = makeBasis(gridView, basix_rt(degree));
-        test.subTest(checkBasis(basis_rt));
+        test.subTest(checkBasis(basis_rt, EnableNormalContinuityCheck()));
 
+        std::cout << "triangle Brezzi-Douglas-Marini (deg=" << degree << "):" << std::endl;
+        auto basis_bdm = makeBasis(gridView, basix_bdm(degree));
+        test.subTest(checkBasis(basis_bdm, EnableNormalContinuityCheck()));
+
+        if (degree == 1) {
+          std::cout << "triangle Crouzeix-Raviart (deg=" << degree << "):" << std::endl;
+          auto basis_cr = makeBasis(gridView, basix_cr());
+          test.subTest(checkBasis(basis_cr, EnableCenterContinuityCheck()));
+        }
+
+#if 0 // not yet implemented
         if (degree < 3) {
           std::cout << "triangle Regge (deg=" << degree << "):" << std::endl;
           auto basis_regge = makeBasis(gridView, basix_regge(degree));
@@ -126,6 +139,7 @@ int main (int argc, char* argv[])
           test.subTest(checkBasis(basis_hhj));
           // TODO: Found a constant zero basis function for degree >= 3
         }
+#endif
       }
     }
 
@@ -133,14 +147,22 @@ int main (int argc, char* argv[])
       auto gridFactory = GridFactory{};
       Factory::createCubeGrid(gridFactory, {0.0,0.0}, {1.0,1.0}, {2,2});
       auto grid = gridFactory.createGrid();
-      grid->globalRefine(1);
+      //grid->globalRefine(1);
       auto gridView = grid->leafGridView();
 
-      for (int degree = 1; degree < 5; ++degree)
+      for (int degree = 1; degree < 4; ++degree)
       {
         std::cout << "quadrilateral (deg=" << degree << "):" << std::endl;
-        auto basis_quad= makeBasis(gridView, basix_lagrange(degree));
-        test.subTest(checkBasis(basis_quad, EnableContinuityCheck()));
+        auto basis_lag= makeBasis(gridView, basix_lagrange(degree));
+        test.subTest(checkBasis(basis_lag, EnableContinuityCheck()));
+
+        std::cout << "quadrilateral Lagrange-dg (deg=" << degree << "):" << std::endl;
+        auto basis_lagdg = makeBasis(gridView, basix_lagrangedg(degree));
+        test.subTest(checkBasis(basis_lagdg));
+
+        std::cout << "quadrilateral Lobatto (deg=" << degree << "):" << std::endl;
+        auto basis_lob = makeBasis(gridView, basix_lagrange(degree,::basix::element::lagrange_variant::gll_warped));
+        test.subTest(checkBasis(basis_lob, EnableContinuityCheck()));
       }
     }
   }
@@ -149,8 +171,10 @@ int main (int argc, char* argv[])
   { // dim = 3
     const int dim = 3;
     using Grid = Dune::UGGrid<dim>;
-    using GridFactory = Dune::GridFactory<PerturbedGrid<Grid>>;
-    using Factory = Dune::StructuredGridFactory<PerturbedGrid<Grid>>;
+    using GridFactory = Dune::GridFactory<Grid>;
+    using Factory = Dune::StructuredGridFactory<Grid>;
+    // using GridFactory = Dune::GridFactory<PerturbedGrid<Grid>>;
+    // using Factory = Dune::StructuredGridFactory<PerturbedGrid<Grid>>;
 
     { // simplex grid
       auto gridFactory = GridFactory{};

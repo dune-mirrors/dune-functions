@@ -10,11 +10,18 @@
 #include <utility>
 
 #include <basix/cell.h>
-#include <basix/e-hhj.h>
+
+#include <basix/e-brezzi-douglas-marini.h>
+#include <basix/e-crouzeix-raviart.h>
 #include <basix/e-lagrange.h>
 #include <basix/e-nedelec.h>
 #include <basix/e-raviart-thomas.h>
+
+#if 0
+#include <basix/e-hhj.h>
 #include <basix/e-regge.h>
+#endif
+
 #include <basix/element-families.h>
 
 #include <dune/functions/functionspacebases/basix/prebasis.hh>
@@ -94,6 +101,34 @@ auto basix_rt (int degree,
   };
 }
 
+/** \brief A factory to create a Crouzeix-Raviart Basix pre-basis */
+template<class F = double>
+auto basix_cr ()
+{
+  return []<class GridView>(const GridView& gridView) {
+    auto factory = [](::basix::cell::type cell_type) {
+      return ::basix::element::create_cr<F>(cell_type, 1, false);
+    };
+    return BasixPreBasis<GridView, RangeClass::vector, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+/** \brief A factory to create a Brezzi-Douglas-Marini Basix pre-basis */
+template<class F = double>
+auto basix_bdm (int degree,
+  ::basix::element::lagrange_variant variant = ::basix::element::lagrange_variant::equispaced)
+{
+  return [degree,variant]<class GridView>(const GridView& gridView) {
+    auto factory = [degree,variant](::basix::cell::type cell_type) {
+      return ::basix::element::create_bdm<F>(cell_type, degree, variant, false);
+    };
+    return BasixPreBasis<GridView, RangeClass::vector, decltype(factory)>(gridView, std::move(factory));
+  };
+}
+
+
+#if 0 // not yet supported since double-piola transforms are missing
+
 /**
  * \brief A factory to create a Regge Basix pre-basis.
  * \note This element is restricted to simplex elements.
@@ -123,6 +158,7 @@ auto basix_hhj (int degree)
     return BasixPreBasis<GridView, RangeClass::matrix, decltype(factory)>(gridView, std::move(factory));
   };
 }
+#endif
 
 } // end namespace Dune::Functions::BasisFactory
 

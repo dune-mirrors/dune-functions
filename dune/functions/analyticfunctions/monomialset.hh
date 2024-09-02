@@ -32,11 +32,11 @@ namespace Dune::Functions {
 
 
   /**
-   * \brief Set of all monomials as vector valued function
+   * \brief Set of all monomials up to degree \p maxOrder as vector valued functions.
    *
    * \ingroup FunctionImplementations
    *
-   * \tparam RF scalar type.
+   * \tparam RangeFieldType scalar type.
    * \tparam dim Domain dimension.
    * \tparam maxOrder Maximal monomial order.
    *
@@ -44,16 +44,89 @@ namespace Dune::Functions {
    * order maxOrder as components and models the
    * \ref Concept::DifferentiableFunction<Range(Domain)> concept.
    *
+   * This class is a primary template with functions for documentation purposes only.
    * This is currently specialized for dim=1, dim=2, and dim=3 only.
    */
-  template<class RF, int dim, int maxOrder>
-  struct MonomialSet;
+  template<class RangeFieldType, int dimension, int maxOrder>
+  struct MonomialSet{
+    static constexpr int dim = dimension;
+    static constexpr int size = Dune::binomial(maxOrder + dim, dim);
+    static_assert(false, "This Primary Template should never be compiled");
+    /**
+     * \brief Return array of monomial exponents with shape `size x dim`
+     *
+     * The k-the entry of the returned array is the exponent
+     * multiindex of the monomial corresponding the the k-th
+     * component of the function.
+     */
+    static constexpr std::array<std::array<std::size_t,dim>,size> exponents();
+
+    /**
+    * \brief Return array of monomial evaluations
+    *
+    * The k-the entry of the returned array is the value
+    * of the monomial corresponding the the k-th
+    * entry of the return value of exponents().
+    * Note that the return type depends on \p dim and might change in the future.
+    */
+    template<class DomainFieldType>
+    constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
+
+    /**
+    * \brief Set of all first order derivatives of monomials up to degree \p maxOrder as vector of vector valued functions.
+    */
+    struct Derivative
+    {
+      /**
+      * \brief Return array of arrays of monomial derivatives
+      *
+      * The ith component of the k-the entry of the returned structure
+      * is the derivative in direction i of the monomial corresponding
+      * the the k-th entry of the return value of exponents().
+      * Note that the return type depends on \p dim and might change in the future.
+      */
+      template<class DomainFieldType>
+      constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
+      /**
+      * \brief Set of all second order derivatives of monomials up to degree \p maxOrder as vector of matrix valued functions.
+      */
+      struct Hessian
+      {
+        /**
+        * \brief Return array of Matrices of monomial derivatives
+        *
+        * The (i,j)th component of the k-the entry of the returned structure
+        * is the derivative in direction (i,j) of the monomial corresponding
+        * the the k-th entry of the return value of exponents().
+        * Note that the return type depends on \p dim and might change in the future.
+        */
+        template<class DomainFieldType>
+        constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
+      };
+      /**
+      * \brief Construct the Hessian object from a Derivative
+      */
+      constexpr friend auto derivative(const Derivative & d)
+      {
+        return Hessian{};
+      }
+
+    };
+    /**
+    * \brief Construct the Derivative object from a MonomialSet
+    */
+    constexpr friend auto derivative(const MonomialSet& m)
+    {
+      return Derivative{};
+    }
 
 
+  };
 
+  #ifndef DOXYGEN
   // Specialization for dim = 1
-  template<class RF, int maxOrder>
-  struct MonomialSet<RF, 1, maxOrder>
+  template<class RangeFieldType, int maxOrder>
+  struct MonomialSet<RangeFieldType, 1, maxOrder>
   {
     static constexpr int dim = 1;
     static constexpr int size = maxOrder+1;
@@ -73,23 +146,23 @@ namespace Dune::Functions {
       return p;
     }
 
-    template<class DF>
-    constexpr auto operator()(const Dune::FieldVector<DF,1>& x) const
+    template<class DomainFieldType>
+    constexpr auto operator()(const Dune::FieldVector<DomainFieldType,1>& x) const
     {
-      auto y = Dune::FieldVector<RF,size>{};
+      auto y = Dune::FieldVector<RangeFieldType,size>{};
       Impl::computePowers<maxOrder>(x[0], y);
       return y;
     }
 
     struct Derivative
     {
-      template<class DF>
-      constexpr auto operator()(const Dune::FieldVector<DF,1>& x) const
+      template<class DomainFieldType>
+      constexpr auto operator()(const Dune::FieldVector<DomainFieldType,1>& x) const
       {
-        auto xPowers = Dune::FieldVector<RF,size>{};
+        auto xPowers = Dune::FieldVector<RangeFieldType,size>{};
         Impl::computePowers<maxOrder-1>(x[0], xPowers);
 
-        auto y = Dune::FieldMatrix<RF,size,1>{};
+        auto y = Dune::FieldMatrix<RangeFieldType,size,1>{};
         for(auto order : Dune::range(1, maxOrder+1))
           y[order][0] = order*xPowers[order-1];
         return y;
@@ -97,13 +170,13 @@ namespace Dune::Functions {
 
       struct Hessian
       {
-        template<class DF>
-        constexpr auto operator()(const Dune::FieldVector<DF,1>& x) const
+        template<class DomainFieldType>
+        constexpr auto operator()(const Dune::FieldVector<DomainFieldType,1>& x) const
         {
-          auto xPowers = std::array<RF,maxOrder+1>{};
+          auto xPowers = std::array<RangeFieldType,maxOrder+1>{};
           Impl::computePowers<maxOrder-2>(x[0],xPowers);
 
-          auto y = Dune::FieldVector<Dune::FieldMatrix<RF,1,1>,size>{};
+          auto y = Dune::FieldVector<Dune::FieldMatrix<RangeFieldType,1,1>,size>{};
           for(auto order : Dune::range(maxOrder+1))
             if (order-1 > 0)
               y[order][0][0] = order*(order-1)*xPowers[order-2];
@@ -128,8 +201,8 @@ namespace Dune::Functions {
 
 
   // Specialization for dim = 2
-  template<class RF, int maxOrder>
-  struct MonomialSet<RF, 2, maxOrder>
+  template<class RangeFieldType, int maxOrder>
+  struct MonomialSet<RangeFieldType, 2, maxOrder>
   {
     static constexpr int dim = 2;
     static constexpr int size = (maxOrder+1)*(maxOrder+2)/2;
@@ -157,14 +230,14 @@ namespace Dune::Functions {
       return p;
     }
 
-    template<class DF>
-    constexpr auto operator()(const Dune::FieldVector<DF,2>& x) const
+    template<class DomainFieldType>
+    constexpr auto operator()(const Dune::FieldVector<DomainFieldType,2>& x) const
     {
-      auto xPowers = std::array<Dune::FieldVector<RF,size>,dim>{};
+      auto xPowers = std::array<Dune::FieldVector<RangeFieldType,size>,dim>{};
       for(auto j : Dune::range(dim))
         Impl::computePowers<maxOrder>(x[j], xPowers[j]);
 
-      auto y = Dune::FieldVector<RF,size>{};
+      auto y = Dune::FieldVector<RangeFieldType,size>{};
       std::size_t index = 0;
       for(auto order : Dune::range(maxOrder+1))
       {
@@ -179,14 +252,14 @@ namespace Dune::Functions {
 
     struct Derivative
     {
-      template<class DF>
-      constexpr auto operator()(const Dune::FieldVector<DF,2>& x) const
+      template<class DomainFieldType>
+      constexpr auto operator()(const Dune::FieldVector<DomainFieldType,2>& x) const
       {
-        auto xPowers = std::array<Dune::FieldVector<RF,size>,dim>{};
+        auto xPowers = std::array<Dune::FieldVector<RangeFieldType,size>,dim>{};
         for(auto j : Dune::range(dim))
           Impl::computePowers<maxOrder-1>(x[j], xPowers[j]);
 
-        auto y = Dune::FieldMatrix<RF,size,2>{};
+        auto y = Dune::FieldMatrix<RangeFieldType,size,2>{};
         std::size_t index = 0;
         for(auto order : Dune::range(maxOrder+1))
         {
@@ -204,14 +277,14 @@ namespace Dune::Functions {
 
       struct Hessian
       {
-        template<class DF>
-        constexpr auto operator()(const Dune::FieldVector<DF,2>& x) const
+        template<class DomainFieldType>
+        constexpr auto operator()(const Dune::FieldVector<DomainFieldType,2>& x) const
         {
-          auto xPowers = std::array<std::array<RF,maxOrder+1>,dim>{};
+          auto xPowers = std::array<std::array<RangeFieldType,maxOrder+1>,dim>{};
           for(auto j : Dune::range(dim))
             Impl::computePowers<maxOrder-2>(x[j], xPowers[j]);
 
-          auto y = Dune::FieldVector<Dune::FieldMatrix<RF,2,2>,size>{};
+          auto y = Dune::FieldVector<Dune::FieldMatrix<RangeFieldType,2,2>,size>{};
           std::size_t index = 0;
           for(auto order : Dune::range(maxOrder+1))
           {
@@ -250,8 +323,8 @@ namespace Dune::Functions {
 
 
     // Specialization for dim = 3
-  template<class RF, int maxOrder>
-  struct MonomialSet<RF, 3, maxOrder>
+  template<class RangeFieldType, int maxOrder>
+  struct MonomialSet<RangeFieldType, 3, maxOrder>
   {
     static constexpr int dim = 3;
     static constexpr int size = Dune::binomial(maxOrder + dim, dim);
@@ -284,14 +357,14 @@ namespace Dune::Functions {
       return p;
     }
 
-    template<class DF>
-    constexpr auto operator()(const Dune::FieldVector<DF,3>& x) const
+    template<class DomainFieldType>
+    constexpr auto operator()(const Dune::FieldVector<DomainFieldType,3>& x) const
     {
-      auto xPowers = std::array<std::array<RF,maxOrder+1>,dim>{};
+      auto xPowers = std::array<std::array<RangeFieldType,maxOrder+1>,dim>{};
       for(auto j : Dune::range(dim))
         Impl::computePowers<maxOrder>(x[j], xPowers[j]);
 
-      auto y = Dune::FieldVector<RF,size>{};
+      auto y = Dune::FieldVector<RangeFieldType,size>{};
       std::size_t index = 0;
       for(auto order : Dune::range(maxOrder+1))
       {
@@ -309,10 +382,10 @@ namespace Dune::Functions {
 
     struct Derivative
     {
-      template<class DF>
-      constexpr auto operator()(const Dune::FieldVector<DF,3>& x) const
+      template<class DomainFieldType>
+      constexpr auto operator()(const Dune::FieldVector<DomainFieldType,3>& x) const
       {
-        auto xPowers = std::array<std::array<RF,maxOrder+1>,dim>{};
+        auto xPowers = std::array<std::array<RangeFieldType,maxOrder+1>,dim>{};
         for(auto j : Dune::range(dim))
         {
           xPowers[j][0] = 1.0;
@@ -320,7 +393,7 @@ namespace Dune::Functions {
             xPowers[j][k+1] = xPowers[j][k]*x[j];
         }
 
-        auto y = Dune::FieldMatrix<RF,size,3>{};
+        auto y = Dune::FieldMatrix<RangeFieldType,size,3>{};
         std::size_t index = 0;
         for(auto order : Dune::range(maxOrder+1))
         {
@@ -343,14 +416,14 @@ namespace Dune::Functions {
 
       struct Hessian
       {
-        template<class DF>
-        constexpr auto operator()(const Dune::FieldVector<DF,3>& x) const
+        template<class DomainFieldType>
+        constexpr auto operator()(const Dune::FieldVector<DomainFieldType,3>& x) const
         {
-          auto xPowers = std::array<std::array<RF,maxOrder+1>,dim>{};
+          auto xPowers = std::array<std::array<RangeFieldType,maxOrder+1>,dim>{};
           for(auto j : Dune::range(dim))
             Impl::computePowers<maxOrder>(x[j], xPowers[j]);
 
-          auto y = Dune::FieldVector<Dune::FieldMatrix<RF,3,3>,size>{};
+          auto y = Dune::FieldVector<Dune::FieldMatrix<RangeFieldType,3,3>,size>{};
           std::size_t index = 0;
           for(auto order : Dune::range(maxOrder+1))
           {
@@ -406,7 +479,7 @@ namespace Dune::Functions {
     }
 
   };
-
+  #endif
 } // namespace Dune::Functions
 
 #endif // DUNE_FUNCTIONS_ANALYTICFUNCTIONS_MONOMIALSET_HH

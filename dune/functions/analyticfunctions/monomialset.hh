@@ -51,7 +51,7 @@ namespace Dune::Functions {
   struct MonomialSet{
     static constexpr int dim = dimension;
     static constexpr int size = Dune::binomial(maxOrder + dim, dim);
-    static_assert(false, "This Primary Template should never be compiled");
+    static_assert(dimension <= 3 and dimension >= 1, "This Primary Template should never be compiled");
     /**
      * \brief Return array of monomial exponents with shape `size x dim`
      *
@@ -68,6 +68,7 @@ namespace Dune::Functions {
     * of the monomial corresponding the the k-th
     * entry of the return value of exponents().
     * Note that the return type depends on \p dim and might change in the future.
+    * \tparam DomainFieldType The scalar type of the domain.
     */
     template<class DomainFieldType>
     constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
@@ -84,6 +85,7 @@ namespace Dune::Functions {
       * is the derivative in direction i of the monomial corresponding
       * the the k-th entry of the return value of exponents().
       * Note that the return type depends on \p dim and might change in the future.
+      * \tparam DomainFieldType The scalar type of the domain.
       */
       template<class DomainFieldType>
       constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
@@ -99,6 +101,7 @@ namespace Dune::Functions {
         * is the derivative in direction (i,j) of the monomial corresponding
         * the the k-th entry of the return value of exponents().
         * Note that the return type depends on \p dim and might change in the future.
+        * \tparam DomainFieldType The scalar type of the domain.
         */
         template<class DomainFieldType>
         constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;

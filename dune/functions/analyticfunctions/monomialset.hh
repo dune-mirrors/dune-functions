@@ -88,8 +88,9 @@ namespace Dune::Functions {
       * \tparam DomainFieldType The scalar type of the domain.
       */
       template<class DomainFieldType>
-      constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
-      /**
+      constexpr Dune::FieldMatrix<RangeFieldType,size, dim> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
+
+       /**
       * \brief Set of all second order derivatives of monomials up to degree \p degree as vector of matrix valued functions.
       */
       struct Hessian
@@ -104,8 +105,9 @@ namespace Dune::Functions {
         * \tparam DomainFieldType The scalar type of the domain.
         */
         template<class DomainFieldType>
-        constexpr Dune::FieldVector<RangeFieldType,size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
+        constexpr std::array<FieldMatrix<RangeFieldType,dim, dim>, size> operator()(const Dune::FieldVector<DomainFieldType,dim>& x) const;
       };
+
       /**
       * \brief Construct the Hessian object from a Derivative
       */
@@ -179,7 +181,7 @@ namespace Dune::Functions {
           auto xPowers = std::array<RangeFieldType,degree+1>{};
           Impl::computePowers<degree-2>(x[0],xPowers);
 
-          auto y = Dune::FieldVector<Dune::FieldMatrix<RangeFieldType,1,1>,size>{};
+          auto y = std::array<Dune::FieldMatrix<RangeFieldType,1,1>,size>{};
           for(auto order : Dune::range(degree+1))
             if (order-1 > 0)
               y[order][0][0] = order*(order-1)*xPowers[order-2];
@@ -287,7 +289,7 @@ namespace Dune::Functions {
           for(auto j : Dune::range(dim))
             Impl::computePowers<degree-2>(x[j], xPowers[j]);
 
-          auto y = Dune::FieldVector<Dune::FieldMatrix<RangeFieldType,2,2>,size>{};
+          auto y = std::array<Dune::FieldMatrix<RangeFieldType,2,2>,size>{};
           std::size_t index = 0;
           for(auto order : Dune::range(degree+1))
           {
@@ -426,7 +428,7 @@ namespace Dune::Functions {
           for(auto j : Dune::range(dim))
             Impl::computePowers<degree>(x[j], xPowers[j]);
 
-          auto y = Dune::FieldVector<Dune::FieldMatrix<RangeFieldType,3,3>,size>{};
+          auto y = std::array<Dune::FieldMatrix<RangeFieldType,3,3>,size>{};
           std::size_t index = 0;
           for(auto order : Dune::range(degree+1))
           {

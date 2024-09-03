@@ -25,201 +25,196 @@ namespace Dune
 {
 namespace Functions
 {
-namespace Impl
-{
-
-
-// Helper function returning an unordered range
-// of global indices associated to the element.
-// This could be implemented cheaper internally in
-// the MCMGMapper by storing a precomputed
-// container of all subsentities addressed by the layout.
-template<class GridView>
-auto subIndexSet(Dune::MultipleCodimMultipleGeomTypeMapper<GridView> const &mapper,
-                 const typename GridView::template Codim<0>::Entity &element)
-{
-  using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GridView>;
-  using Index = typename Mapper::Index;
-  constexpr auto dimension = GridView::dimension;
-  auto subIndices = std::vector<Index>();
-  auto referenceElement = Dune::referenceElement<double, dimension>(element.type());
-  for (auto codim : Dune::range(dimension + 1)) {
-    for (auto subEntity : Dune::range(referenceElement.size(codim))) {
-      std::size_t c = mapper.layout()(referenceElement.type(subEntity, codim), dimension);
-      if (c > 0) {
-        std::size_t firstIndex = mapper.subIndex(element, subEntity, codim);
-        for (auto j : Dune::range(firstIndex, firstIndex + c)) {
-          subIndices.push_back(j);
-        }
-      }
-    }
-  }
-  return subIndices;
-}
-
-  // Helper function computing an average mesh size per subentity
-  // by averaging over the adjacent elements. This only considers
-  // the subentities handled by the given mapper and returns a
-  // vector of mesh sizes indixed according to the mapper.
-  template<class FieldType = double, class Mapper>
-  auto computeAverageSubEntityMeshSize(const Mapper& mapper)
+  namespace Impl
   {
-    constexpr auto dimension = Mapper::GridView::dimension;
 
-    std::vector<unsigned int> adjacentElements(mapper.size(), 0);
-    std::vector<FieldType> subEntityMeshSize(mapper.size(), 0.0);
-    for(const auto& element : Dune::elements(mapper.gridView()))
+    // Helper function returning an unordered range
+    // of global indices associated to the element.
+    // This could be implemented cheaper internally in
+    // the MCMGMapper by storing a precomputed
+    // container of all subsentities addressed by the layout.
+    template<class GridView>
+    auto subIndexSet(Dune::MultipleCodimMultipleGeomTypeMapper<GridView> const &mapper,
+                    const typename GridView::template Codim<0>::Entity &element)
     {
-      auto A = element.geometry().volume();
-      for(auto i : Impl::subIndexSet(mapper, element))
-      {
-        subEntityMeshSize[i] += A;
-        ++(adjacentElements[i]);
-      }
-    }
-    for(auto i : Dune::range(mapper.size()))
-      subEntityMeshSize[i] = std::pow(subEntityMeshSize[i]/adjacentElements[i], 1./dimension);
-    return subEntityMeshSize;
-  }
-
-/** \brief Helper struct describing the Traits of the Global State of an Hermite Element*/
-template<class M, class R>
-struct HermiteGlobalStateTraits {
-    using Mapper = M;
-    using GlobalState = std::tuple<Mapper, std::vector<R>>;
-    using LocalState = std::vector<R>;
-};
-
-
-/** \brief This class implements the Transformation for Hermite finite elements, that 'corrects' the non affine-equivalence.
-*   It is bindable to an Element, stateful and offers a transform(...) method.
-*   Its state can change upon binding and can be accessed via localState().
-*   Additionally, it offers a GlobalValuedInterpolation class to be used for interpolation.
-*   \tparam Element   The Grid Element
-*   \tparam R         The Fieldtype of the Finite Element
-*   \tparam reduced   If True, use the reduced Hermite element aka Discrete Kirchhoff Triangle
-*/
-template<class Element, class R, class GlobalStateTraits, bool reduced = false>
-struct HermiteTransformator {
-
-  private:
-    static constexpr int dim = Element::mydimension;
-    static_assert(dim > 0 && dim < 4);
-    static_assert(!(reduced && (dim != 2))); // TODO is there a reduced 3d version ?
-    static constexpr std::size_t nDofs = (dim == 1) ? 4 : (dim == 2) ? 10 : 20;
-    static constexpr std::size_t numberOfVertices = dim + 1;
-    static constexpr std::size_t numberOfInnerDofs = reduced ? 0 : (dim - 1) * (dim - 1);
-    static constexpr std::size_t numberOfVertexDofs = numberOfVertices * numberOfVertices;
-  public:
-    using GlobalState = typename GlobalStateTraits::GlobalState;
-    using LocalState = typename GlobalStateTraits::LocalState;
-    using size_type = std::size_t;
-
-    HermiteTransformator(GlobalState const &globalState) : globalState_(&globalState) {}
-
-    /** Binds the Transformator to an element.
-     */
-    void bind(Element const &e)
-    {
-      localState_ = std::apply(
-          [&e](auto &&mapper, auto &&data) {
-            LocalState localState;
-            for (auto const &index : range(e.subEntities(dim)))
-              localState.push_back(data[mapper.subIndex(e, index, dim)]);
-            return localState;
-          },
-          *globalState_);
-
-      fillMatrix(e.geometry(), localState_);
-    }
-
-    LocalState const &localState() const { return localState_; }
-
-    //! The size of the transformed finite element.
-    static constexpr size_type size()
-    {
-      if constexpr (dim == 1)
-        return 4;
-      else if constexpr (dim == 2) {
-        if constexpr (reduced)
-          return 9;
-        else
-          return 10;
-      } else // dim == 3
-        return 20;
-    }
-
-    /** Applies the transformation. Note that we do not distinguish for
-    Scalar/Vector/Matrix Type,
-    * but only assume the Values to be Elements of a Vectorspace.
-      We assume random access containers. */
-    template<typename InputValues, typename OutputValues, class LocalCoordinate>
-    void transform(InputValues const &inValues, OutputValues &outValues, LocalCoordinate const& x) const
-    {
-      assert(inValues.size() == numberOfVertexDofs + numberOfInnerDofs);
-      assert(reduced || (outValues.size() == inValues.size()));
-      auto inIt = inValues.begin();
-      auto outIt = outValues.begin();
-
-      for (auto vertex : Dune::range(dim + 1)) {
-        *outIt = *inIt; // value dof is not transformed
-        outIt++, inIt++;
-        // transform the gradient dofs together
-        for (auto &&[row_i, i] : sparseRange(subMatrices_[vertex])) {
-          outIt[i] = 0.;
-          for (auto &&[val_i_j, j] : sparseRange(row_i))
-            outIt[i] += val_i_j * inIt[j];
+      using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GridView>;
+      using Index = typename Mapper::Index;
+      constexpr auto dimension = GridView::dimension;
+      auto subIndices = std::vector<Index>();
+      auto referenceElement = Dune::referenceElement<double, dimension>(element.type());
+      for (auto codim : Dune::range(dimension + 1)) {
+        for (auto subEntity : Dune::range(referenceElement.size(codim))) {
+          std::size_t c = mapper.layout()(referenceElement.type(subEntity, codim), dimension);
+          if (c > 0) {
+            std::size_t firstIndex = mapper.subIndex(element, subEntity, codim);
+            for (auto j : Dune::range(firstIndex, firstIndex + c)) {
+              subIndices.push_back(j);
+            }
+          }
         }
-        // increase pointer by size of gradient = dim
-        outIt += dim, inIt += dim;
       }
-
-      if constexpr (not reduced)
-        // copy all remaining inner dofs
-        std::copy(inIt, inValues.end(), outIt);
+      return subIndices;
     }
 
-  private:
-    /**
-     * \brief Create the transformationmatrix m
-     *
-     * \tparam Geometry
-     * \param geometry
-     * \return BCRSMatrix with size nDofs x nDofs
-     *
-     *      |1          0|} repeat
-     *      |   J        |} dim + 1 times
-     * m =  |     1      |
-     *      |       J ...|
-     *      |0          1|  } repeat (dim-1)^2 times
-     *
-     */
-    template<class Geometry>
-    void fillMatrix(Geometry const &geometry, LocalState const &averageSubEntityMeshSize)
+    // Helper function computing an average mesh size per subentity
+    // by averaging over the adjacent elements. This only considers
+    // the subentities handled by the given mapper and returns a
+    // vector of mesh sizes indixed according to the mapper.
+    template<class FieldType = double, class Mapper>
+    auto computeAverageSubEntityMeshSize(const Mapper& mapper)
     {
-      auto const &refElement = Dune::ReferenceElements<typename Geometry::ctype, dim>::simplex();
-      for (std::size_t i = 0; i < numberOfVertices; ++i) // dim + 1 vertices
+      constexpr auto dimension = Mapper::GridView::dimension;
+
+      std::vector<unsigned int> adjacentElements(mapper.size(), 0);
+      std::vector<FieldType> subEntityMeshSize(mapper.size(), 0.0);
+      for(const auto& element : Dune::elements(mapper.gridView()))
       {
-        subMatrices_[i] = geometry.jacobian(refElement.position(i, dim));
-        subMatrices_[i] /= averageSubEntityMeshSize[i];
+        auto A = element.geometry().volume();
+        for(auto i : Impl::subIndexSet(mapper, element))
+        {
+          subEntityMeshSize[i] += A;
+          ++(adjacentElements[i]);
+        }
       }
+      for(auto i : Dune::range(mapper.size()))
+        subEntityMeshSize[i] = std::pow(subEntityMeshSize[i]/adjacentElements[i], 1./dimension);
+      return subEntityMeshSize;
     }
 
-    // one transformation per vertex
-    std::array<Dune::FieldMatrix<R, dim, dim>, numberOfVertices> subMatrices_;
-    GlobalState const *globalState_;
-    LocalState localState_;
-
-  public:
-    /**
-     * \brief Class that evaluates the push forwards of the global nodes of a
-     * LocalFunction. It stretches the LocalInterpolation interface, because we
-     * evaluate the derivatives of f.
-     *
-     */
-    class GlobalValuedInterpolation
+    /** \brief Helper struct describing the Traits of the Global State of an Hermite Element*/
+    template<class M, class R>
+    struct HermiteGlobalStateTraits
     {
+      using Mapper = M;
+      using GlobalState = std::tuple<Mapper, std::vector<R>>;
+      using LocalState = std::vector<R>;
+    };
 
+
+    /** \brief This class implements the Transformation for Hermite finite elements, that 'corrects' the non affine-equivalence.
+    *   It is bindable to an Element, stateful and offers a transform(...) method.
+    *   Its state can change upon binding and can be accessed via localState().
+    *   Additionally, it offers a GlobalValuedInterpolation class to be used for interpolation.
+    *   \tparam Element   The Grid Element
+    *   \tparam R         The Fieldtype of the Finite Element
+    *   \tparam reduced   If True, use the reduced Hermite element aka Discrete Kirchhoff Triangle
+    */
+    template<class Element, class R, class GlobalStateTraits, bool reduced = false>
+    class HermiteTransformator
+    {
+      static constexpr int dim = Element::mydimension;
+      static_assert(dim > 0 && dim < 4);
+      static_assert(!(reduced && (dim != 2))); // TODO is there a reduced 3d version ?
+      static constexpr std::size_t numberOfVertices = dim + 1;
+      static constexpr std::size_t numberOfInnerDofs = reduced ? 0 : (dim - 1) * (dim - 1);
+      static constexpr std::size_t numberOfVertexDofs = numberOfVertices * numberOfVertices;
+    public:
+      using GlobalState = typename GlobalStateTraits::GlobalState;
+      using LocalState = typename GlobalStateTraits::LocalState;
+      using size_type = std::size_t;
+
+      HermiteTransformator(GlobalState const &globalState) : globalState_(&globalState) {}
+
+      /** Binds the Transformator to an element.
+      */
+      void bind(Element const &e)
+      {
+        localState_ = std::apply(
+            [&e](auto &&mapper, auto &&data) {
+              LocalState localState;
+              for (auto const &index : range(e.subEntities(dim)))
+                localState.push_back(data[mapper.subIndex(e, index, dim)]);
+              return localState;
+            },
+            *globalState_);
+
+        fillMatrix(e.geometry(), localState_);
+      }
+
+      LocalState const &localState() const { return localState_; }
+
+      //! The size of the transformed finite element.
+      static constexpr size_type size()
+      {
+        if constexpr (dim == 1)
+          return 4;
+        else if constexpr (dim == 2) {
+          if constexpr (reduced)
+            return 9;
+          else
+            return 10;
+        } else // dim == 3
+          return 20;
+      }
+
+      /** Applies the transformation. Note that we do not distinguish for
+      * Scalar/Vector/Matrix Type,
+      * but only assume the Values to be Elements of a Vectorspace.
+      * We assume random access containers. */
+      template<typename InputValues, typename OutputValues, class LocalCoordinate>
+      void transform(InputValues const &inValues, OutputValues &outValues, LocalCoordinate const& x) const
+      {
+        assert(inValues.size() == numberOfVertexDofs + numberOfInnerDofs);
+        assert(reduced || (outValues.size() == inValues.size()));
+        auto inIt = inValues.begin();
+        auto outIt = outValues.begin();
+
+        for (auto vertex : Dune::range(numberOfVertices)) {
+          *outIt = *inIt; // value dof is not transformed
+          outIt++, inIt++;
+          // transform the gradient dofs together
+          for (auto &&[row_i, i] : sparseRange(subMatrices_[vertex])) {
+            outIt[i] = 0.;
+            for (auto &&[val_i_j, j] : sparseRange(row_i))
+              outIt[i] += val_i_j * inIt[j];
+          }
+          // increase pointer by size of gradient = dim
+          outIt += dim, inIt += dim;
+        }
+
+        if constexpr (not reduced)
+          // copy all remaining inner dofs
+          std::copy(inIt, inValues.end(), outIt);
+      }
+
+    private:
+      /**
+      * \brief Fill the transformationmatrix m
+      *
+      * \tparam Geometry  the Geometry class
+      * \param geometry   the geometry of the element we are bound to
+      *
+      *
+      *      |1          0|} repeat for each vertex
+      * m =  |  J/h       |}
+      *      |0          1|} repeat for each inner dof i.e. (dim-1)^2 times
+      *  where h is the mesh size average over the local vertex patch
+      */
+      template<class Geometry>
+      void fillMatrix(Geometry const &geometry, LocalState const &averageSubEntityMeshSize)
+      {
+        auto const &refElement = Dune::ReferenceElements<typename Geometry::ctype, dim>::simplex();
+        for (std::size_t i = 0; i < numberOfVertices; ++i) // dim + 1 vertices
+        {
+          subMatrices_[i] = geometry.jacobian(refElement.position(i, dim));
+          subMatrices_[i] /= averageSubEntityMeshSize[i];
+        }
+      }
+
+      // one transformation per vertex
+      std::array<Dune::FieldMatrix<R, dim, dim>, numberOfVertices> subMatrices_;
+      GlobalState const *globalState_;
+      LocalState localState_;
+
+    public:
+      /**
+      * \brief Class that evaluates the push forwards of the global nodes of a
+      * LocalFunction. It stretches the LocalInterpolation interface, because we
+      * evaluate the derivatives of f.
+      *
+      */
+      class GlobalValuedInterpolation
+      {
         using size_type = std::size_t;
         using ctype = typename Element::Geometry::ctype;
         static constexpr size_type numberOfVertices = dim + 1;
@@ -239,12 +234,12 @@ struct HermiteTransformator {
         }
       public:
         /** \brief Evaluate a given function and its derivatives at the nodes
-         *
-         * \tparam F Type of function to evaluate
-         * \tparam C Type used for the values of the function
-         * \param[in] f Function to evaluate
-         * \param[out] out Array of function values
-         */
+        *
+        * \tparam F Type of function to evaluate
+        * \tparam C Type used for the values of the function
+        * \param[in] f Function to evaluate
+        * \param[out] out Array of function values
+        */
         template<typename F, typename C>
         void interpolate(const F &f, std::vector<C> &out) const
         {
@@ -294,39 +289,44 @@ struct HermiteTransformator {
           else
             DUNE_THROW(Dune::NotImplemented, "Derivative of scalar function is a matrix!");
         }
+
+
         HermiteTransformator const *transformator_;
         LocalState const* localState_;
+      };
+
     };
 
-};
+  } // namespace Impl
 
-} // namespace Impl
-
-/**
- * \brief A pre-basis for a Hermitebasis
- *
- * \ingroup FunctionSpaceBasesImplementations
- *
- * \tparam GV  The grid view that the FE basis is defined on
- * \tparam R   Range type used for shape function values
- * \note This only works for simplex grids
- */
-template<typename GV, typename R, bool reduced = false>
-class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
-{
+  /**
+  * \brief A pre-basis for a Hermitebasis
+  *
+  * \ingroup FunctionSpaceBasesImplementations
+  *
+  * \tparam GV  The grid view that the FE basis is defined on
+  * \tparam R   Range type used for shape function values
+  * \note This only works for simplex grids
+  */
+  template<typename GV, typename R, bool reduced = false>
+  class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
+  {
     using Base = LeafPreBasisMapperMixin<GV>;
     using SubEntityMapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
 
+    // helper methods to assign each subentity the number of dofs. Used by the LeafPreBasisMapperMixin.
     static constexpr auto cubicHermiteMapperLayout(Dune::GeometryType type, int gridDim)
     {
       if (type.isVertex())
-        return 1 + gridDim;
-      if (gridDim == 1)
+        return 1 + gridDim; // one evaluation dof and gridDim derivative dofs per vertex
+      if (gridDim == 1)    // in 1d there are no other dofs
         return 0;
+      // in 2d we have one inner dof (i.e. on the triangle) or non for the reduced case
+      // and in 3d we have one dof on each face (i.e. on each triangle)
       if ((type.isTriangle()) and (not reduced))
         return 1;
       else
-        return 0;
+        return 0; // this case is only entered for the interior of the 3d element. There are no dofs.
     }
 
   public:
@@ -338,7 +338,6 @@ class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
 
   private:
     static const size_type dim = GV::dimension;
-    static constexpr size_type innerDofCodim = (dim == 2) ? 0 : 1;
     using Element = typename GridView::template Codim<0>::Entity;
 
     // the following typedefs configure the whole transformation framework
@@ -347,6 +346,7 @@ class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
     //! The Traits for the global state of the Hermite elements
     using GlobalStateTraits =
         Impl::HermiteGlobalStateTraits<Dune::MultipleCodimMultipleGeomTypeMapper<GridView>, R>;
+
     using GlobalState = typename GlobalStateTraits::GlobalState;
     //! Type used for the transformator which turns the generic LocalFiniteElement
     //! into a LocalFiniteElement that is affine equivalent to the global
@@ -379,8 +379,8 @@ class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
     }
 
     /**
-     * \brief Create tree node
-     */
+    * \brief Create tree node
+    */
     Node makeNode() const { return Node(globalState_); }
 
   protected:
@@ -394,40 +394,40 @@ class HermitePreBasis : public LeafPreBasisMapperMixin<GV>
 
     GlobalState globalState_;
 
-}; // class HermitePreBasis
+  }; // class HermitePreBasis
 
-namespace BasisFactory
-{
+  namespace BasisFactory
+  {
 
-/**
- * \brief construct a PreBasisFactory
- *
- * \tparam R RangeFieldType
- * \return the PreBasisFactory
- */
-template<typename R = double>
-auto hermite()
-{
-  return [=](auto const &gridView) {
-    return HermitePreBasis<std::decay_t<decltype(gridView)>, R>(gridView);
-  };
-}
+    /**
+    * \brief construct a PreBasisFactory for the full cubic Hermite Finite Element
+    *
+    * \tparam R RangeFieldType
+    * \return the PreBasisFactory
+    */
+    template<typename R = double>
+    auto hermite()
+    {
+      return [=](auto const &gridView) {
+        return HermitePreBasis<std::decay_t<decltype(gridView)>, R>(gridView);
+      };
+    }
 
-/**
- * \brief construct a PreBasisFactory
- *
- * \tparam R RangeFieldType
- * \return the PreBasisFactory
- */
-template<typename R = double>
-auto reducedHermite()
-{
-  return [=](auto const &gridView) {
-    return HermitePreBasis<std::decay_t<decltype(gridView)>, R, true>(gridView);
-  };
-}
+    /**
+    * \brief construct a PreBasisFactory for the reduced cubic Hermite Finite Element
+    *
+    * \tparam R RangeFieldType
+    * \return the PreBasisFactory
+    */
+    template<typename R = double>
+    auto reducedHermite()
+    {
+      return [=](auto const &gridView) {
+        return HermitePreBasis<std::decay_t<decltype(gridView)>, R, true>(gridView);
+      };
+    }
 
-} // namespace BasisFactory
+  } // namespace BasisFactory
 
 } // namespace Functions
 } // namespace Dune

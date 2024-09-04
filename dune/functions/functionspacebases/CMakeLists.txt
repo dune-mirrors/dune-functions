@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 
 add_subdirectory("test")
-add_subdirectory("genericlocalfiniteelements")
 install(FILES
         basistags.hh
         boundarydofs.hh

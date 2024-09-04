@@ -72,6 +72,34 @@ int main(int argc, char *argv[])
     }
   }
 
+    { // 1d
+    std::cout << "Hermite test in 1d, Carstens implementation" << std::endl;
+    auto grid = StructuredGridFactory<OneDGrid>::createSimplexGrid({0.}, {1.}, {10});
+
+    auto gridView = grid->levelGridView(0);
+
+    {
+      std::cout << "Grid has " << gridView.size(0) << " elementes and " << gridView.size(1)
+                << " facettes and " << gridView.size(2) << " vertices" << std::endl;
+
+      auto basis = makeBasis(gridView, cubicHermite());
+      std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
+
+      test_1d.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck(),
+                                 EnableVertexDifferentiabilityCheck(),
+                                 CheckLocalFiniteElementFlag<0>()));
+      if (benchmark) {
+        auto lv = basis.localView();
+        for (auto e : elements(gridView)) {
+          lv.bind(e);
+          std::cout << repeat << " Evaluations took "
+                    << benchmarkEvaluation(lv.tree().finiteElement(), repeat) << std::endl;
+          break;
+        }
+      }
+    }
+  }
+
   { // 2d
     std::cout << "Hermite test in 2d" << std::endl;
 

@@ -22,6 +22,7 @@
 #include <dune/geometry/quadraturerules.hh>
 
 #include <dune/functions/functionspacebases/concepts.hh>
+#include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
 #include <dune/functions/functionspacebases/test/testboundlocalfe.hh>
 
 struct CheckBasisFlag {};

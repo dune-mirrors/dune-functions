@@ -56,4 +56,5 @@ install(
   FILES
   basistest.hh
   interpolatetest.hh
+  testboundlocalfe.hh
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/test)

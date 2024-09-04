@@ -23,10 +23,11 @@
 
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/test/testboundlocalfe.hh>
-#include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
 
 struct CheckBasisFlag {};
 struct AllowZeroBasisFunctions {};
+
+// Enable Checks that compare evaluateJacobian/partial methods up to order diffOrder with a finite Difference approximation
 template<int i = 1>
 struct CheckLocalFiniteElementFlag
 {
@@ -250,6 +251,7 @@ Dune::TestSuite checkNonZeroShapeFunctions(const LocalFiniteElement& fe, std::si
 
   /**
    * Check that finite Element returned by localView fullfilles properties of Local Finite Element
+   * This test corresponds to a dune-localfunctions test, but for a bound, i.e. possibly transformed, FE
    *  This is called by checkLocalView()
    */
 
@@ -300,9 +302,9 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
   // Check that all basis functions are non-zero.
   if (not IsContained<AllowZeroBasisFunctions, Flags...>::value)
   {
-      Dune::TypeTree::forEachLeafNode(
-          localView.tree(), [&](const auto &node, auto &&treePath)
-          { test.subTest(checkNonZeroShapeFunctions(node.finiteElement())); });
+    Dune::TypeTree::forEachLeafNode(localView.tree(), [&](const auto& node, auto&& treePath) {
+      test.subTest(checkNonZeroShapeFunctions(node.finiteElement()));
+    });
   }
   if constexpr(IsContained<CheckLocalFiniteElementFlag<0>, Flags...>::value)
   {

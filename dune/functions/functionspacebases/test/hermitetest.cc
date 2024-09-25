@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 
       test_1d.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck(),
                                  EnableVertexDifferentiabilityCheck(),
-                                 CheckLocalFiniteElementFlag()));
+                                 CheckLocalFiniteElementFlag<1>()));
       if (benchmark) {
         auto lv = basis.localView();
         for (auto e : elements(gridView)) {
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 
       test_2d.subTest(checkBasis(basis, EnableContinuityCheck(),
                                  EnableVertexDifferentiabilityCheck(),
-                                 CheckLocalFiniteElementFlag()));
+                                 CheckLocalFiniteElementFlag<1>()));
       if (benchmark) {
         auto lv = basis.localView();
         for (auto e : elements(gridView)) {

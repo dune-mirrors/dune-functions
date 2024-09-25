@@ -479,6 +479,7 @@ namespace Functions
           localState_.push_back(data[mapper.subIndex(e, index, dim)]);
 
       fillMatrix(e.geometry(), localState_);
+      interpolation_.bind(e, localState_);
     }
   protected:
     /** \brief Returns the local basis, i.e., the set of shape functions

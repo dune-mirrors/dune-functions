@@ -166,7 +166,8 @@ public:
     auto totalOrder = std::accumulate(order.begin(), order.end(), 0);
     if (totalOrder == 0)
       evaluateFunction(x, out);
-    DUNE_THROW(RangeError, "partial() not implemented for given order");
+    else
+      DUNE_THROW(RangeError, "partial() not implemented for given order");
   }
 
   unsigned int order() const

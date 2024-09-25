@@ -116,10 +116,14 @@ class TransformedFiniteElementMixin
     TransformedFiniteElementMixin()
     : tlb_(this->as_impl()){}
 
+    TransformedFiniteElementMixin(TransformedFiniteElementMixin const& other)
+    : TransformedFiniteElementMixin(){}
+
     FE  const& as_impl() const { return *(static_cast<FE const*>(this));}
+
     auto const& localBasis() const{ return tlb_;}
 
-    protected:
+  protected:
     TransformedLocalBasis<FE, ReferenceLocalBasisTraits> tlb_;
 };
 

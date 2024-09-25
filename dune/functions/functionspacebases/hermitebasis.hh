@@ -75,9 +75,9 @@ namespace Functions
         polynomialJacobians[i][0] += coefficients[i][j]*monomialJacobians[j];
   }
 
-  template<class KCoeff, int sizePolynom, class KMonom, int sizeMonom, int dim>
+  template<class KCoeff, int sizePolynom, class KMonom, int sizeMonom, std::size_t sizeMonom2, int dim>
   void multiplyWithCoefficentMatrix(Dune::FieldMatrix<KCoeff, sizePolynom, sizeMonom> const& coefficients,
-                                   std::array<Dune::FieldMatrix<KMonom, dim, dim>, sizeMonom> const& monomialHessians,
+                                   std::array<Dune::FieldMatrix<KMonom, dim, dim>, sizeMonom2> const& monomialHessians,
                                    std::vector<Dune::FieldMatrix<typename Dune::PromotionTraits<KCoeff, KMonom>::PromotedType, dim, dim>>& polynomialHessians)
   {
     polynomialHessians.resize(sizePolynom);
@@ -93,7 +93,7 @@ namespace Functions
    * \tparam R Type to represent the field in the range
    * \tparam dim Dimension of the domain simplex
    */
-  template<class D, class R, unsigned int dim, bool reduced>
+  template<class D, class R, int dim, bool reduced>
   class HermiteLocalBasis
   {
     public:
@@ -176,7 +176,7 @@ namespace Functions
 
     public:
       static_assert(not reduced || dim == 2, "Reduced Hermite element only implemented for 2d");
-      static constexpr unsigned int coeffSize = (dim == 1)   ? 4
+      static constexpr int coeffSize = (dim == 1)   ? 4
                                                 : (dim == 2) ? ((reduced) ? 9 : 10)
                                                             : 20;
       HermiteLocalBasis()

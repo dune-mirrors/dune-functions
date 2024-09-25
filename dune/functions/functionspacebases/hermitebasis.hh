@@ -408,7 +408,6 @@ namespace Functions
   template<class D, class R, unsigned int dim, bool reduced = false>
   class HermiteLocalFiniteElement: public TransformedFiniteElementMixin<HermiteLocalFiniteElement<D,R,dim,reduced>>
   {
-    static constexpr int dim = Element::mydimension;
     static_assert(dim > 0 && dim < 4);
     static_assert(!(reduced && (dim != 2)));
     static constexpr std::size_t numberOfVertices = dim + 1;
@@ -421,7 +420,7 @@ namespace Functions
     using size_type = std::size_t;
     using Traits = LocalFiniteElementTraits<
         Impl::HermiteLocalBasis<D, R, dim, reduced>, Impl::HermiteLocalCoefficients<dim, reduced>,
-        Impl::HermiteLocalInterpolation<class Element, R>>;
+        Impl::HermiteLocalInterpolation<Element, R>>;
 
     /** \brief Returns the assignment of the degrees of freedom to the element
      * subentities
@@ -443,7 +442,7 @@ namespace Functions
     static constexpr GeometryType type() const { return GeometryTypes::simplex(dim); }
 
     /** The size of the transformed finite element.
-      */
+     */
     static constexpr size_type size() const
     {
       if constexpr (dim == 1)
@@ -597,27 +596,22 @@ namespace Functions
 
   } // namespace Impl
 
-template<typename GV, class R>
+template<typename GV, class R, bool reduced>
 class HermiteNode : public LeafBasisNode
 {
-    static constexpr unsigned int dim = GV::dimension;
     using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
   public:
     using size_type = std::size_t;
     using Element = typename GV::template Codim<0>::Entity;
 
-    using FiniteElement = HermiteLocalFiniteElement<class GridView::ctype, class R, unsigned int dim>
+    using FiniteElement = HermiteLocalFiniteElement<GV::ctype, R, GV::dimension, reduced>;
 
 
     HermiteNode(Mapper const&m, std::vector<R> const& data)
     : mapper_(&m), data_(&data)
     {
-      // finiteElement_ is not bound yet, i.e. it might not have a size
+      this->setSize(finiteElement_.size());
     }
-
-    //TODO Copy Constr, Move, assignment, etc
-
-    ~HermiteNode() {}
 
     //! Return current element, throw if unbound
     Element const &element() const { return element_; }
@@ -634,7 +628,6 @@ class HermiteNode : public LeafBasisNode
     {
       element_ = e;
       finiteElement_.bind(*mapper_, *data_, element_);
-      this->setSize(finiteElement_.size());
     }
 
     //! The order of the local basis.
@@ -661,6 +654,8 @@ class HermiteNode : public LeafBasisNode
     using Base = LeafPreBasisMapperMixin<GV>;
     using SubEntityMapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
 
+    static const size_type dim = GV::dimension;
+    using Element = typename GV::template Codim<0>::Entity;
     // helper methods to assign each subentity the number of dofs. Used by the LeafPreBasisMapperMixin.
     static constexpr auto cubicHermiteMapperLayout(Dune::GeometryType type, int gridDim)
     {
@@ -676,6 +671,7 @@ class HermiteNode : public LeafBasisNode
         return 0; // this case is only entered for the interior of the 3d element. There are no dofs.
     }
 
+
   public:
     //! The grid view that the FE basis is defined on
     using GridView = GV;
@@ -683,17 +679,8 @@ class HermiteNode : public LeafBasisNode
     //! Type used for indices and size information
     using size_type = std::size_t;
 
-  private:
-    static const size_type dim = GV::dimension;
-    using Element = typename GridView::template Codim<0>::Entity;
-
-    // the following typedefs configure the whole transformation framework
-    //! Type used for the generic LocalFiniteElement
-    using LocalFE = HermiteLocalFiniteElement<typename GridView::ctype, R, dim, reduced>;
-
-  public:
     //! Template mapping root tree path to type of created tree node
-    using Node = HermiteNode;
+    using Node = HermiteNode<GridView, R,reduced>;
 
     static constexpr size_type maxMultiIndexSize = 1;
     static constexpr size_type minMultiIndexSize = 1;
@@ -724,12 +711,12 @@ class HermiteNode : public LeafBasisNode
   protected:
     void updateState(GridView const &gridView)
     {
-      mapper.update(gridView);
-      data = Impl::computeAverageSubEntityMeshSize<R>(mapper);
+      mapper_.update(gridView);
+      data_ = Impl::computeAverageSubEntityMeshSize<D>(mapper_);
     }
 
     SubEntityMapper mapper_;
-    std::vector<R> data_;
+    std::vector<D> data_;
 
   }; // class HermitePreBasis
 

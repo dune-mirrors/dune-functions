@@ -21,6 +21,7 @@ class TransformedLocalBasis
     using Traits = ReferenceLocalBasisTraits;
     using LocalValuedRangeType = typename Traits::RangeType;
     using LocalValuedJacobianType = typename Traits::JacobianType;
+    // todo guard this somehow
     using LocalValuedHessianType = typename Traits::HessianType;
 
     TransformedLocalBasis(FE const &fe) : fe_impl_(&(fe.as_impl())) {}
@@ -68,13 +69,11 @@ class TransformedLocalBasis
      * element where to evaluation the Hessians \param[out] out The Hessians of
      * all shape functions at the point x
      */
-    template<class TT = LocalValuedLocalBasis,
-             std::enable_if_t<models<Concept::Impl::H2Basis, TT>(), int> = 0>
+    template<class TT,
+             std::enable_if_t<std::is_same_v<TT, LocalValuedHessianType>, int> = 0>
     void evaluateHessian(const typename Traits::DomainType &x,
-                         std::vector<typename TT::HessianType> &out) const
+                         std::vector<TT> &out) const
     {
-
-      static_assert(std::is_same_v<TT, LocalValuedLocalBasis>);
       hessianBuffer_.resize(fe_impl_->size());
       fe_impl_->referenceLocalBasis()->evaluateHessian(x, hessianBuffer_);
       out.resize(size());
@@ -117,6 +116,7 @@ class TransformedLocalBasis
 template<class FE, class ReferenceLocalBasisTraits>
 class TransformedFiniteElementMixin
 {
+  public:
     TransformedFiniteElementMixin()
     : tlb_(this){}
 
@@ -130,9 +130,11 @@ class TransformedFiniteElementMixin
 
 // Example Usage
 template<class ReferenceLocalBasisTraits>
-class TransformedFEExample : TransformedFiniteElementMixin<TransformedFEExample, ReferenceLocalBasisTraits>
+class TransformedFEExample : TransformedFiniteElementMixin<TransformedFEExample<ReferenceLocalBasisTraits>, ReferenceLocalBasisTraits>
 {
     friend class TransformedLocalBasis<TransformedFEExample, ReferenceLocalBasisTraits>;
+    using ReferenceRangeType = double;
+    using RangeType = double;
     protected:
         auto const& referenceLocalBasis(){/* return the basis that is to be transformed*/}
         void transform(std::vector<ReferenceRangeType> const& in, std::vector<RangeType>& out){

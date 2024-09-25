@@ -311,87 +311,87 @@ namespace Functions
      * evaluate the derivatives of f.
      *
      */
-    template<class D, class GlobalStateTraits, bool reduced = false>
+    template<class D, int dim, bool reduced = false>
     class HermiteLocalInterpolation
     {
-    using size_type = std::size_t;
-    static constexpr size_type numberOfVertices = dim + 1;
-    static constexpr size_type innerDofCodim = (dim == 2) ? 0 : 1; // probably wrong for dim > 3
-    static constexpr size_type numberOfInnerDofs =
-        (dim - 1) * (dim - 1); // probably wrong for dim > 3
-
+      using size_type = std::size_t;
+      static constexpr size_type numberOfVertices = dim + 1;
+      static constexpr size_type innerDofCodim = (dim == 2) ? 0 : 1; // probably wrong for dim > 3
+      static constexpr size_type numberOfInnerDofs =
+          (dim - 1) * (dim - 1); // probably wrong for dim > 3
+      static constexpr unsigned int coeffSize = (dim == 1)   ? 4
+                                                : (dim == 2) ? ((reduced) ? 9 : 10)
+                                                            : 20;
     public:
-    GlobalValuedInterpolation(HermiteTransformator const &t) : transformator_(&t) {}
+      HermiteLocalInterpolation(){}
 
-    /** \brief bind the Interpolation to an element and a localState.
-     */
-    template<class Element>
-    void bind( Element const &element, std::vector<D>const& localState)
-    {
-        localState_ = &localState;
-    }
+      /** \brief bind the Interpolation to an element and a localState.
+      */
+      template<class Element>
+      void bind( Element const &element, std::vector<D>const& localState)
+      {
+          localState_ = &localState;
+      }
 
-    public:
-    /** \brief Evaluate a given function and its derivatives at the nodes
-    *
-    * \tparam F Type of function to evaluate
-    * \tparam C Type used for the values of the function
-    * \param[in] f Function to evaluate
-    * \param[out] out Array of function values
-    */
-    template<typename F, typename C>
-    void interpolate(const F &f, std::vector<C> &out) const
-    {
-        auto df = derivative(f);
-        out.resize(transformator_->size());
+      /** \brief Evaluate a given function and its derivatives at the nodes
+      *
+      * \tparam F Type of function to evaluate
+      * \tparam C Type used for the values of the function
+      * \param[in] f Function to evaluate
+      * \param[out] out Array of function values
+      */
+      template<typename F, typename C>
+      void interpolate(const F &f, std::vector<C> &out) const
+      {
+          auto df = derivative(f);
+          out.resize(coeffSize);
 
-        auto const &refElement = Dune::ReferenceElements<D, dim>::simplex();
-        // Iterate over vertices, dim dofs per vertex
-        for (int i = 0; i < dim + 1; ++i) {
-        auto x = refElement.position(i, dim);
+          auto const &refElement = Dune::ReferenceElements<D, dim>::simplex();
+          // Iterate over vertices, dim dofs per vertex
+          for (int i = 0; i < dim + 1; ++i) {
+          auto x = refElement.position(i, dim);
 
-        auto derivativeValue = df(x);
-        out[i * numberOfVertices] = f(x);
-        for (int d = 0; d < dim; ++d)
-            out[i * numberOfVertices + d + 1] = getPartialDerivative(derivativeValue,d) * (*localState_)[i];
-        }
+          auto derivativeValue = df(x);
+          out[i * numberOfVertices] = f(x);
+          for (int d = 0; d < dim; ++d)
+              out[i * numberOfVertices + d + 1] = getPartialDerivative(derivativeValue,d) * (*localState_)[i];
+          }
 
-        if constexpr (not reduced)
-        for (size_type i = 0; i < numberOfInnerDofs; ++i) {
-            out[numberOfVertices * numberOfVertices + i] =
-                f(refElement.position(i, innerDofCodim));
-        }
-    }
+          if constexpr (not reduced)
+          for (size_type i = 0; i < numberOfInnerDofs; ++i) {
+              out[numberOfVertices * numberOfVertices + i] =
+                  f(refElement.position(i, innerDofCodim));
+          }
+      }
 
     protected:
-    template<class DerivativeType, class FieldType>
-    FieldType getPartialDerivative(DerivativeType const &df, std::size_t i) const
-    {
-        DUNE_THROW(Dune::NotImplemented, "Derivative Type is neither FieldMatrix<double,1,d> nor "
-                                        "FieldVector<double,d>");
-    }
+      template<class DerivativeType, class FieldType>
+      FieldType getPartialDerivative(DerivativeType const &df, std::size_t i) const
+      {
+          DUNE_THROW(Dune::NotImplemented, "Derivative Type is neither FieldMatrix<double,1,d> nor "
+                                          "FieldVector<double,d>");
+      }
 
-    template<class FieldType, int d>
-    FieldType getPartialDerivative(Dune::FieldVector<FieldType, d> const &df, std::size_t i) const
-    {
-        return df[i];
-    }
+      template<class FieldType, int d>
+      FieldType getPartialDerivative(Dune::FieldVector<FieldType, d> const &df, std::size_t i) const
+      {
+          return df[i];
+      }
 
-    template<class FieldType, int d>
-    FieldType getPartialDerivative(Dune::FieldMatrix<FieldType, 1, d> const &df,
-                                    std::size_t i) const
-    {
-      if (df.N() == 1)
-        return df[0][i];
-      else if (df.M() == 1)
-        return df[i][0];
-      else
-        DUNE_THROW(Dune::NotImplemented, "Derivative of scalar function is a matrix!");
-    }
+      template<class FieldType, int d>
+      FieldType getPartialDerivative(Dune::FieldMatrix<FieldType, 1, d> const &df,
+                                      std::size_t i) const
+      {
+        if (df.N() == 1)
+          return df[0][i];
+        else if (df.M() == 1)
+          return df[i][0];
+        else
+          DUNE_THROW(Dune::NotImplemented, "Derivative of scalar function is a matrix!");
+      }
 
-
-    LocalState const* localState_;
-    };
+      std::vector<D> const* localState_;
+  };
 
 
 
@@ -406,7 +406,7 @@ namespace Functions
    * \tparam dim dimension of the reference element
    */
   template<class D, class R, unsigned int dim, bool reduced = false>
-  class HermiteLocalFiniteElement: public TransformedFiniteElementMixin<HermiteLocalFiniteElement<D,R,dim,reduced>>
+  class HermiteLocalFiniteElement: public Impl::TransformedFiniteElementMixin<HermiteLocalFiniteElement<D,R,dim,reduced>>
   {
     static_assert(dim > 0 && dim < 4);
     static_assert(!(reduced && (dim != 2)));
@@ -420,7 +420,7 @@ namespace Functions
     using size_type = std::size_t;
     using Traits = LocalFiniteElementTraits<
         Impl::HermiteLocalBasis<D, R, dim, reduced>, Impl::HermiteLocalCoefficients<dim, reduced>,
-        Impl::HermiteLocalInterpolation<Element, R>>;
+        Impl::HermiteLocalInterpolation<D, dim, reduced>>;
 
     /** \brief Returns the assignment of the degrees of freedom to the element
      * subentities
@@ -604,7 +604,7 @@ class HermiteNode : public LeafBasisNode
     using size_type = std::size_t;
     using Element = typename GV::template Codim<0>::Entity;
 
-    using FiniteElement = HermiteLocalFiniteElement<GV::ctype, R, GV::dimension, reduced>;
+    using FiniteElement = typename HermiteLocalFiniteElement<GV::ctype, R, GV::dimension, reduced>;
 
 
     HermiteNode(Mapper const&m, std::vector<R> const& data)

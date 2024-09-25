@@ -252,7 +252,7 @@ namespace Functions
             out[i] = jacobiansBuffer_[i][0][which];
         }
         else if (totalOrder == 2){
-          evaluateHessian(in, hessianBuffer_);q
+          evaluateHessian(in, hessianBuffer_);
           std::size_t first, second;
           first = std::max_element(order.begin(), order.end()) - order.begin();
           if (order[first] == 2){

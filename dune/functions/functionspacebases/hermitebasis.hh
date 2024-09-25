@@ -238,7 +238,7 @@ namespace Functions
        * \param[in] in  The evaluation point
        * \param[out] out Jacobians of all shape functions at that point
        */
-      void partial(std::array<unsigned int, dim> const &order, const typename Traits::DomainType &in,
+      void partial(std::array<unsigned int, dim> order, const typename Traits::DomainType &in,
                   std::vector<typename Traits::RangeType> &out) const
       {
         out.resize(size());
@@ -246,17 +246,32 @@ namespace Functions
         if (totalOrder == 0)
           evaluateFunction(in, out);
         else if (totalOrder == 1){
-          evaluateJacobian(in,jacobians);
+          evaluateJacobian(in,jacobiansBuffer_);
           std::size_t which = std::max_element(order.begin(), order.end()) - order.begin();
           for (auto i : Dune::range(size()))
-            out[i] = jacobians[i][0][which];
+            out[i] = jacobiansBuffer_[i][0][which];
+        }
+        else if (totalOrder == 2){
+          evaluateHessian(in, hessianBuffer_);q
+          std::size_t first, second;
+          first = std::max_element(order.begin(), order.end()) - order.begin();
+          if (order[first] == 2){
+            second = first;
+          } else {
+            order[first] = 0;
+            second = std::max_element(order.begin(), order.end()) - order.begin();
+          }
+          for (auto i : Dune::range(size()))
+            out[i] = hessianBuffer_[i][first][second];
         }
         else
           DUNE_THROW(RangeError, "partial() not implemented for given order");
       }
 
       private:
-      mutable std::vector<typename Traits::JacobianType> jacobians;
+      mutable std::vector<typename Traits::JacobianType> jacobiansBuffer_;
+      mutable std::vector<typename Traits::HessianType> hessianBuffer_;
+
   };
 
   /** \brief Associations of the Hermite degrees of freedom to subentities of the
@@ -347,7 +362,7 @@ namespace Functions
           out.resize(coeffSize);
 
           auto const &refElement = Dune::ReferenceElements<D, dim>::simplex();
-          // Iterate over vertices, dim dofs per vertex
+          // Iterate over vertices, dim +1 dofs per vertex
           for (int i = 0; i < dim + 1; ++i) {
           auto x = refElement.position(i, dim);
 
@@ -476,7 +491,7 @@ namespace Functions
     void bind(Mapper const& mapper, std::vector<D> const& data, Element const &e)
     {
       for (auto const &index : range(e.subEntities(dim)))
-          localState_.push_back(data[mapper.subIndex(e, index, dim)]);
+        localState_.push_back(data[mapper.subIndex(e, index, dim)]);
 
       fillMatrix(e.geometry(), localState_);
       interpolation_.bind(e, localState_);
@@ -622,14 +637,14 @@ class HermiteNode : public LeafBasisNode
     using FiniteElement = HermiteLocalFiniteElement<typename GV::ctype, R, GV::dimension, reduced>;
 
 
-    HermiteNode(Mapper const&m, std::vector<typename GV::ctype> const& data)
+    HermiteNode(Mapper const& m, std::vector<typename GV::ctype> const& data)
     : mapper_(&m), data_(&data)
     {
       this->setSize(finiteElement_.size());
     }
 
     //! Return current element, throw if unbound
-    Element const &element() const { return element_; }
+    Element const &element() const { return *element_; }
 
     /** \brief Return the LocalFiniteElement for the element we are bound to
      *
@@ -641,8 +656,8 @@ class HermiteNode : public LeafBasisNode
     //! Bind to element.
     void bind(Element const &e)
     {
-      element_ = e;
-      finiteElement_.bind(*mapper_, *data_, element_);
+      element_ = &e;
+      finiteElement_.bind(*mapper_, *data_, *element_);
     }
 
     //! The order of the local basis.
@@ -650,7 +665,7 @@ class HermiteNode : public LeafBasisNode
 
   protected:
     FiniteElement finiteElement_;
-    Element element_;
+    Element const* element_;
     Mapper const* mapper_;
     std::vector<typename GV::ctype> const* data_;
 };

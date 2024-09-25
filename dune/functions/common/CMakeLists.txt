@@ -16,6 +16,7 @@ install(FILES
         localfunction.hh
         localfunction_imp.hh
         mapperutilities.hh
+        multidomain.hh
         multiindex.hh
         overflowarray.hh
         polymorphicsmallobject.hh

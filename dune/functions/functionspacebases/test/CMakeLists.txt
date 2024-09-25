@@ -25,6 +25,8 @@ dune_add_test(SOURCES lagrangedgbasistest.cc LABELS quick)
 
 dune_add_test(SOURCES lfebasistest.cc LABELS quick)
 
+dune_add_test(SOURCES multidomaintest.cc LABELS quick)
+
 dune_add_test(SOURCES nedelecbasistest.cc LABELS quick)
 
 dune_add_test(SOURCES periodicbasistest.cc LABELS quick)

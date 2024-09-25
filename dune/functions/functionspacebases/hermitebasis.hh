@@ -397,6 +397,12 @@ namespace Functions
 
   } // namespace Impl
 
+  template<class D, class R, unsigned int dim , bool reduced>
+  struct HermiteLocalBasisTraits
+    : public H2LocalBasisTraits<D, dim, Dune::FieldVector<D,dim>, R, 1,
+            Dune::FieldVector<R,1>, Dune::FieldMatrix<R,1,dim>, Dune::FieldMatrix<R,dim,dim>>
+  {};
+
   /** \brief Hermite finite element for simplices, as defined on the reference Element.
    * Note, that this is a non affine-equivalent finite element, that requires an additional transformation to the relate reference basis with the pullbacks of global basis.
    * For more Details, see <dune/functions/functionspacebases/hermitebasis.hh>.
@@ -406,20 +412,28 @@ namespace Functions
    * \tparam dim dimension of the reference element
    */
   template<class D, class R, unsigned int dim, bool reduced = false>
-  class HermiteLocalFiniteElement: public Impl::TransformedFiniteElementMixin<HermiteLocalFiniteElement<D,R,dim,reduced>>
+  class HermiteLocalFiniteElement: public Impl::TransformedFiniteElementMixin<HermiteLocalFiniteElement<D,R,dim,reduced>, HermiteLocalBasisTraits<D, R, dim, reduced>>
   {
+    using Base = Impl::TransformedFiniteElementMixin< HermiteLocalFiniteElement<D,R,dim,reduced>, HermiteLocalBasisTraits<D, R, dim, reduced>>;
+    friend class Impl::TransformedLocalBasis<HermiteLocalFiniteElement<D,R,dim,reduced>, HermiteLocalBasisTraits<D, R, dim, reduced>>;
+
     static_assert(dim > 0 && dim < 4);
     static_assert(!(reduced && (dim != 2)));
     static constexpr std::size_t numberOfVertices = dim + 1;
     static constexpr std::size_t numberOfInnerDofs = reduced ? 0 : (dim - 1) * (dim - 1);
     static constexpr std::size_t numberOfVertexDofs = numberOfVertices * numberOfVertices;
   public:
+
+    HermiteLocalFiniteElement()
+      :Base()
+      {}
     /** \brief Export number types, dimensions, etc.
      */
     using LocalState = typename std::vector<D>;
     using size_type = std::size_t;
     using Traits = LocalFiniteElementTraits<
-        Impl::HermiteLocalBasis<D, R, dim, reduced>, Impl::HermiteLocalCoefficients<dim, reduced>,
+        Impl::TransformedLocalBasis<HermiteLocalFiniteElement<D,R,dim,reduced>, HermiteLocalBasisTraits<D, R, dim, reduced>>,
+        Impl::HermiteLocalCoefficients<dim, reduced>,
         Impl::HermiteLocalInterpolation<D, dim, reduced>>;
 
     /** \brief Returns the assignment of the degrees of freedom to the element
@@ -439,11 +453,11 @@ namespace Functions
 
     /** \brief The reference element that the local finite element is defined on
      */
-    static constexpr GeometryType type() const { return GeometryTypes::simplex(dim); }
+    static constexpr GeometryType type() { return GeometryTypes::simplex(dim); }
 
     /** The size of the transformed finite element.
      */
-    static constexpr size_type size() const
+    static constexpr size_type size()
     {
       if constexpr (dim == 1)
         return 4;
@@ -469,7 +483,7 @@ namespace Functions
   protected:
     /** \brief Returns the local basis, i.e., the set of shape functions
      */
-    const typename Traits::LocalBasisType &referenceLocalBasis() const { return basis_; }
+    Impl::HermiteLocalBasis<D, R, dim, reduced> const&referenceLocalBasis() const { return basis_; }
 
     /** Applies the transformation. Note that we do not distinguish for
       * Scalar/Vector/Matrix Type,
@@ -526,7 +540,7 @@ namespace Functions
     }
 
     // a finite element consists of a basis, coeffiecents and an interpolation
-    typename Traits::LocalBasisType basis_;
+    typename Impl::HermiteLocalBasis<D, R, dim, reduced> basis_;
     typename Traits::LocalCoefficientsType coefficients_;
     typename Traits::LocalInterpolationType interpolation_;
     // the transformation to correct the lack of affine equivalence boils down to
@@ -604,10 +618,10 @@ class HermiteNode : public LeafBasisNode
     using size_type = std::size_t;
     using Element = typename GV::template Codim<0>::Entity;
 
-    using FiniteElement = typename HermiteLocalFiniteElement<GV::ctype, R, GV::dimension, reduced>;
+    using FiniteElement = HermiteLocalFiniteElement<typename GV::ctype, R, GV::dimension, reduced>;
 
 
-    HermiteNode(Mapper const&m, std::vector<R> const& data)
+    HermiteNode(Mapper const&m, std::vector<typename GV::ctype> const& data)
     : mapper_(&m), data_(&data)
     {
       this->setSize(finiteElement_.size());
@@ -636,6 +650,8 @@ class HermiteNode : public LeafBasisNode
   protected:
     FiniteElement finiteElement_;
     Element element_;
+    Mapper const* mapper_;
+    std::vector<typename GV::ctype> const* data_;
 };
 
 
@@ -654,8 +670,9 @@ class HermiteNode : public LeafBasisNode
     using Base = LeafPreBasisMapperMixin<GV>;
     using SubEntityMapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
 
-    static const size_type dim = GV::dimension;
+    static const std::size_t dim = GV::dimension;
     using Element = typename GV::template Codim<0>::Entity;
+    using D = typename GV::ctype;
     // helper methods to assign each subentity the number of dofs. Used by the LeafPreBasisMapperMixin.
     static constexpr auto cubicHermiteMapperLayout(Dune::GeometryType type, int gridDim)
     {
@@ -689,7 +706,7 @@ class HermiteNode : public LeafBasisNode
   public:
     //! Constructor for a given grid view object
     HermitePreBasis(const GV &gv)
-        : Base(gv, cubicHermiteMapperLayout), mapper({gv, mcmgVertexLayout()})
+        : Base(gv, cubicHermiteMapperLayout), mapper_({gv, mcmgVertexLayout()})
     {
       updateState(gv);
       if (dim > 3)

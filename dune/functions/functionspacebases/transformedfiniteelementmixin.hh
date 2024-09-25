@@ -19,12 +19,8 @@ class TransformedLocalBasis
 
   public:
     using Traits = ReferenceLocalBasisTraits;
-    using LocalValuedRangeType = typename Traits::RangeType;
-    using LocalValuedJacobianType = typename Traits::JacobianType;
-    // todo guard this somehow
-    using LocalValuedHessianType = typename Traits::HessianType;
 
-    TransformedLocalBasis(FE const &fe) : fe_impl_(&(fe.as_impl())) {}
+    TransformedLocalBasis(FE const& fe_impl) : fe_impl_(&fe_impl) {}
 
   public:
     /** \brief Number of shape functions
@@ -42,9 +38,9 @@ class TransformedLocalBasis
     {
 
       rangeBuffer_.resize(fe_impl_->size());
-      fe_impl_->referenceLocalBasis()->evaluateFunction(x, rangeBuffer_);
+      fe_impl_->referenceLocalBasis().evaluateFunction(x, rangeBuffer_);
       out.resize(size());
-      fe_impl_->transform(rangeBuffer_, out, x);
+      fe_impl_->transform(rangeBuffer_, out);
     }
 
     /** \brief Evaluate Jacobian of all shape functions
@@ -57,9 +53,9 @@ class TransformedLocalBasis
     {
 
       jacobianBuffer_.resize(fe_impl_->size());
-      fe_impl_->referenceLocalBasis()->evaluateJacobian(x, jacobianBuffer_);
+      fe_impl_->referenceLocalBasis().evaluateJacobian(x, jacobianBuffer_);
       out.resize(size());
-      fe_impl_->transform(jacobianBuffer_, out, x);
+      fe_impl_->transform(jacobianBuffer_, out);
     }
 
     /** \brief Evaluate Hessian of all shape functions
@@ -70,14 +66,14 @@ class TransformedLocalBasis
      * all shape functions at the point x
      */
     template<class TT,
-             std::enable_if_t<std::is_same_v<TT, LocalValuedHessianType>, int> = 0>
+             std::enable_if_t<std::is_same_v<TT, typename Traits::HessianType>, int> = 0>
     void evaluateHessian(const typename Traits::DomainType &x,
                          std::vector<TT> &out) const
     {
       hessianBuffer_.resize(fe_impl_->size());
-      fe_impl_->referenceLocalBasis()->evaluateHessian(x, hessianBuffer_);
+      fe_impl_->referenceLocalBasis().evaluateHessian(x, hessianBuffer_);
       out.resize(size());
-      fe_impl_->transform(hessianBuffer_, out, x);
+      fe_impl_->transform(hessianBuffer_, out);
     }
 
     /** \brief Evaluate partial derivatives of any order of all shape functions
@@ -93,22 +89,22 @@ class TransformedLocalBasis
     {
 
       rangeBuffer_.resize(fe_impl_->size());
-      fe_impl_->referenceLocalBasis()->partial(order, x, rangeBuffer_);
+      fe_impl_->referenceLocalBasis().partial(order, x, rangeBuffer_);
       out.resize(size());
-      fe_impl_->transform(rangeBuffer_, out, x);
+      fe_impl_->transform(rangeBuffer_, out);
     }
 
     //! \brief Polynomial order of the shape functions
-    auto order() const { return fe_impl_->referenceLocalBasis()->order(); }
+    auto order() const { return fe_impl_->referenceLocalBasis().order(); }
 
     //Transformator const &transformator() const { return *transformator_; }
 
-    auto const &cacheable() const { return fe_impl_->referenceBasis(); }
+    // auto const &cacheable() const { return fe_impl_->referenceBasis(); }
 
   private:
-    FE const * fe_impl_;
-    mutable std::vector<LocalValuedRangeType> rangeBuffer_;
-    mutable std::vector<LocalValuedJacobianType> jacobianBuffer_;
+    FE const* fe_impl_;
+    mutable std::vector<typename Traits::RangeType> rangeBuffer_;
+    mutable std::vector<typename Traits::JacobianType> jacobianBuffer_;
     mutable std::vector<typename Traits::HessianType> hessianBuffer_;
 };
 
@@ -118,10 +114,10 @@ class TransformedFiniteElementMixin
 {
   public:
     TransformedFiniteElementMixin()
-    : tlb_(this){}
+    : tlb_(this->as_impl()){}
 
-    FE  const& as_impl()const { return *(static_cast<FE const*>(this));}
-    auto const& localBasis(){ return tlb_;}
+    FE  const& as_impl() const { return *(static_cast<FE const*>(this));}
+    auto const& localBasis() const{ return tlb_;}
 
     protected:
     TransformedLocalBasis<FE, ReferenceLocalBasisTraits> tlb_;

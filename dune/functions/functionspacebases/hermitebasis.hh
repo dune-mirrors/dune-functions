@@ -29,11 +29,10 @@ namespace Functions
   template<class DF, int n, class D, class RF, int m, class R, class J, class H>
   struct H2LocalBasisTraits : public LocalBasisTraits<DF, n, D, RF, m, R, J> {
       /** \brief Type to represent the Hessian
-
-          When \f$ \hat\phi : \mbox{IR}^n \to \mbox{IR}\f$ then HessianType
-          is an 2D-array of m x m components where entry H[i][j] contains
-          the derivative  \f$\partial_i \partial_j \hat\phi \f$.
-        */
+       *  When \f$ \hat\phi : \mbox{IR}^n \to \mbox{IR}\f$ then HessianType
+       *  is an 2D-array of m x m components where entry H[i][j] contains
+       *  the derivative  \f$\partial_i \partial_j \hat\phi \f$.
+       */
       using HessianType = H;
   };
 
@@ -89,11 +88,11 @@ namespace Functions
   }
 
   /**
-  * \brief Implementation of hermite Polynomials
-  * \tparam D Type to represent the field in the domain
-    \tparam R Type to represent the field in the range
-    \tparam dim Dimension of the domain simplex
-  */
+   * \brief Implementation of hermite Polynomials
+   * \tparam D Type to represent the field in the domain
+   * \tparam R Type to represent the field in the range
+   * \tparam dim Dimension of the domain simplex
+   */
   template<class D, class R, unsigned int dim, bool reduced>
   class HermiteLocalBasis
   {
@@ -103,10 +102,10 @@ namespace Functions
 
     private:
       /**
-      * @brief Get the Hermite Coefficients Matrix
-      * @return FieldMatrix<F, (possibly reduced) size, size>
-      *  where size is the dimension of the cubic polynomial space
-      */
+       * @brief Get the Hermite Coefficients Matrix
+       * @return FieldMatrix<F, (possibly reduced) size, size>
+       *  where size is the dimension of the cubic polynomial space
+       */
       static constexpr auto getHermiteCoefficients()
       {
         static_assert(dim > 0 and dim < 4 and not(reduced and dim != 2));
@@ -186,24 +185,32 @@ namespace Functions
           DUNE_THROW(Dune::NotImplemented, "only implemented for dim <= 3");
       }
 
+      /** The number of basis functions in the basis
+       */
       static constexpr unsigned int size() { return coeffSize; }
 
+      /** The polynomial order of the basis
+       */
       unsigned int order() const { return 3; }
 
+      /** \brief Evaluate function values of all shape functions at a given point
+       *
+       * \param[in]  in  The evaluation point
+       * \param[out] out Values of all shape functions at that point
+       */
       void evaluateFunction(const typename Traits::DomainType &in,
                             std::vector<typename Traits::RangeType> &out) const
       {
         out.resize(size());
         auto monomialValues = monomials(in);
-        // thread_local auto monomialValues = evaluateMonomialValues(in);
         multiplyWithCoefficentMatrix(referenceBasisCoefficients, monomialValues, out);
       }
 
       /** \brief Evaluate Jacobians of all shape functions at a given point
-      *
-      * \param[in]  in  The evaluation point
-      * \param[out] out Jacobians of all shape functions at that point
-      */
+       *
+       * \param[in]  in  The evaluation point
+       * \param[out] out Jacobians of all shape functions at that point
+       */
       void evaluateJacobian(const typename Traits::DomainType &in,
                             std::vector<typename Traits::JacobianType> &out) const
       {
@@ -213,10 +220,10 @@ namespace Functions
       }
 
       /** \brief Evaluate Hessians of all shape functions at a given point
-      *
-      * \param[in]  in  The evaluation point
-      * \param[out] out Hessians of all shape functions at that point
-      */
+       *
+       * \param[in]  in  The evaluation point
+       * \param[out] out Hessians of all shape functions at that point
+       */
       void evaluateHessian(const typename Traits::DomainType &in,
                             std::vector<typename Traits::HessianType> &out) const
       {
@@ -226,11 +233,11 @@ namespace Functions
       }
 
       /** \brief Evaluate partial derivatives of all shape functions at a given point
-      *
-      * \param[in] order The partial derivative to be computed, as a multi-index
-      * \param[in] in  The evaluation point
-      * \param[out] out Jacobians of all shape functions at that point
-      */
+       *
+       * \param[in] order The partial derivative to be computed, as a multi-index
+       * \param[in] in  The evaluation point
+       * \param[out] out Jacobians of all shape functions at that point
+       */
       void partial(std::array<unsigned int, dim> const &order, const typename Traits::DomainType &in,
                   std::vector<typename Traits::RangeType> &out) const
       {
@@ -239,7 +246,6 @@ namespace Functions
         if (totalOrder == 0)
           evaluateFunction(in, out);
         else if (totalOrder == 1){
-          thread_local std::vector<typename Traits::JacobianType> jacobians;
           evaluateJacobian(in,jacobians);
           std::size_t which = std::max_element(order.begin(), order.end()) - order.begin();
           for (auto i : Dune::range(size()))
@@ -248,13 +254,16 @@ namespace Functions
         else
           DUNE_THROW(RangeError, "partial() not implemented for given order");
       }
+
+      private:
+      mutable std::vector<typename Traits::JacobianType> jacobians;
   };
 
   /** \brief Associations of the Hermite degrees of freedom to subentities of the
-  * reference simplex
-  *
-  * \tparam dim Dimension of the reference simplex
-  */
+   * reference simplex
+   *
+   * \tparam dim Dimension of the reference simplex
+   */
   template<unsigned int dim, bool reduced>
   class HermiteLocalCoefficients
   {
@@ -281,13 +290,15 @@ namespace Functions
                 LocalKey(i, innerDofCodim, 0); // inner dofs
       }
 
-      //! number of coefficients
+      /** number of coefficients
+       */
       static constexpr size_type size()
       {
         return dim == 1 ? 4 : dim == 2 ? ((reduced) ? 9 : 10) : 20;
       }
 
-      //! get i'th index
+      /** get i'th index
+       */
       LocalKey const &localKey(size_type i) const { return localKeys_[i]; }
 
     private:
@@ -295,11 +306,11 @@ namespace Functions
   };
 
     /**
-    * \brief Class that evaluates the push forwards of the global nodes of a
-    * LocalFunction. It stretches the LocalInterpolation interface, because we
-    * evaluate the derivatives of f.
-    *
-    */
+     * \brief Class that evaluates the push forwards of the global nodes of a
+     * LocalFunction. It stretches the LocalInterpolation interface, because we
+     * evaluate the derivatives of f.
+     *
+     */
     template<class D, class GlobalStateTraits, bool reduced = false>
     class HermiteLocalInterpolation
     {
@@ -312,7 +323,8 @@ namespace Functions
     public:
     GlobalValuedInterpolation(HermiteTransformator const &t) : transformator_(&t) {}
 
-    /** \brief bind the Interpolation to an element and a localInterpolation.*/
+    /** \brief bind the Interpolation to an element and a localState.
+     */
     template<class Element>
     void bind( Element const &element, std::vector<D>const& localState)
     {
@@ -386,122 +398,112 @@ namespace Functions
   } // namespace Impl
 
   /** \brief Hermite finite element for simplices, as defined on the reference Element.
-  * Note, that this is a non affine-equivalent finite element, that requires an additional transformation to the relate reference basis with the pullbacks of global basis.
-  * For more Details, see <dune/functions/functionspacebases/hermitebasis.hh>.
-  *
-  * \tparam D Type used for domain coordinates
-  * \tparam R Type used for function values
-  * \tparam dim dimension of the reference element
-  */
+   * Note, that this is a non affine-equivalent finite element, that requires an additional transformation to the relate reference basis with the pullbacks of global basis.
+   * For more Details, see <dune/functions/functionspacebases/hermitebasis.hh>.
+   *
+   * \tparam D Type used for domain coordinates
+   * \tparam R Type used for function values
+   * \tparam dim dimension of the reference element
+   */
   template<class D, class R, unsigned int dim, bool reduced = false>
-  class HermiteLocalFiniteElement
+  class HermiteLocalFiniteElement: public TransformedFiniteElementMixin<HermiteLocalFiniteElement<D,R,dim,reduced>>
   {
+    static constexpr int dim = Element::mydimension;
+    static_assert(dim > 0 && dim < 4);
+    static_assert(!(reduced && (dim != 2)));
+    static constexpr std::size_t numberOfVertices = dim + 1;
+    static constexpr std::size_t numberOfInnerDofs = reduced ? 0 : (dim - 1) * (dim - 1);
+    static constexpr std::size_t numberOfVertexDofs = numberOfVertices * numberOfVertices;
   public:
     /** \brief Export number types, dimensions, etc.
-    */
-
+     */
+    using LocalState = typename std::vector<D>;
+    using size_type = std::size_t;
     using Traits = LocalFiniteElementTraits<
         Impl::HermiteLocalBasis<D, R, dim, reduced>, Impl::HermiteLocalCoefficients<dim, reduced>,
         Impl::HermiteLocalInterpolation<class Element, R>>;
 
-    /** \brief Returns the local basis, i.e., the set of shape functions
-    */
-    const typename Traits::LocalBasisType &localBasis() const { return basis_; }
-
     /** \brief Returns the assignment of the degrees of freedom to the element
-    * subentities
-    */
+     * subentities
+     */
     const typename Traits::LocalCoefficientsType &localCoefficients() const
     {
       return coefficients_;
     }
 
     /** \brief Returns object that evaluates degrees of freedom
-    */
+     */
     const typename Traits::LocalInterpolationType &localInterpolation() const
     {
       return interpolation_;
     }
 
-    /** \brief The number of shape functions */
-    static constexpr std::size_t size() { return dim == 1 ? 4 : dim == 2 ? 10 : 20; }
-
     /** \brief The reference element that the local finite element is defined on
-    */
-    static constexpr GeometryType type() { return GeometryTypes::simplex(dim); }
+     */
+    static constexpr GeometryType type() const { return GeometryTypes::simplex(dim); }
 
-  private:
-    typename Traits::LocalBasisType basis_;
-    typename Traits::LocalCoefficientsType coefficients_;
-    typename Traits::LocalInterpolationType interpolation_;
-
-    static constexpr int dim = Element::mydimension;
-    static_assert(dim > 0 && dim < 4);
-    static_assert(!(reduced && (dim != 2))); // TODO is there a reduced 3d version ?
-    static constexpr std::size_t numberOfVertices = dim + 1;
-    static constexpr std::size_t numberOfInnerDofs = reduced ? 0 : (dim - 1) * (dim - 1);
-    static constexpr std::size_t numberOfVertexDofs = numberOfVertices * numberOfVertices;
-    public:
-      using LocalState = typename std::vector<D>;
-      using size_type = std::size_t;
-
-      /** Binds the Transformator to an element.
+    /** The size of the transformed finite element.
       */
-      template<class Mapper, class Element>
-      void bind(Mapper const& mapper, std::vector<D> const& data, Element const &e)
-      {
-        for (auto const &index : range(e.subEntities(dim)))
-            localState_.push_back(data[mapper.subIndex(e, index, dim)]);
+    static constexpr size_type size() const
+    {
+      if constexpr (dim == 1)
+        return 4;
+      else if constexpr (dim == 2) {
+        if constexpr (reduced)
+          return 9;
+        else
+          return 10;
+      } else // dim == 3
+        return 20;
+    }
 
-        fillMatrix(e.geometry(), localState_);
-      }
+    /** Binds the Finite Element to an element.
+      */
+    template<class Mapper, class Element>
+    void bind(Mapper const& mapper, std::vector<D> const& data, Element const &e)
+    {
+      for (auto const &index : range(e.subEntities(dim)))
+          localState_.push_back(data[mapper.subIndex(e, index, dim)]);
 
-      //! The size of the transformed finite element.
-      static constexpr size_type size()
-      {
-        if constexpr (dim == 1)
-          return 4;
-        else if constexpr (dim == 2) {
-          if constexpr (reduced)
-            return 9;
-          else
-            return 10;
-        } else // dim == 3
-          return 20;
-      }
+      fillMatrix(e.geometry(), localState_);
+    }
+  protected:
+    /** \brief Returns the local basis, i.e., the set of shape functions
+     */
+    const typename Traits::LocalBasisType &referenceLocalBasis() const { return basis_; }
 
-      /** Applies the transformation. Note that we do not distinguish for
+    /** Applies the transformation. Note that we do not distinguish for
       * Scalar/Vector/Matrix Type,
       * but only assume the Values to be Elements of a Vectorspace.
       * We assume random access containers. */
-      template<typename InputValues, typename OutputValues>
-      void transform(InputValues const &inValues, OutputValues &outValues) const
-      {
-        assert(inValues.size() == numberOfVertexDofs + numberOfInnerDofs);
-        assert(reduced || (outValues.size() == inValues.size()));
-        auto inIt = inValues.begin();
-        auto outIt = outValues.begin();
+    template<typename InputValues, typename OutputValues>
+    void transform(InputValues const &inValues, OutputValues &outValues) const
+    {
+      assert(inValues.size() == numberOfVertexDofs + numberOfInnerDofs);
+      assert(reduced || (outValues.size() == inValues.size()));
+      auto inIt = inValues.begin();
+      auto outIt = outValues.begin();
 
-        for (auto vertex : Dune::range(numberOfVertices)) {
-          *outIt = *inIt; // value dof is not transformed
-          outIt++, inIt++;
-          // transform the gradient dofs together
-          for (auto &&[row_i, i] : sparseRange(subMatrices_[vertex])) {
-            outIt[i] = 0.;
-            for (auto &&[val_i_j, j] : sparseRange(row_i))
-              outIt[i] += val_i_j * inIt[j];
-          }
-          // increase pointer by size of gradient = dim
-          outIt += dim, inIt += dim;
+      for (auto vertex : Dune::range(numberOfVertices)) {
+        *outIt = *inIt; // value dof is not transformed
+        outIt++, inIt++;
+        // transform the gradient dofs together
+        for (auto &&[row_i, i] : sparseRange(subMatrices_[vertex])) {
+          outIt[i] = 0.;
+          for (auto &&[val_i_j, j] : sparseRange(row_i))
+            outIt[i] += val_i_j * inIt[j];
         }
-
-        if constexpr (not reduced)
-          // copy all remaining inner dofs
-          std::copy(inIt, inValues.end(), outIt);
+        // increase pointer by size of gradient = dim
+        outIt += dim, inIt += dim;
       }
 
-    private:
-      /**
+      if constexpr (not reduced)
+        // copy all remaining inner dofs
+        std::copy(inIt, inValues.end(), outIt);
+    }
+
+  private:
+    /**
       * \brief Fill the transformationmatrix m
       *
       * \tparam Geometry  the Geometry class
@@ -513,22 +515,28 @@ namespace Functions
       *      |0          1|} repeat for each inner dof i.e. (dim-1)^2 times
       *  where h is the mesh size average over the local vertex patch
       */
-      template<class Geometry>
-      void fillMatrix(Geometry const &geometry, LocalState const &averageSubEntityMeshSize)
+    template<class Geometry>
+    void fillMatrix(Geometry const &geometry, LocalState const &averageSubEntityMeshSize)
+    {
+      auto const &refElement = Dune::ReferenceElements<typename Geometry::ctype, dim>::simplex();
+      for (std::size_t i = 0; i < numberOfVertices; ++i) // dim + 1 vertices
       {
-        auto const &refElement = Dune::ReferenceElements<typename Geometry::ctype, dim>::simplex();
-        for (std::size_t i = 0; i < numberOfVertices; ++i) // dim + 1 vertices
-        {
-          subMatrices_[i] = geometry.jacobian(refElement.position(i, dim));
-          subMatrices_[i] /= averageSubEntityMeshSize[i];
-        }
+        subMatrices_[i] = geometry.jacobian(refElement.position(i, dim));
+        subMatrices_[i] /= averageSubEntityMeshSize[i];
       }
+    }
 
-      // one transformation per vertex
-      std::array<Dune::FieldMatrix<R, dim, dim>, numberOfVertices> subMatrices_;
-      LocalState localState_;
+    // a finite element consists of a basis, coeffiecents and an interpolation
+    typename Traits::LocalBasisType basis_;
+    typename Traits::LocalCoefficientsType coefficients_;
+    typename Traits::LocalInterpolationType interpolation_;
+    // the transformation to correct the lack of affine equivalence boils down to
+    // one transformation matrix per vertex
+    std::array<Dune::FieldMatrix<R, dim, dim>, numberOfVertices> subMatrices_;
+    // the local state, i.e. a collection of global information restricted to this element
+    LocalState localState_;
 
-    };
+  };
 
 
   namespace Impl

@@ -77,49 +77,6 @@ namespace Dune {
         std::size_t treeIndex_;
       };
 
-      // forward declaration
-      template<typename Node, typename Entity>
-      void bindTreeForward(Node& node, const Entity& entity, std::size_t& offset);
-
-      // generic bind, i.e. propagte size information and collect offsets
-      // should match any non-specialized tag,
-      // i.e. PowerNodeTag, DynamicPowerNodeTag and CompositeNodeTag
-      template<typename Node, typename Entity, typename Tag>
-      void bindTree(Tag, Node& node, const Entity& entity, std::size_t& offset)
-      {
-          node.setOffset(offset);
-
-          // iterate over child-nodes
-          Dune::Hybrid::forEach(Dune::range(node.degree()), [&](auto i) {
-            bindTreeForward(node.child(i), entity, offset);
-          });
-
-          node.setSize(offset - node.offset());
-      }
-
-      // specialization for leaf node
-      template<typename Node, typename Entity>
-      void bindTree(TypeTree::LeafNodeTag, Node& node, const Entity& entity, std::size_t& offset)
-      {
-        node.setOffset(offset);
-        node.bind(entity);
-        offset += node.size();
-      }
-
-      // special handling for restricted nodes
-      // template<typename Tree, typename Entity>
-      // void bindTree(RestrictedNodeTag, Tree& tree, const Entity& entity, std::size_t offset = 0)
-      // {
-      // }
-
-      // taking a node we extract the tag and forward the call using a tag dispatch
-      template<typename Node, typename Entity>
-      void bindTreeForward(Node& node, const Entity& entity, std::size_t& offset)
-      {
-        // static_assert(hasNodeTag_v<Tree>, "tree is not an instance of a typetree node");
-        bindTree(typename Node::NodeTag{}, node, entity, offset);
-      }
-
     } // end namespace Impl
 
 
@@ -132,9 +89,6 @@ namespace Dune {
       // friend struct Impl::BindVisitor;
 
       friend struct Impl::InitializeTreeVisitor;
-
-      template<typename Node, typename Entity, typename Tag>
-      friend void Impl::bindTree(Tag, Node&, const Entity&, std::size_t&);
 
     public:
 
@@ -163,7 +117,7 @@ namespace Dune {
       }
 
       // friend declaration does not work ... temporarily make protected methods public
-      // protected:
+    protected:
 
       size_type offset() const
       {
@@ -197,12 +151,44 @@ namespace Dune {
     class LeafBasisNode :
         public BasisNodeMixin,
         public TypeTree::LeafNode
-    {};
+    {
+    public:
+      template<typename Node, typename Element,
+               std::enable_if_t<Node::isLeaf,int> = 0>
+      friend
+      void bindTree(Node& node, const Element& entity, std::size_t& offset) {
+        node.setOffset(offset);
+        node.bind(entity);
+        offset += node.size();
+      }
+    };
 
+
+    template<typename Node, typename Element>
+    class BranchNodeMixin :
+      public BasisNodeMixin
+    {
+    public:
+
+      friend
+      void bindTree(Node& node, const Element& entity, std::size_t& offset)
+      {
+        node.setOffset(offset);
+
+        // iterate over child-nodes
+        Dune::Hybrid::forEach(Dune::range(node.degree()), [&](auto i) {
+          bindTree(node.child(i), entity, offset);
+        });
+
+        node.setSize(offset - node.offset());
+      }
+
+    };
 
     template<typename T, std::size_t n>
     class PowerBasisNode :
-      public BasisNodeMixin,
+      public BranchNodeMixin<PowerBasisNode<T,n>,
+                             typename T::Element>,
       public TypeTree::PowerNode<T,n>
     {
 
@@ -228,7 +214,8 @@ namespace Dune {
 
     template<typename T>
     class DynamicPowerBasisNode :
-      public BasisNodeMixin,
+      public BranchNodeMixin<DynamicPowerBasisNode<T>,
+                             typename T::Element>,
       public TypeTree::DynamicPowerNode<T>
     {
 
@@ -256,7 +243,8 @@ namespace Dune {
 
     template<typename... T>
     class CompositeBasisNode :
-      public BasisNodeMixin,
+      public BranchNodeMixin<CompositeBasisNode<T...>,
+                             typename TypeTree::CompositeNode<T...>::template Child<0>::Type::Element>,
       public TypeTree::CompositeNode<T...>
     {
 
@@ -289,12 +277,6 @@ namespace Dune {
     void clearSize(Tree& tree, std::size_t offset)
     {
       TypeTree::applyToTree(tree,Impl::ClearSizeVisitor(offset));
-    }
-
-    template<typename Tree, typename Entity>
-    void bindTree(Tree& tree, const Entity& entity, std::size_t offset = 0)
-    {
-      Impl::bindTreeForward(tree, entity, offset);
     }
 
     template<typename Tree>

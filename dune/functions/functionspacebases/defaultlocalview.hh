@@ -85,7 +85,8 @@ public:
   void bind(const Element& e)
   {
     element_ = e;
-    bindTree(tree_, *element_);
+    std::size_t offset = 0;
+    bindTree(tree_, *element_, offset);
     indices_.resize(size());
     globalBasis_->preBasis().indices(tree_, indices_.begin());
   }

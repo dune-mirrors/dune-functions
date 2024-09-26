@@ -86,7 +86,7 @@ public:
   {
     element_ = e;
     std::size_t offset = 0;
-    bindTree(tree_, *element_, offset);
+    Impl::callNodeBind(tree_, *element_, offset);
     indices_.resize(size());
     globalBasis_->preBasis().indices(tree_, indices_.begin());
   }

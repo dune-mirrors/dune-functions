@@ -77,6 +77,21 @@ namespace Dune {
         std::size_t treeIndex_;
       };
 
+      template<typename Node, typename Element>
+      void callNodeBind(Node& node, const Element& entity, std::size_t& offset)
+      {
+        if constexpr (Node::isLeaf) {
+          // we directly implement the leaf bind here, until the leaf
+          // interface is updated to also handle the offset
+          node.setOffset(offset);
+          node.bind(entity);
+          offset += node.size();
+        }
+        else {
+          node.bind(entity, offset);
+        }
+      }
+
     } // end namespace Impl
 
 
@@ -85,10 +100,11 @@ namespace Dune {
 
       friend struct Impl::ClearSizeVisitor;
 
-      // template<typename>
-      // friend struct Impl::BindVisitor;
-
       friend struct Impl::InitializeTreeVisitor;
+
+      template<typename Node, typename Element>
+      friend
+      void Impl::callNodeBind(Node& node, const Element& entity, std::size_t& offset);
 
     public:
 
@@ -151,17 +167,7 @@ namespace Dune {
     class LeafBasisNode :
         public BasisNodeMixin,
         public TypeTree::LeafNode
-    {
-    public:
-      template<typename Node, typename Element,
-               std::enable_if_t<Node::isLeaf,int> = 0>
-      friend
-      void bindTree(Node& node, const Element& entity, std::size_t& offset) {
-        node.setOffset(offset);
-        node.bind(entity);
-        offset += node.size();
-      }
-    };
+    {};
 
 
     template<typename Node, typename Element>
@@ -170,14 +176,16 @@ namespace Dune {
     {
     public:
 
-      friend
-      void bindTree(Node& node, const Element& entity, std::size_t& offset)
+      void bind(const Element& entity, std::size_t& offset)
       {
+        // cast to actual implementation
+        Node& node = *static_cast<Node*>(this);
+
         node.setOffset(offset);
 
         // iterate over child-nodes
         Dune::Hybrid::forEach(Dune::range(node.degree()), [&](auto i) {
-          bindTree(node.child(i), entity, offset);
+          Impl::callNodeBind(node.child(i), entity, offset);
         });
 
         node.setSize(offset - node.offset());

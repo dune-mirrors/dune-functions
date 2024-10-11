@@ -25,7 +25,10 @@ dune_add_library(dunefunctions INTERFACE
 
 add_subdirectory("dune")
 add_subdirectory("doc")
-add_subdirectory("examples")
+
+if(DUNE_ENABLE_TESTING)
+  add_subdirectory("examples")
+endif()
 
 if( DUNE_ENABLE_PYTHONBINDINGS )
   add_subdirectory(python)

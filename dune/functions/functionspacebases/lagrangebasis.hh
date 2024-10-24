@@ -148,6 +148,11 @@ public:
           + dofsPerCube(1) * ((size_type)gridView_.size(dim-1));
       case 2:
       {
+        std::cout << "LAGRANGE space dimension: " << dofsPerCube(0) * ((size_type)gridView_.size(dim))
+          + dofsPerCube(1) * ((size_type)gridView_.size(dim-1))
+          + dofsPerSimplex(2) * ((size_type)gridView_.size(Dune::GeometryTypes::triangle))
+          + dofsPerCube(2) * ((size_type)gridView_.size(Dune::GeometryTypes::quadrilateral))
+                  << std::endl;
         return dofsPerCube(0) * ((size_type)gridView_.size(dim))
           + dofsPerCube(1) * ((size_type)gridView_.size(dim-1))
           + dofsPerSimplex(2) * ((size_type)gridView_.size(Dune::GeometryTypes::triangle))
@@ -301,7 +306,7 @@ public:
   }
 
 protected:
-  GridView gridView_;
+  const GridView& gridView_;
 
   // Run-time order, only valid if k<0
   unsigned int order_;

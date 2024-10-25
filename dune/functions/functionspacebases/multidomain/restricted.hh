@@ -37,8 +37,6 @@ namespace Functions {
 // and can be used without a global basis.
 // *****************************************************************************
 
-#define RESTRICTED_PARANOIA_CLEAR 0
-
 template<typename Node, typename GridView>
 class RestrictedNode :
     public Node
@@ -57,28 +55,6 @@ public:
     _gridView(gridView)
   {}
 
-  // version if we wrap a leaf-node
-  void bind(const Element& entity)
-  {
-    // cast to actual implementation
-    Node& node = *this;
-
-    // TODO
-    // where do we get access to _subDomainInfo?
-    if (_gridView.contains(entity))
-    {
-      // forward to sub node and do the full bind there
-      node.bind(entity);
-    }
-    else
-    {
-#if RESTRICTED_PARANOIA_CLEAR
-      // actually we should not need to reset the size, as this was already done in the first visitor of bind
-      node.setSize(0);
-#endif
-    }
-  }
-
   void bind(const Element& entity, std::size_t& offset)
   {
     // cast to actual implementation
@@ -93,11 +69,8 @@ public:
     }
     else
     {
-#if RESTRICTED_PARANOIA_CLEAR
-      // actually we should not need to reset the size, as this was already done in the first visitor of bind
-      node.setOffset(offset);
-      node.setSize(0);
-#endif
+      // set size to 0 in this sub tree
+      clearSize(node, offset);
     }
   }
 
@@ -146,11 +119,16 @@ public:
   // template<class ,
   //   disableCopyMove<RestrictedPreBasis, SFArgs...> = 0,
   //   enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  explicit RestrictedPreBasis(SubPreBasis&& subPreBasis) :
-    SubPreBasis(std::forward<SubPreBasis>(subPreBasis))
+  // explicit RestrictedPreBasis(SubPreBasis&& subPreBasis) :
+  //   SubPreBasis(std::forward<SubPreBasis>(subPreBasis))
+  explicit RestrictedPreBasis(const SubPreBasis& subPreBasis) :
+    SubPreBasis(subPreBasis)
   {
     static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to RestrictedPreBasis does not model the PreBasis concept.");
   }
+
+  // RestrictedPreBasis(RestrictedPreBasis&&) = default;
+  // RestrictedPreBasis(const RestrictedPreBasis&) = default;
 
   //! Initialize the global indices
   void initializeIndices()
@@ -223,20 +201,34 @@ class MultiDomainPreBasis :
 public:
   using HostGridView = typename MultiDomainGridView::HostGridView;
 
+  //! The grid view that the FE basis is defined on
+  using GridView = MultiDomainGridView;
+
   explicit MultiDomainPreBasis(
-    CompositePowerPreBasis&& subPreBasis,
+    // CompositePowerPreBasis&& subPreBasis,
+    const CompositePowerPreBasis& subPreBasis,
     std::shared_ptr<MultiDomainGridView>& mdgv
     ) :
-    CompositePowerPreBasis(std::forward<CompositePowerPreBasis>(subPreBasis)),
+    //CompositePowerPreBasis(std::forward<CompositePowerPreBasis>(subPreBasis)),
+    CompositePowerPreBasis(subPreBasis),
     _multiDomainGridView(mdgv)
   {
   }
+
+  // MultiDomainPreBasis(MultiDomainPreBasis&&) = default;
+  // MultiDomainPreBasis(const MultiDomainPreBasis&) = default;
 
   //! Initialize the global indices
   void initializeIndices()
   {
     // is there something we need to update first?
     CompositePowerPreBasis::initializeIndices();
+  }
+
+  //! Obtain the grid view that the basis is defined on
+  const MultiDomainGridView& gridView() const
+  {
+    return * _multiDomainGridView;
   }
 
   //! Update the stored grid view, to be called if the grid has changed

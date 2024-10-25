@@ -22,6 +22,25 @@
 namespace Dune {
   namespace Functions {
 
+    namespace Concept {
+
+      struct HasElementBind
+      {
+        template<class N>
+        auto require(N&& node) -> decltype(
+          node.bind(std::declval<typename N::Element>())
+          );
+      };
+
+      struct HasElementBind2
+      {
+        template<class N>
+        auto require(N&& node) -> decltype(
+          node.bind(std::declval<typename N::Element>(), std::declval<std::size_t&>())
+          );
+      };
+
+    } // end namespace Concept
 
     namespace Impl {
 
@@ -80,7 +99,16 @@ namespace Dune {
       template<typename Node, typename Element>
       void callNodeBind(Node& node, const Element& entity, std::size_t& offset)
       {
-        if constexpr (Node::isLeaf) {
+        using namespace Dune::Functions::Concept;
+        static_assert(
+          models<HasElementBind2,Node>()
+          || (Node::isLeaf && models<HasElementBind,Node>()),
+          "");
+
+        // if the node does not implement the new 2-arg bind
+        // *and* the node is a leaf node, we can do the leaf-bind directly here.
+        if constexpr (Node::isLeaf && !models<HasElementBind2,Node>())
+        {
           // we directly implement the leaf bind here, until the leaf
           // interface is updated to also handle the offset
           node.setOffset(offset);

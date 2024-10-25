@@ -57,28 +57,6 @@ public:
     _gridView(gridView)
   {}
 
-  // version if we wrap a leaf-node
-  void bind(const Element& entity)
-  {
-    // cast to actual implementation
-    Node& node = *this;
-
-    // TODO
-    // where do we get access to _subDomainInfo?
-    if (_gridView.contains(entity))
-    {
-      // forward to sub node and do the full bind there
-      node.bind(entity);
-    }
-    else
-    {
-#if RESTRICTED_PARANOIA_CLEAR
-      // actually we should not need to reset the size, as this was already done in the first visitor of bind
-      node.setSize(0);
-#endif
-    }
-  }
-
   void bind(const Element& entity, std::size_t& offset)
   {
     // cast to actual implementation

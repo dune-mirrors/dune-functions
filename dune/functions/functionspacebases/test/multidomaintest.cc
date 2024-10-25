@@ -16,12 +16,16 @@
 #include <dune/grid/yaspgrid.hh>
 #include <dune/functions/functionspacebases/multidomain.hh>
 
+#include <dune/functions/functionspacebases/test/basistest.hh>
+
 int main(int argc, char** argv)
 {
   using namespace Dune::Functions::BasisFactory;
   using namespace Dune::Functions::MultiDomain;
 
   Dune::MPIHelper::instance(argc, argv);
+
+  /* ---- setup a mesh, partition it and define subdomains ---- */
 
   constexpr int dim = 2;
   Dune::YaspGrid<dim> grid{ {1.0,1.0}, {3,1} };
@@ -38,43 +42,85 @@ int main(int argc, char** argv)
   // partitions 0,2,1 ... 0: domain 0, 1: domain 1, 2: overlap
   // -> subdomains domain0 = {0,2}, domain1 = {1,2}, interface = {2}
   auto domainInfo = createPartitionedDomainInfo(std::move(partitions), {{0,2}, {1,2}, {2}});
+
+  /*      _______
+    dom0: |_|_|X|
+          _______
+    dom1: |X|_|_|
+   */
   // CutCellDomainInfo domainInfo(levelsets, {{0,2}, {1,2}, {2}});
 
 
-  auto stokesPreBasis = restrict(composite(power<dim>(lagrange<2>()), lagrange<1>()), subdomain(0));
-  // we definitely
-  auto darcyPreBasis = restrict(lagrange<1>(), subdomain(1));
-  auto multiDomainPreBasis = multiDomainComposite(domainInfo, stokesPreBasis, darcyPreBasis);
-  auto fooDomainPreBasis = multiDomainComposite(domainInfo, darcyPreBasis);
-  // auto basis = makeBasis(gridView,fooDomainPreBasis);
-  auto basis = makeBasis(gridView,multiDomainPreBasis);
+  /* ---- run tests on a single subdomain or in a multidomain setup ---- */
 
-  basis.gridView(); // -> original gridView
-  auto localView = basis.localView();
-  int i = 0;
-  for (auto && e : elements(gridView))
+  Dune::TestSuite test;
+
   {
-    localView.bind(e); // -> domainInfo.bind(e), dann child.bind(e)
-    std::cout << "cell " << i++
-              << " has " << localView.size() << " DOFs" << std::endl;
+    auto stokesPreBasis = composite(power<dim>(lagrange<2>()), lagrange<1>());
+    auto darcyPreBasis = lagrange<1>();
+    auto multiDomainPreBasis =
+      multiDomainComposite(domainInfo,
+        restrict(stokesPreBasis, subdomain(0)),
+        restrict(darcyPreBasis, subdomain(1)));
+
+    auto basis = makeBasis(gridView,multiDomainPreBasis);
+
+    using namespace Dune::Indices;
+    const auto& restrictedGridView0 = basis.preBasis().subPreBasis(_0).gridView();
+    const auto& restrictedGridView1 = basis.preBasis().subPreBasis(_1).gridView();
+
+    // 3x1 mesh
+    // subdomains : 2x1 mesh -> 2 cells, 7 edges, 6 vertices
+    test.require(restrictedGridView0.size(0) == 2, "check # of subdomain 0 cells");
+    test.require(restrictedGridView1.size(0) == 2, "check # of subdomain 1 cells");
+    test.require(restrictedGridView0.size(1) == 7, "check # of subdomain 0 edges");
+    test.require(restrictedGridView1.size(1) == 7, "check # of subdomain 1 edges");
+    test.require(restrictedGridView0.size(2) == 6, "check # of subdomain 0 vertices");
+    test.require(restrictedGridView1.size(2) == 6, "check # of subdomain 1 vertices");
   }
 
-  using namespace Dune::Indices;
-  std::cout << "DOM0: " << basis.preBasis().subPreBasis(_0).gridView().size(0) << " cells\n";
-  std::cout << "DOM1: " << basis.preBasis().subPreBasis(_0).gridView().size(0) << " cells\n";
-  std::cout << "DOM0: " << basis.preBasis().subPreBasis(_0).gridView().size(1) << " edges\n";
-  std::cout << "DOM1: " << basis.preBasis().subPreBasis(_0).gridView().size(1) << " edges\n";
-  std::cout << "DOM0: " << basis.preBasis().subPreBasis(_0).gridView().size(2) << " vertices\n";
-  std::cout << "DOM1: " << basis.preBasis().subPreBasis(_0).gridView().size(2) << " vertices\n";
+  {
+    auto stokesPreBasis = composite(power<dim>(lagrange<2>()), lagrange<1>());
+    auto darcyPreBasis = lagrange<1>();
+    auto multiDomainPreBasis =
+      multiDomainComposite(domainInfo,
+        restrict(stokesPreBasis, subdomain(0)),
+        restrict(darcyPreBasis, subdomain(1)));
 
-  // after setting a subdomain id for all elements, the number of DOFs has changed
-  // 3x1 mesh
-  // subdomains : 2x1 mesh -> 2 cells, 7 edges, 6 vertices
-  // TH(dom0)   :
-  //         v  :  30 DOFs ( 2 per cell, edge, vertex)
-  //         p  :   6 DOFs
-  // Lag(dom1)  :   6 DOFs
-  // total      :  42 DOFs
-  int sz = basis.dimension();
-  std::cout << "Functionsspace has " << sz << " global DOFs" << std::endl;
+    auto basis = makeBasis(gridView,multiDomainPreBasis);
+
+    auto checkGlobalSize = [](const auto & basis)
+    {
+      // TH(dom0)   :
+      //         v  :  30 DOFs ( 2 per cell, edge, vertex)
+      //         p  :   6 DOFs
+      // Lag(dom1)  :   6 DOFs
+      // total      :  42 DOFs
+      int sz = basis.dimension();
+      return sz == 42;
+    };
+
+    auto checkLocalSize = [](const auto & basis)
+    {
+      // Stokes(dom0): 2 x (4 x vertex + 4 x edge + cell) + 4 x vertex -> 22 DOFs
+      // Darcy(dom1):  4 x vertex -> 4 DOFs
+      std::array<int,3> refSizes = { 22, 26, 4 };
+      std::array<int,3> sizes;
+      auto & gv = basis.gridView(); // -> wrapped original gridView
+      auto localView = basis.localView();
+      int i = 0;
+      for (auto && e : elements(gv))
+      {
+        localView.bind(e); // internally: domainInfo.bind(e), then child.bind(e)
+        sizes[i++] = localView.size();
+      };
+      return std::ranges::equal(refSizes, sizes);
+    };
+
+    // test.subTest(checkBasis(basis));
+    test.require(checkGlobalSize(basis), "check global size of restricted Stokes-Darcy basis");
+    test.require(checkLocalSize(basis), "check local sizes of restricted Stokes-Darcy basis");
+  }
+
+  return test.exit();
 }

@@ -124,11 +124,16 @@ public:
   // template<class ,
   //   disableCopyMove<RestrictedPreBasis, SFArgs...> = 0,
   //   enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  explicit RestrictedPreBasis(SubPreBasis&& subPreBasis) :
-    SubPreBasis(std::forward<SubPreBasis>(subPreBasis))
+  // explicit RestrictedPreBasis(SubPreBasis&& subPreBasis) :
+  //   SubPreBasis(std::forward<SubPreBasis>(subPreBasis))
+  explicit RestrictedPreBasis(const SubPreBasis& subPreBasis) :
+    SubPreBasis(subPreBasis)
   {
     static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to RestrictedPreBasis does not model the PreBasis concept.");
   }
+
+  // RestrictedPreBasis(RestrictedPreBasis&&) = default;
+  // RestrictedPreBasis(const RestrictedPreBasis&) = default;
 
   //! Initialize the global indices
   void initializeIndices()
@@ -202,13 +207,18 @@ public:
   using HostGridView = typename MultiDomainGridView::HostGridView;
 
   explicit MultiDomainPreBasis(
-    CompositePowerPreBasis&& subPreBasis,
+    // CompositePowerPreBasis&& subPreBasis,
+    const CompositePowerPreBasis& subPreBasis,
     std::shared_ptr<MultiDomainGridView>& mdgv
     ) :
-    CompositePowerPreBasis(std::forward<CompositePowerPreBasis>(subPreBasis)),
+    //CompositePowerPreBasis(std::forward<CompositePowerPreBasis>(subPreBasis)),
+    CompositePowerPreBasis(subPreBasis),
     _multiDomainGridView(mdgv)
   {
   }
+
+  // MultiDomainPreBasis(MultiDomainPreBasis&&) = default;
+  // MultiDomainPreBasis(const MultiDomainPreBasis&) = default;
 
   //! Initialize the global indices
   void initializeIndices()

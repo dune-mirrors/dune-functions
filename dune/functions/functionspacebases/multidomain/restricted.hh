@@ -206,6 +206,9 @@ class MultiDomainPreBasis :
 public:
   using HostGridView = typename MultiDomainGridView::HostGridView;
 
+  //! The grid view that the FE basis is defined on
+  using GridView = MultiDomainGridView;
+
   explicit MultiDomainPreBasis(
     // CompositePowerPreBasis&& subPreBasis,
     const CompositePowerPreBasis& subPreBasis,
@@ -225,6 +228,12 @@ public:
   {
     // is there something we need to update first?
     CompositePowerPreBasis::initializeIndices();
+  }
+
+  //! Obtain the grid view that the basis is defined on
+  const MultiDomainGridView& gridView() const
+  {
+    return * _multiDomainGridView;
   }
 
   //! Update the stored grid view, to be called if the grid has changed

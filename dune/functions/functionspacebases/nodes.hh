@@ -61,6 +61,7 @@ namespace Dune {
         void leaf(Node& node, TreePath treePath)
         {
           node.setOffset(offset_);
+          node.setSize(0);
         }
 
         ClearSizeVisitor(std::size_t offset)
@@ -160,7 +161,6 @@ namespace Dune {
         return treeIndex_;
       }
 
-      // friend declaration does not work ... temporarily make protected methods public
     protected:
 
       size_type offset() const

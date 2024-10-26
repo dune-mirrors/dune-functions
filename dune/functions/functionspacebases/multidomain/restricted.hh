@@ -37,8 +37,6 @@ namespace Functions {
 // and can be used without a global basis.
 // *****************************************************************************
 
-#define RESTRICTED_PARANOIA_CLEAR 0
-
 template<typename Node, typename GridView>
 class RestrictedNode :
     public Node
@@ -71,11 +69,8 @@ public:
     }
     else
     {
-#if RESTRICTED_PARANOIA_CLEAR
-      // actually we should not need to reset the size, as this was already done in the first visitor of bind
-      node.setOffset(offset);
-      node.setSize(0);
-#endif
+      // set size to 0 in this sub tree
+      clearSize(node, offset);
     }
   }
 

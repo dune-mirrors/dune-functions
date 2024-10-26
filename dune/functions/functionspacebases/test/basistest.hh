@@ -261,8 +261,7 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
   std::vector<std::size_t> localIndices;
   localIndices.resize(localView.size(), 0);
   Dune::TypeTree::forEachLeafNode(localView.tree(), [&](const auto& node, auto&& treePath) {
-    std::cout << "skipping empty node\n";
-    if (node.size() == 0) return;
+    assert ((node.size() == 0) == (! node.active()));
     test.check(node.size() == node.finiteElement().size())
       << "Size of leaf node and finite element are different.";
     for(std::size_t i=0; i<node.size(); ++i)
@@ -289,7 +288,6 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
   if (not IsContained<AllowZeroBasisFunctions, Flags...>::value)
   {
     Dune::TypeTree::forEachLeafNode(localView.tree(), [&](const auto& node, auto&& treePath) {
-      if (node.size() == 0) return;
       test.subTest(checkNonZeroShapeFunctions(node.finiteElement()));
     });
   }

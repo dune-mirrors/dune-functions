@@ -10,6 +10,9 @@
 #include <dune/common/reservedvector.hh>
 #include <dune/common/typeutilities.hh>
 #include <dune/common/indices.hh>
+#include <dune/common/tupleutility.hh>
+
+#include <dune/localfunctions/restricted.hh>
 
 #include <dune/functions/common/utility.hh>
 #include <dune/functions/common/type_traits.hh>
@@ -37,47 +40,259 @@ namespace Functions {
 // and can be used without a global basis.
 // *****************************************************************************
 
-template<typename Node, typename GridView>
-class RestrictedNode :
-    public Node
+// DEBUG Helper
+template<typename Node>
+std::string nodeName()
 {
-
-public:
-
-  using Element = typename Node::Element;
-
-  RestrictedNode() = default;
-
-  // we should actually also get some kind of
-  // subDomainInfo
-  RestrictedNode(Node&& subNode, const GridView & gridView) :
-    Node(std::forward<Node>(subNode)),
-    _gridView(gridView)
-  {}
-
-  void bind(const Element& entity, std::size_t& offset)
+  auto substitute = [](std::string& str, const std::string& from, std::string to)
   {
-    // cast to actual implementation
-    Node& node = *this;
+    size_t start_pos = str.find(from);
+    while(start_pos != std::string::npos)
+    {
+      str.replace(start_pos, from.length(), to);
+      start_pos = str.find(from);
+    }
+  };
+  std::map<std::string,std::string> translation;
+  translation["Dune::Functions::Impl::RestrictedNodeBase<"] = "Restrict< ";
+  translation["Dune::Functions::Impl::RestrictedLeafBase<"] = "RestrictLeaf< ";
+  translation["Dune::Functions::RestrictedNode<"] = "Restrict< ";
+  translation["Dune::Functions::PowerBasisNode<"] = "Power< ";
+  translation["Dune::Functions::CompositeBasisNode<"] = "Composite< ";
+  translation["Dune::Functions::MultiDomain::RestrictedGridView<Dune::GridView<Dune::DefaultLeafGridViewTraits<Dune::YaspGrid<2, Dune::EquidistantCoordinates<double, 2> > const> > >, "] = "";
+  translation["Dune::Functions::LagrangeNode<1, double>"] = "Lagrange<P1>";
+  translation["Dune::Functions::LagrangeNode<2, double>"] = "Lagrange<P2>";
+  translation[", Dune::Functions::MultiDomain::RestrictedGridView<Dune::GridView<Dune::DefaultLeafGridViewTraits<Dune::YaspGrid<2, Dune::EquidistantCoordinates<double, 2> > const> > >"] = "";
+  translation[", 2ul>"] = " >";
+  std::string name = className<Node>();
 
-    // TODO
-    // where do we get access to _subDomainInfo?
-    if (_gridView.contains(entity))
+  for (const auto & [from,to] : translation)
+  {
+    substitute(name,from,to);
+  }
+  return name;
+}
+
+template<typename Node>
+std::string nodeName(const Node& node)
+{
+  return nodeName<Node>();
+}
+
+// forward declaration
+template<typename Node, typename GridView>
+class RestrictedNode;
+
+namespace Impl {
+
+  template<typename Node, typename GridView>
+  class RestrictedNodeBase :
+    public Node
+  {
+  public:
+
+    static constexpr bool isRestricted = true;
+
+    using Element = typename Node::Element;
+
+    RestrictedNodeBase() = default;
+
+    // we should actually also get some kind of
+    // subDomainInfo
+    RestrictedNodeBase(Node&& subNode, const GridView & gridView) :
+      Node(std::forward<Node>(subNode)),
+      _gridView(gridView)
+    {}
+
+    void bind(const Element& entity, std::size_t& offset)
     {
-      // forward to sub node and do the full bind there
+      // cast to actual implementation
+      Node& node = *this;
+
+      std::cout << "RESTRICTED contains? "
+                << _gridView.contains(entity) << "\t"
+                << nodeName(*this) << std::endl;
+
       Impl::callNodeBind(node, entity, offset);
+
+      // if (_gridView.contains(entity))
+      // {
+      //   // forward to sub node and do the full bind there
+      //   Impl::callNodeBind(node, entity, offset);
+      // }
+      // else
+      // {
+      //   std::cout << "RESTRICTED bind ... skip subTree " << nodeName(*this) << std::endl;
+      //   // set sizes to 0 in this sub tree
+      //   clearSize(node, offset);
+      // }
     }
-    else
+
+  protected:
+    const GridView & _gridView;
+  };
+
+  template<typename Node, typename GridView>
+  class RestrictedLeafNode :
+    public RestrictedNodeBase<Node, GridView>
+  {
+  public:
+
+    using Base = RestrictedNodeBase<Node, GridView>;
+    using FiniteElement = RestrictedLocalFiniteElementView<typename Node::FiniteElement>;
+
+    // subDomainInfo
+    RestrictedLeafNode(Node&& subNode, const GridView & gridView) :
+      Base(std::forward<Node>(subNode), gridView)
+      ,
+      finiteElement_(subNode.finiteElement())
     {
-      // set size to 0 in this sub tree
-      clearSize(node, offset);
+      std::cout << "RestrictedLeafNode constructor\n";
+      finiteElement_ = Base::finiteElement();
     }
+
+    bool active() const {
+      return this->size() > 0;
+    };
+
+    using Element = typename Base::Element;
+
+    void bind(const Element& entity, std::size_t& offset)
+    {
+      std::cout << "BIND LEAF " << nodeName(*this) << "\n";
+      if (this->_gridView.contains(entity))
+        //if (active())
+      {
+        std::cout << "ACTIVE " << nodeName(*this) << "\n";
+        Base::bind(entity, offset);
+        finiteElement_ = Base::finiteElement();
+        finiteElement_.activate();
+      }
+      else
+      {
+        std::cout << "DEACTIVATE " << nodeName(*this) << "\n";
+        finiteElement_.setDefaultGeometry(entity.type());
+        finiteElement_.deactivate();
+        // set sizes to 0 in this sub tree
+        clearSize(*this, offset);
+      }
+    }
+
+    /** \brief Return the LocalFiniteElement for the element we are bound to
+     *
+     * The LocalFiniteElement implements the corresponding interfaces of the dune-localfunctions module
+     *
+     * If the current element is not
+     */
+    // const auto& finiteElement() const
+    // {
+    //   return Base::finiteElement();
+    // }
+    const FiniteElement& finiteElement() const
+    {
+      std::cout << "RESTRICTED finiteElement() ... " << nodeName(*this) << std::endl;
+      finiteElement_ = ((const Node&)(*this)).finiteElement();
+      std::cout << "NAME " << className<Node>() << std::endl;
+      std::cout << "ADDRESS " << &(((const Node&)(*this)).finiteElement()) << std::endl;
+      return finiteElement_;
+    }
+
+  private:
+    mutable FiniteElement finiteElement_;
+  };
+
+  template<typename Node, typename GridView>
+  using RestrictedNodeBaseClass =
+    std::conditional_t<
+      std::is_same_v<typename Node::NodeTag, TypeTree::LeafNodeTag>,
+      Impl::RestrictedLeafNode<Node,GridView>,
+      Impl::RestrictedNodeBase<Node,GridView>
+    >;
+
+  template<typename Tree, typename GridView>
+  auto restrictTree(Tree && node, const GridView & gridView);
+
+  struct CreateOnStack {};
+  struct CreateSharedPtr {};
+
+  template<typename T, typename... Args>
+  auto createObject(CreateOnStack, Args&&... args)
+  {
+    return T{std::forward<Args>(args)...};
   }
 
-private:
-  const GridView & _gridView;
-};
+  template<typename T, typename... Args>
+  auto createObject(CreateSharedPtr, Args&&... args)
+  {
+    return std::make_shared<T>(std::forward<Args>(args)...);
+  }
 
+  template<typename Tree, typename GridView>
+  auto transformSubTree(Tree && node, const GridView & gridView, TypeTree::LeafNodeTag)
+  {
+    return std::forward<Tree>(node);
+  }
+
+  template<typename GridView, typename T, std::size_t n>
+  auto transformSubTree(PowerBasisNode<T,n> && node, const GridView & gridView, TypeTree::PowerNodeTag)
+  {
+    // ALTERNATIVE: node.setChild(restrictTree(...), index_constant<k> = {})
+
+    using Node = PowerBasisNode<T,n>;
+    // unpack the power node, restrict all children and
+    // pack everything again
+    const auto & children = node.nodeStorage();
+    using ChildType = decltype(restrictTree(std::declval<T>(), gridView, CreateOnStack()));
+    using TransformedPowerNode = PowerBasisNode<ChildType,Node::degree()>;
+    typename TransformedPowerNode::NodeStorage restrictedChildren;
+    for (std::size_t i=0; i<children.size(); i++)
+      restrictedChildren[i] = restrictTree(*children[i], gridView, CreateSharedPtr());
+    return TransformedPowerNode{restrictedChildren};
+  }
+
+  template<typename... Children>
+  auto createCompositeBasisNode(std::tuple<std::shared_ptr<Children>...> && storage)
+  {
+    return CompositeBasisNode<Children...>(
+      std::forward<std::tuple<std::shared_ptr<Children>...>>(storage));
+  }
+
+  template<typename GridView, typename... T>
+  auto transformSubTree(CompositeBasisNode<T...> && node, const GridView & gridView, TypeTree::CompositeNodeTag)
+  {
+    const auto & children = node.nodeStorage();
+    // unpack the composite node, restrict all children and
+    // pack everything again
+    auto restrictedChildren = transformTuple(
+      [&](auto && childNode){
+        return restrictTree(*childNode, gridView, CreateSharedPtr());
+      }, children);
+    return createCompositeBasisNode(std::move(restrictedChildren));
+  }
+
+#warning TODO avoid wrapping nodes twice!
+  template<typename Tree, typename GridView, typename CreatePolicy>
+  auto restrictTree(Tree && node, const GridView & gridView, CreatePolicy policy)
+  {
+    using Node = std::decay_t<Tree>;
+    typename Node::NodeTag tag;
+    auto transformedNode = transformSubTree(std::forward<Node>(node), gridView, tag);
+    using TransformedNode = decltype(transformedNode);
+    using Restricted = RestrictedNode<TransformedNode, GridView>;
+    std::cout << "Create " << nodeName<Restricted>() << std::endl;
+    return createObject<Restricted>(CreatePolicy(), std::move(transformedNode), gridView);
+  }
+
+} // end namespace Impl
+
+template<typename Node, typename GridView>
+class RestrictedNode :
+    public Impl::RestrictedNodeBaseClass<Node,GridView>
+{
+  using Base = Impl::RestrictedNodeBaseClass<Node,GridView>;
+public:
+  using Base::Base;
+};
 
 /**
  * \brief A pre-basis for power bases
@@ -103,9 +318,6 @@ public:
 
   //! Strategy used to merge the global indices of the child factories
   // using IndexMergingStrategy = IMS;
-
-  //! Template mapping root tree path to type of created tree node
-  using Node = RestrictedNode<typename SubPreBasis::Node, GridView>;
 
   static constexpr size_type maxMultiIndexSize = SubPreBasis::maxMultiIndexSize;
   static constexpr size_type minMultiIndexSize = SubPreBasis::minMultiIndexSize;
@@ -152,18 +364,26 @@ public:
   /**
    * \brief Create tree node
    */
-  Node makeNode() const
+  auto makeNode() const
   {
     auto subNode = SubPreBasis::makeNode();
-    return Node{std::move(subNode), this->gridView()};
+    return Impl::restrictTree(subNode, this->gridView(), Impl::CreateOnStack());
+    // // transform node!
+    // // ...
+    // return Node{std::move(subNode), this->gridView()};
   }
+
+  using SubNode = typename SubPreBasis::Node;
+  //! Template mapping root tree path to type of created tree node
+  using Node = decltype(Impl::restrictTree(std::declval<SubNode>(), std::declval<const GridView&>(), std::declval<Impl::CreateOnStack>()));
+  // RestrictedNode<typename SubPreBasis::Node, GridView>;
 
   template<typename It>
   It indices(const Node& node, It it) const
   {
     if (node.size() == 0)
       return it;
-    return SubPreBasis::indices(node,it);
+    return SubPreBasis::indices((const SubNode&)node,it);
   }
 
   // TODO
@@ -182,6 +402,7 @@ public:
   // {
   //   return sizeImpl(prefix, children_, IndexMergingStrategy{});
   // }
+private:
 
 };
 

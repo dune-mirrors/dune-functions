@@ -117,7 +117,7 @@ int main(int argc, char** argv)
       return std::ranges::equal(refSizes, sizes);
     };
 
-    // test.subTest(checkBasis(basis));
+    test.subTest(checkBasis(basis));
     test.require(checkGlobalSize(basis), "check global size of restricted Stokes-Darcy basis");
     test.require(checkLocalSize(basis), "check local sizes of restricted Stokes-Darcy basis");
   }

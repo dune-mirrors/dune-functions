@@ -103,15 +103,19 @@ int main(int argc, char** argv)
       auto & gv = basis.gridView(); // -> wrapped original gridView
       auto localView = basis.localView();
       int i = 0;
+      std::cout << "basis ... indexSet -> " << Dune::className(basis.gridView().indexSet()) << std::endl;
       for (auto && e : elements(gv))
       {
         localView.bind(e); // internally: domainInfo.bind(e), then child.bind(e)
+        std::cout << "cell "
+                  << basis.gridView().indexSet().index(e)
+                  << "\tlocalView.size = " << localView.size() << std::endl;
         sizes[i++] = localView.size();
       };
       return std::ranges::equal(refSizes, sizes);
     };
 
-    // test.subTest(checkBasis(basis));
+    test.subTest(checkBasis(basis));
     test.require(checkGlobalSize(basis), "check global size of restricted Stokes-Darcy basis");
     test.require(checkLocalSize(basis), "check local sizes of restricted Stokes-Darcy basis");
   }

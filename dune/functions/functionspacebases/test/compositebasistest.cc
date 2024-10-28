@@ -73,7 +73,7 @@ int main (int argc, char *argv[]) try
     using namespace Functions;
     using PreBasis =
       PowerPreBasis<BlockedInterleaved,
-        CompositePreBasis<BlockedLexicographic,
+        CompositePreBasis<GridView, BlockedLexicographic,
           PowerPreBasis<BlockedInterleaved,
             LagrangePreBasis<GridView,1>,
             2>,
@@ -88,14 +88,14 @@ int main (int argc, char *argv[]) try
 
   {
     using namespace Functions;
-    using PreBasis = CompositePreBasis<BlockedLexicographic, LagrangePreBasis<GridView,1>>;
+    using PreBasis = CompositePreBasis<GridView, BlockedLexicographic, LagrangePreBasis<GridView,1>>;
     auto basis = Dune::Functions::DefaultGlobalBasis<PreBasis>(grid.leafGridView());
     test.subTest(checkBasis(basis, EnableContinuityCheck()));
   }
 
   {
     using namespace Functions;
-    using PreBasis = CompositePreBasis<BlockedLexicographic, LagrangePreBasis<GridView,1>>;
+    using PreBasis = CompositePreBasis<GridView, BlockedLexicographic, LagrangePreBasis<GridView,1>>;
     const auto gridView = grid.leafGridView();
     auto basis = Dune::Functions::DefaultGlobalBasis<PreBasis>(gridView);
     test.subTest(checkBasis(basis, EnableContinuityCheck()));
@@ -103,7 +103,7 @@ int main (int argc, char *argv[]) try
 
   {
     using namespace Functions;
-    using PreBasis = CompositePreBasis<BlockedLexicographic, LagrangePreBasis<GridView,1>>;
+    using PreBasis = CompositePreBasis<GridView, BlockedLexicographic, LagrangePreBasis<GridView,1>>;
     auto basis = Dune::Functions::DefaultGlobalBasis<PreBasis>(gridView);
     test.subTest(checkBasis(basis, EnableContinuityCheck()));
   }

@@ -22,7 +22,7 @@ def preBasisTypeName(tree, gridViewTypeName):
     elif isinstance(tree, Composite):
         IMS = indexMergingStrategy(tree.blocked, tree.layout)
         ChildPreBases = " , ".join(preBasisTypeName(c, gridViewTypeName) for c in tree.children)
-        return "Dune::Functions::CompositePreBasis< " + IMS + " , " + ChildPreBases + " >"
+        return "Dune::Functions::CompositePreBasis< " + gridViewTypeName + ", " + IMS + " , " + ChildPreBases + " >"
     elif isinstance(tree, Power):
         IMS = indexMergingStrategy(tree.blocked, tree.layout)
         ChildPreBasis = preBasisTypeName(tree.children[0], gridViewTypeName)

@@ -37,6 +37,10 @@ public:
   const int& partition(std::size_t i) const {
     return _partitions[i];
   }
+
+  void update(const auto &) {
+    std::cout << "WARNING ! not updating the PartitionedDomainInfo" << std::endl;
+  }
 };
 
 auto createPartitionedDomainInfo(std::vector<int> && partitions,

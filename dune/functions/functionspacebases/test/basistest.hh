@@ -557,9 +557,9 @@ Dune::TestSuite checkBasis(Basis& basis, Flags... flags)
     test.subTest(checkConstBasis(copy,flags...));
   }
 
-  // // Check update of gridView
-  // auto gridView = basis.gridView();
-  // basis.update(gridView);
+  // Check update of gridView
+  auto gridView = basis.gridView();
+  basis.update(gridView);
 
   return test;
 }

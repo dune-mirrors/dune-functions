@@ -44,11 +44,7 @@ namespace Dune
       _entityMapper(mapper),
       _indices(indices),
       _sizes(sizes)
-    {
-      // std::size_t maxsize = GlobalGeometryTypeIndex::size(dimension);
-      // sizes_.resize(maxsize);
-      // indices_.resize(maxsize);
-    }
+    {}
 
 
     //===========================================================
@@ -196,16 +192,6 @@ namespace Dune
       return index(e) != -1;
     }
 
-  protected:
-    // Must be explicitly defined although this class should get a default constructor.
-    RestrictedIndexSet() = default;
-
-  public:
-    //! Forbid the copy constructor
-    RestrictedIndexSet(const RestrictedIndexSet&) = delete;
-    //! Forbid the assignment operator
-    RestrictedIndexSet& operator=(const RestrictedIndexSet&) = delete;
-
   private:
     const HostIndexSet& _hostIndexSet;
     const MultipleCodimMultipleGeomTypeMapper<HostGridView>& _entityMapper;
@@ -215,4 +201,4 @@ namespace Dune
 
 } // namespace Dune
 
-#endif // DUNE_FUNCTIONS_RESTRICTEDDOMAIN_HH
+#endif // DUNE_FUNCTIONS_RESTRICTEDINDEXSET_HH

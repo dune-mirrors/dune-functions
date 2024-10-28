@@ -66,7 +66,7 @@ auto restrict(ChildPreBasisFactory&& childPreBasisFactory, SubDomain&& subdomain
     const auto & subdomainGridView = gridView.subdomainGridView(subdomain);
     // instatiate child with restricted gridview
     auto childPreBasis = childPreBasisFactory(subdomainGridView);
-    return RestrictedPreBasis<decltype(childPreBasis)>(std::move(childPreBasis));
+    return RestrictedPreBasis<decltype(childPreBasis)>(std::move(childPreBasis),subdomain);
   };
 }
 

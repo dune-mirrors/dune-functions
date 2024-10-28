@@ -314,8 +314,8 @@ public:
   //   enableIfConstructible<SubPreBasis, SFArgs...> = 0>
   // explicit RestrictedPreBasis(SubPreBasis&& subPreBasis) :
   //   SubPreBasis(std::forward<SubPreBasis>(subPreBasis))
-  explicit RestrictedPreBasis(const SubPreBasis& subPreBasis) :
-    SubPreBasis(subPreBasis)
+  explicit RestrictedPreBasis(const SubPreBasis& subPreBasis, unsigned int subdomain) :
+    SubPreBasis(subPreBasis), _subdomain(subdomain)
   {
     static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to RestrictedPreBasis does not model the PreBasis concept.");
   }
@@ -331,10 +331,15 @@ public:
   }
 
   //! Update the stored grid view, to be called if the grid has changed
+  template<typename MultiDomainGridView>
+  void update(const MultiDomainGridView& gv)
+  {
+    update(gv.subdomainGridView(_subdomain));
+  }
+
+  //! Update the stored grid view, to be called if the grid has changed
   void update(const GridView& gv)
   {
-#warning (LATER) we get a multidomain gridview and then have to re-extract our subdomain gridview
-    assert(false);
     // this gridview comes from the CompositeMultiDomainPreBasis
     // or the PowerMultiDomainPreBasis, this we don't need to update
     // any indexSets, but the pre basis must be made aware of
@@ -384,7 +389,7 @@ public:
   //   return sizeImpl(prefix, children_, IndexMergingStrategy{});
   // }
 private:
-
+  unsigned int _subdomain;
 };
 
 /**
@@ -436,6 +441,7 @@ public:
   //! Update the stored grid view, to be called if the grid has changed
   void update(const HostGridView& gv)
   {
+    // update the underlying multiDomainGridView
     _multiDomainGridView->update(gv);
     // this gridview comes from the CompositeMultiDomainPreBasis
     // or the PowerMultiDomainPreBasis, this we don't need to update

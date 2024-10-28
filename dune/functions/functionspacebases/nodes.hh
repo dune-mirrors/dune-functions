@@ -195,7 +195,10 @@ namespace Dune {
     class LeafBasisNode :
         public BasisNodeMixin,
         public TypeTree::LeafNode
-    {};
+    {
+    public:
+      constexpr bool active () const { return true; }
+    };
 
 
     template<typename Node, typename Element>

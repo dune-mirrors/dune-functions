@@ -109,23 +109,13 @@ namespace Impl {
       // cast to actual implementation
       Node& node = *this;
 
-      std::cout << "RESTRICTED contains? "
-                << _gridView.contains(entity) << "\t"
-                << nodeName(*this) << std::endl;
+      // std::cout << "RESTRICTED contains? "
+      //           << _gridView.contains(entity) << "\t"
+      //           << nodeName(*this) << std::endl;
 
+      // forward to sub node and do the full
+      // or restricted bind there
       Impl::callNodeBind(node, entity, offset);
-
-      // if (_gridView.contains(entity))
-      // {
-      //   // forward to sub node and do the full bind there
-      //   Impl::callNodeBind(node, entity, offset);
-      // }
-      // else
-      // {
-      //   std::cout << "RESTRICTED bind ... skip subTree " << nodeName(*this) << std::endl;
-      //   // set sizes to 0 in this sub tree
-      //   clearSize(node, offset);
-      // }
     }
 
   protected:
@@ -143,13 +133,9 @@ namespace Impl {
 
     // subDomainInfo
     RestrictedLeafNode(Node&& subNode, const GridView & gridView) :
-      Base(std::forward<Node>(subNode), gridView)
-      ,
+      Base(std::forward<Node>(subNode), gridView),
       finiteElement_(subNode.finiteElement())
-    {
-      std::cout << "RestrictedLeafNode constructor\n";
-      finiteElement_ = Base::finiteElement();
-    }
+    {}
 
     bool active() const {
       return this->size() > 0;
@@ -161,7 +147,6 @@ namespace Impl {
     {
       std::cout << "BIND LEAF " << nodeName(*this) << "\n";
       if (this->_gridView.contains(entity))
-        //if (active())
       {
         std::cout << "ACTIVE " << nodeName(*this) << "\n";
         Base::bind(entity, offset);
@@ -184,10 +169,6 @@ namespace Impl {
      *
      * If the current element is not
      */
-    // const auto& finiteElement() const
-    // {
-    //   return Base::finiteElement();
-    // }
     const FiniteElement& finiteElement() const
     {
       std::cout << "RESTRICTED finiteElement() ... " << nodeName(*this) << std::endl;

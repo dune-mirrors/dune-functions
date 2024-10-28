@@ -553,8 +553,8 @@ Dune::TestSuite checkBasis(Basis& basis, Flags... flags)
   {
     Basis copy(basis);
     test.subTest(checkConstBasis(copy,flags...));
-    // copy = basis;
-    // test.subTest(checkConstBasis(copy,flags...));
+    copy = basis;
+    test.subTest(checkConstBasis(copy,flags...));
   }
 
   // // Check update of gridView

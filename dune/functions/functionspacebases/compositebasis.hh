@@ -49,10 +49,14 @@ namespace Functions {
  * This pre-basis represents a composition of several given pre-bases.
  * Its node type is a CompositeBasisNodes for the given subnodes.
  *
+ * \tparam GV  The grid view that the FE basis is defined on
  * \tparam IMS An IndexMergingStrategy used to merge the global indices of the child pre-bases
  * \tparam SPB  The child pre-bases
+ *
+ * Note that it is expected that every child of CompositePreBasis can
+ * operate on the gieven GridView GV.
  */
-template<class IMS, class... SPB>
+template<typename GV, class IMS, class... SPB>
 class CompositePreBasis
 {
   static const bool isBlocked = std::is_same_v<IMS,BasisFactory::BlockedLexicographic> or std::is_same_v<IMS,BasisFactory::BlockedInterleaved>;
@@ -66,7 +70,7 @@ public:
   using SubPreBasis = std::tuple_element_t<i, SubPreBases>;
 
   //! The grid view that the FE basis is defined on
-  using GridView = typename std::tuple_element_t<0, SubPreBases>::GridView;
+  using GridView = GV;
 
   //! Type used for indices and size information
   using size_type = std::size_t;
@@ -96,11 +100,14 @@ public:
   template<class... SFArgs,
     disableCopyMove<CompositePreBasis, SFArgs...> = 0,
     enableIfConstructible<std::tuple<SPB...>, SFArgs...> = 0>
-  CompositePreBasis(SFArgs&&... sfArgs) :
+  CompositePreBasis(const GridView & gridView, SFArgs&&... sfArgs) :
+    gridView_(gridView),
     subPreBases_(std::forward<SFArgs>(sfArgs)...)
   {
     Hybrid::forEach(subPreBases_, [&](const auto& subPreBasis){
-      static_assert(models<Concept::PreBasis<GridView>, std::decay_t<decltype(subPreBasis)>>(), "Subprebases passed to CompositePreBasis does not model the PreBasis concept.");
+      using ChildPreBasis = std::decay_t<decltype(subPreBasis)>;
+      using ChildGridView = std::decay_t<typename ChildPreBasis::GridView>;
+      static_assert(models<Concept::PreBasis<ChildGridView>, ChildPreBasis>(), "Subprebases passed to CompositePreBasis does not model the PreBasis concept.");
     });
   }
 
@@ -110,13 +117,13 @@ public:
    * This constructor is only available if all child pre-bases are constructible
    * from the grid view.
    */
-  template<class GV,
-    std::enable_if_t<std::conjunction_v<
-      std::bool_constant<(children > 1)>,    // Avoid ambiguous constructor if there's only one child
-      std::is_same<GV, GridView>,
-      std::is_constructible<SPB, GridView>...
-    >, int> = 0>
-  CompositePreBasis(const GV& gv) :
+  template<class otherGV,
+    std::enable_if_t<
+      std::is_same_v<otherGV, GridView> &&
+      std::conjunction_v<std::is_constructible<SPB, GridView>...>
+      , int> = 0>
+  CompositePreBasis(const otherGV& gv) :
+    gridView_(gv),
     subPreBases_(SPB(gv)...)
   {
     Hybrid::forEach(subPreBases_, [&](const auto& subPreBasis){
@@ -135,14 +142,15 @@ public:
   //! Obtain the grid view that the basis is defined on
   const GridView& gridView() const
   {
-    return std::get<0>(subPreBases_).gridView();
+    return gridView_; // std::get<0>(subPreBases_).gridView();
   }
 
   //! Update the stored grid view, to be called if the grid has changed
   void update(const GridView& gv)
   {
+    gridView_ = gv;
     Hybrid::forEach(ChildIndices(), [&](auto i) {
-      this->subPreBasis(i).update(gv);
+      this->subPreBasis(i).update(gridView_);
     });
   }
 
@@ -335,6 +343,7 @@ private:
     return multiIndices;
   }
 
+  GridView gridView_;
   std::tuple<SPB...> subPreBases_;
 };
 
@@ -349,9 +358,10 @@ class CompositePreBasisFactory
 {
 
   template<class GridView, class... ChildPreBasis>
-  auto makePreBasisFromChildPreBases(const GridView&, ChildPreBasis&&... childPreBasis) const
+  auto makePreBasisFromChildPreBases(const GridView& gridView, ChildPreBasis&&... childPreBasis) const
   {
-    return CompositePreBasis<IndexMergingStrategy, std::decay_t<ChildPreBasis>...>(std::forward<ChildPreBasis>(childPreBasis)...);
+    return CompositePreBasis<GridView, IndexMergingStrategy, std::decay_t<ChildPreBasis>...>(
+      gridView, std::forward<ChildPreBasis>(childPreBasis)...);
   }
 
 public:

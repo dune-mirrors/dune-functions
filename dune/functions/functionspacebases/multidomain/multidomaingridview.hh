@@ -33,21 +33,64 @@ public:
     _entityMapper((const GridView&)(*this), [](GeometryType, int) { return true; }),
     _domainInfo(domainInfo)
   {
+    unsigned int subdomains = _domainInfo->subdomains().size();
+    _sizes.resize(subdomains);
+    _indices.resize(subdomains);
+    _indexSets.resize(subdomains);
+    _gridViews.resize(subdomains);
+
+    updateRestrictedgridViews();
+
+    // setup indexSets
+    for (int d=0; d<subdomains; d++)
+      _indexSets[d] = std::make_shared<SubdomainIndexSet>(
+          *this, _entityMapper,
+          _indices[d], _sizes[d]);
+
+    // seup gridViews
+    for (int d=0; d<subdomains; d++)
+      _gridViews[d] = std::make_shared<SubdomainGridView>(
+          *this, _indexSets[d]);
+  }
+
+  /** \brief obtain the index set
+   *
+   * The lifetime of the returned index set is bound to the lifetime of the
+   * grid view. Keep a copy of the grid view to prevent the index set from
+   * becoming a dangling reference.
+   */
+  const SubdomainGridView & subdomainGridView (int i) const
+  {
+    assert(i < _gridViews.size());
+    return *_gridViews[i];
+  }
+
+  void update(const GridView & backgroundView)
+  {
+    (GridView &)*this = backgroundView;
+    _domainInfo->update(backgroundView);
+    _cellMapper.update(backgroundView);
+    _entityMapper.update(backgroundView);
+    updateRestrictedgridViews();
+  }
+
+private:
+  void updateRestrictedgridViews()
+  {
     constexpr int dim = GridView::dimension;
-    std::size_t subdomains = domainInfo->subdomains().size();
+    std::size_t subdomains = _domainInfo->subdomains().size();
 
     // create a temporary map from partition index to subdomain index
     std::map<int,std::vector<int>> parts;
     for (int d = 0; d<subdomains; d++)
-      for (int p : domainInfo->subdomain(d))
+      for (int p : _domainInfo->subdomain(d))
         parts[p].push_back(d);
 
     // clear and initialize indices and sizes
-    _sizes.resize(subdomains);
-    _indices.resize(subdomains);
     for (int dom=0; dom<subdomains; dom++)
     {
-      _indices[dom].resize(_entityMapper.size(), -1);
+      _indices[dom].resize(_entityMapper.size());
+      std::ranges::fill(_indices[dom],-1);
       _sizes[dom].clear();
       for (unsigned int d = 0; d <= dim; d++)
       {
@@ -60,7 +103,7 @@ public:
     }
 
     // loop through mesh, check sub-domain and update indices
-    for (auto && e : elements(gridView))
+    for (auto && e : elements(*this))
     {
       auto i = _cellMapper.index(e);
       auto refcell = referenceElement<double,dim>(e.type());
@@ -81,34 +124,8 @@ public:
           }
       }
     }
-
-    // setup indexSets
-    _indexSets.resize(0);
-    for (int d=0; d<subdomains; d++)
-      _indexSets.push_back(std::make_shared<SubdomainIndexSet>(
-          *this, _entityMapper,
-          _indices[d], _sizes[d]));
-
-    // seup gridViews
-    _gridViews.resize(0);
-    for (int d=0; d<subdomains; d++)
-      _gridViews.push_back(std::make_shared<SubdomainGridView>(
-          *this, _indexSets[d]));
   }
 
-  /** \brief obtain the index set
-   *
-   * The lifetime of the returned index set is bound to the lifetime of the
-   * grid view. Keep a copy of the grid view to prevent the index set from
-   * becoming a dangling reference.
-   */
-  const SubdomainGridView & subdomainGridView (int i) const
-  {
-    assert(i < _gridViews.size());
-    return *_gridViews[i];
-  }
-
-private:
   MultipleCodimMultipleGeomTypeMapper<GridView> _cellMapper;
   MultipleCodimMultipleGeomTypeMapper<GridView> _entityMapper;
   std::shared_ptr<PartitionedDomainInfo> _domainInfo;

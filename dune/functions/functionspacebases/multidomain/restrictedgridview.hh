@@ -38,10 +38,17 @@ public:
   using IndexSet = RestrictedIndexSet<GridView>;
 
   RestrictedGridView(const GridView & gridView, std::shared_ptr<IndexSet> indexSet) :
-    GridView(gridView), _restrictedIndexSet(indexSet)
+    GridView(gridView), _restrictedIndexSet(*indexSet)
   {}
 
   RestrictedGridView(const RestrictedGridView&) = default;
+
+  RestrictedGridView& operator=(const RestrictedGridView& other)
+  {
+    (GridView&)*this = other;
+    // the indexSet should be implicitly updated
+    return *this;
+  }
 
   /** \brief obtain the index set
    *
@@ -51,19 +58,19 @@ public:
    */
   const IndexSet &indexSet () const
   {
-    return *_restrictedIndexSet;
+    return _restrictedIndexSet;
   }
 
   /** \brief obtain number of entities in a given codimension */
   int size ( int codim ) const
   {
-    return _restrictedIndexSet->size( codim );
+    return _restrictedIndexSet.size( codim );
   }
 
   /** \brief obtain number of entities with a given geometry type */
   int size ( const GeometryType &type ) const
   {
-    return _restrictedIndexSet->size( type );
+    return _restrictedIndexSet.size( type );
   }
 
   /** @brief Return true if the given entity is contained in this grid view
@@ -75,12 +82,12 @@ public:
   template<class EntityType>
   bool contains (const EntityType& e) const
   {
-    return _restrictedIndexSet->contains(e);
+    return _restrictedIndexSet.contains(e);
   }
 
 private:
   RestrictedGridView() = delete;
-  std::shared_ptr<IndexSet> _restrictedIndexSet;
+  IndexSet _restrictedIndexSet;
 };
 
 } // namespace Dune::Functions::MultiDomain

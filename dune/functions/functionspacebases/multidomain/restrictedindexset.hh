@@ -147,7 +147,7 @@ namespace Dune
     {
 #warning TODO switch to GeometryTypeIndex instead of a map, this avoids problems with uninitialized values
       /*
-        we initialize all types reproted be the grid, but the lagrange
+        we initialize all types reported be the grid, but the lagrange
         basis does not care about these types and also queries other
         types...
 

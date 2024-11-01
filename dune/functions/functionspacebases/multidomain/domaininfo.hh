@@ -38,7 +38,8 @@ public:
     return _partitions[i];
   }
 
-  void update(const auto &) {
+  template<typename GridView>
+  void update(const GridView &) {
     std::cout << "WARNING ! not updating the PartitionedDomainInfo" << std::endl;
   }
 };

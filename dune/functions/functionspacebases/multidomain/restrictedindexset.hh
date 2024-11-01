@@ -23,7 +23,7 @@ namespace Dune
   public:
     /** \brief Export the type of the entity used as parameter in the index(...) method */
     template <int cc>
-    using Codim = HostIndexSet :: template Codim<cc>;
+    using Codim = typename HostIndexSet :: template Codim<cc>;
 
     /** \brief The type used for the indices */
     using IndexType = int;

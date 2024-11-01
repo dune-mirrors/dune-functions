@@ -90,7 +90,7 @@ private:
     for (int dom=0; dom<subdomains; dom++)
     {
       _indices[dom].resize(_entityMapper.size());
-      std::ranges::fill(_indices[dom],-1);
+      std::fill(_indices[dom].begin(), _indices[dom].end(), -1);
       _sizes[dom].clear();
       for (unsigned int d = 0; d <= dim; d++)
       {

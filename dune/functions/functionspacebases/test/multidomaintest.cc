@@ -114,7 +114,7 @@ int main(int argc, char** argv)
         localView.bind(e); // internally: domainInfo.bind(e), then child.bind(e)
         sizes[i++] = localView.size();
       };
-      return std::ranges::equal(refSizes, sizes);
+      return std::equal(refSizes.begin(), refSizes.end(), sizes.begin());
     };
 
     test.subTest(checkBasis(basis));

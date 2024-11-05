@@ -43,7 +43,7 @@ namespace Functions {
  * \tparam IMS An IndexMergingStrategy used to merge the global indices of the child factories
  * \tparam SPB  The child pre-basis
  */
-template<class IMS, class SPB>
+template<typename GV, class IMS, class SPB>
 class DynamicPowerPreBasis
 {
   static const bool isBlocked = std::is_same_v<IMS,BasisFactory::BlockedLexicographic> or std::is_same_v<IMS,BasisFactory::BlockedInterleaved>;
@@ -54,7 +54,7 @@ public:
   using SubPreBasis = SPB;
 
   //! The grid view that the FE basis is defined on
-  using GridView = typename SPB::GridView;
+  using GridView = GV;
 
   //! Type used for indices and size information
   using size_type = std::size_t;
@@ -74,12 +74,32 @@ public:
    *
    * The child factories will be stored as copies
    */
-  template<class... SFArgs,
-    disableCopyMove<DynamicPowerPreBasis, SFArgs...> = 0,
-    enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  explicit DynamicPowerPreBasis(std::size_t c, SFArgs&&... sfArgs) :
+  template<class Arg1, class... SFArgs,
+           disableCopyMove<DynamicPowerPreBasis, Arg1, SFArgs...> = 0 ,
+           enableIfConstructible<SubPreBasis, Arg1, SFArgs...> = 0>
+  explicit DynamicPowerPreBasis(const GridView & gridView, std::size_t c, Arg1&& arg1, SFArgs&&... sfArgs) :
+    gridView_(gridView),
     children_(c),
-    subPreBasis_(std::forward<SFArgs>(sfArgs)...)
+    subPreBasis_(std::forward<Arg1>(arg1), std::forward<SFArgs>(sfArgs)...)
+  {
+    static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to DynamicPowerPreBasis does not model the PreBasis concept.");
+  }
+
+  /**
+   * \brief Constructor for given GridView
+   *
+   * This constructor is only available if all child pre-bases are constructible
+   * from the grid view.
+   */
+  template<class otherGV,
+    std::enable_if_t<
+      std::is_same_v<otherGV, GridView> &&
+      std::conjunction_v<std::is_constructible<SPB, GridView>>
+      , int> = 0>
+  DynamicPowerPreBasis(const otherGV& gv, std::size_t c) :
+    gridView_(gv),
+    children_(c),
+    subPreBasis_(gv)
   {
     static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to DynamicPowerPreBasis does not model the PreBasis concept.");
   }
@@ -93,13 +113,14 @@ public:
   //! Obtain the grid view that the basis is defined on
   const GridView& gridView() const
   {
-    return subPreBasis_.gridView();
+    return gridView_;
   }
 
   //! Update the stored grid view, to be called if the grid has changed
   void update(const GridView& gv)
   {
-    subPreBasis_.update(gv);
+    gridView_ = gv;
+    subPreBasis_.update(gridView_);
   }
 
   /**
@@ -385,6 +406,7 @@ protected:
   }
 
 protected:
+  GridView gridView_;
   std::size_t children_;
   SubPreBasis subPreBasis_;
 };
@@ -410,7 +432,8 @@ auto power(ChildPreBasisFactory&& childPreBasisFactory, std::size_t k, const Ind
 {
   return [childPreBasisFactory,k](const auto& gridView) {
     auto childPreBasis = childPreBasisFactory(gridView);
-    return DynamicPowerPreBasis<IndexMergingStrategy, decltype(childPreBasis)>(k,std::move(childPreBasis));
+    using GridView = std::decay_t<decltype(gridView)>;
+    return DynamicPowerPreBasis<GridView, IndexMergingStrategy, decltype(childPreBasis)>(gridView, k,std::move(childPreBasis));
   };
 }
 
@@ -429,7 +452,8 @@ auto power(ChildPreBasisFactory&& childPreBasisFactory, std::size_t k)
 {
   return [childPreBasisFactory,k](const auto& gridView) {
     auto childPreBasis = childPreBasisFactory(gridView);
-    return DynamicPowerPreBasis<BlockedInterleaved, decltype(childPreBasis)>(k,std::move(childPreBasis));
+    using GridView = std::decay_t<decltype(gridView)>;
+    return DynamicPowerPreBasis<GridView, BlockedInterleaved, decltype(childPreBasis)>(gridView, k,std::move(childPreBasis));
   };
 }
 

@@ -72,12 +72,12 @@ int main (int argc, char *argv[]) try
   {
     using namespace Functions;
     using PreBasis =
-      PowerPreBasis<BlockedInterleaved,
+      PowerPreBasis<GridView, BlockedInterleaved,
         CompositePreBasis<GridView, BlockedLexicographic,
-          PowerPreBasis<BlockedInterleaved,
+          PowerPreBasis<GridView, BlockedInterleaved,
             LagrangePreBasis<GridView,1>,
             2>,
-          PowerPreBasis<BlockedInterleaved,
+          PowerPreBasis<GridView, BlockedInterleaved,
             LagrangePreBasis<GridView,2>,
             2>
         >,

@@ -26,7 +26,7 @@ def preBasisTypeName(tree, gridViewTypeName):
     elif isinstance(tree, Power):
         IMS = indexMergingStrategy(tree.blocked, tree.layout)
         ChildPreBasis = preBasisTypeName(tree.children[0], gridViewTypeName)
-        return "Dune::Functions::PowerPreBasis< " + IMS + " , " + ChildPreBasis + " , " + str(tree.exponent) + " >"
+        return "Dune::Functions::PowerPreBasis< " + gridViewTypeName + ", " + IMS + " , " + ChildPreBasis + " , " + str(tree.exponent) + " >"
     else:
         raise Exception("Unknown type of tree: " + repr(tree))
 

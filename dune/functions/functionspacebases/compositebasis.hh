@@ -49,8 +49,12 @@ namespace Functions {
  * This pre-basis represents a composition of several given pre-bases.
  * Its node type is a CompositeBasisNodes for the given subnodes.
  *
+ * \tparam GV  The grid view that the FE basis is defined on
  * \tparam IMS An IndexMergingStrategy used to merge the global indices of the child pre-bases
  * \tparam SPB  The child pre-bases
+ *
+ * Note that it is expected that every child of CompositePreBasis can
+ * operate on the gieven GridView GV.
  */
 template<typename GV, class IMS, class... SPB>
 class CompositePreBasis
@@ -96,7 +100,7 @@ public:
   template<class... SFArgs,
     disableCopyMove<CompositePreBasis, SFArgs...> = 0,
     enableIfConstructible<std::tuple<SPB...>, SFArgs...> = 0>
-  CompositePreBasis(GridView gridView, SFArgs&&... sfArgs) :
+  CompositePreBasis(const GridView & gridView, SFArgs&&... sfArgs) :
     gridView_(gridView),
     subPreBases_(std::forward<SFArgs>(sfArgs)...)
   {
@@ -113,16 +117,12 @@ public:
    * This constructor is only available if all child pre-bases are constructible
    * from the grid view.
    */
-#if 1
   template<class otherGV,
     std::enable_if_t<
       std::is_same_v<otherGV, GridView> &&
       std::conjunction_v<std::is_constructible<SPB, GridView>...>
       , int> = 0>
   CompositePreBasis(const otherGV& gv) :
-#else
-  CompositePreBasis(const GridView& gv) :
-#endif
     gridView_(gv),
     subPreBases_(SPB(gv)...)
   {
@@ -148,8 +148,9 @@ public:
   //! Update the stored grid view, to be called if the grid has changed
   void update(const GridView& gv)
   {
+    gridView_ = gv;
     Hybrid::forEach(ChildIndices(), [&](auto i) {
-      this->subPreBasis(i).update(gv);
+      this->subPreBasis(i).update(gridView_);
     });
   }
 

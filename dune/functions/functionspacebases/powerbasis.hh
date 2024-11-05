@@ -46,11 +46,11 @@ namespace Functions {
  * \tparam SPB  The child pre-basis
  * \tparam C    The exponent of the power node
  */
-template<class IMS, class SPB, std::size_t C>
+template<typename GV, class IMS, class SPB, std::size_t C>
 class PowerPreBasis :
-    public DynamicPowerPreBasis<IMS,SPB>
+  public DynamicPowerPreBasis<GV, IMS,SPB>
 {
-  using Base = DynamicPowerPreBasis<IMS,SPB>;
+  using Base = DynamicPowerPreBasis<GV, IMS,SPB>;
 
 public:
 
@@ -75,10 +75,22 @@ public:
    * The child factories will be stored as copies
    */
   template<class... SFArgs,
-    disableCopyMove<PowerPreBasis, SFArgs...> = 0,
-    enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  explicit PowerPreBasis(SFArgs&&... sfArgs) :
-    Base(std::size_t(C), std::forward<SFArgs>(sfArgs)...)
+    disableCopyMove<PowerPreBasis, SFArgs...> = 0
+    //        ,
+    // enableIfConstructible<SubPreBasis, SFArgs...> = 0
+           >
+  explicit PowerPreBasis(const GV & gridView, SFArgs&&... sfArgs) :
+    Base(gridView, std::size_t(C), std::forward<SFArgs>(sfArgs)...)
+  {}
+
+  /**
+   * \brief Constructor for given GridView
+   *
+   * This constructor is only available if all child pre-bases are constructible
+   * from the grid view.
+   */
+  PowerPreBasis(const GV& gridView) :
+    Base(gridView, std::size_t(C))
   {}
 
   /**
@@ -141,7 +153,8 @@ auto power(ChildPreBasisFactory&& childPreBasisFactory, const IndexMergingStrate
 {
   return [childPreBasisFactory](const auto& gridView) {
     auto childPreBasis = childPreBasisFactory(gridView);
-    return PowerPreBasis<IndexMergingStrategy, decltype(childPreBasis), k>(std::move(childPreBasis));
+    using GridView = std::decay_t<decltype(gridView)>;
+    return PowerPreBasis<GridView, IndexMergingStrategy, decltype(childPreBasis), k>(gridView, std::move(childPreBasis));
   };
 }
 
@@ -160,7 +173,8 @@ auto power(ChildPreBasisFactory&& childPreBasisFactory)
 {
   return [childPreBasisFactory](const auto& gridView) {
     auto childPreBasis = childPreBasisFactory(gridView);
-    return PowerPreBasis<BlockedInterleaved, decltype(childPreBasis), k>(std::move(childPreBasis));
+    using GridView = std::decay_t<decltype(gridView)>;
+    return PowerPreBasis<GridView, BlockedInterleaved, decltype(childPreBasis), k>(gridView, std::move(childPreBasis));
   };
 }
 

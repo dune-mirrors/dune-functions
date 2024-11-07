@@ -3,5 +3,5 @@
 
 # tests that should build and run successfully
 
-dune_add_test(SOURCES monomialsettest.cc LABELS quick)
-dune_add_test(SOURCES polynomialtest.cc LABELS quick)
+dune_add_test(SOURCES monomialsettest.cc LABELS quick LINK_LIBRARIES Dune::Functions)
+dune_add_test(SOURCES polynomialtest.cc LABELS quick LINK_LIBRARIES Dune::Functions)

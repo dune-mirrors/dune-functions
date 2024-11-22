@@ -12,6 +12,7 @@
 #include <array>
 #include <bitset>
 
+#include <dune/common/densevectorspan.hh>
 #include <dune/common/exceptions.hh>
 #include <dune/common/fvector.hh>
 
@@ -423,7 +424,9 @@ namespace Dune::Functions
       template<class InputValues, class OutputValues>
       void transform(InputValues const& inValues, OutputValues& outValues) const
       {
-        mat_.mv(inValues, outValues);
+        auto x = DenseVectorSpan{inValues};
+        auto y = DenseVectorSpan{outValues};
+        mat_.mv(x, y);
       }
 
     private:
@@ -504,7 +507,7 @@ namespace Dune::Functions
       typename Traits::LocalCoefficientsType coefficients_;
       typename Traits::LocalInterpolationType interpolation_;
       // This is the matrix M in Kirbys paper
-      Dune::FieldMatrix<R, 6, 6>mat_;
+      Dune::FieldMatrix<R, 6, 6> mat_;
       // the local state, i.e. a collection of global information restricted to this element
       std::bitset<3> edgeOrientation_;
 

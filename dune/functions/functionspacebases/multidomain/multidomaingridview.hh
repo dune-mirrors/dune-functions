@@ -39,6 +39,11 @@ public:
     _indexSets.resize(subdomains);
     _gridViews.resize(subdomains);
 
+    // create a map from partition index to subdomain index
+    for (int d = 0; d<subdomains; d++)
+      for (int p : _domainInfo->subdomain(d))
+        _parts[p].push_back(d);
+
     updateRestrictedgridViews();
 
     // setup indexSets
@@ -47,7 +52,7 @@ public:
           *this, _entityMapper,
           _indices[d], _sizes[d]);
 
-    // seup gridViews
+    // setup gridViews
     for (int d=0; d<subdomains; d++)
       _gridViews[d] = std::make_shared<SubdomainGridView>(
           *this, _indexSets[d]);
@@ -74,17 +79,18 @@ public:
     updateRestrictedgridViews();
   }
 
+  std::vector<int> domains(const typename GridView::template Codim<0>::Entity & e) const
+  {
+    auto i = _cellMapper.index(e);
+    auto p = _domainInfo->partition(i);
+    return _parts.at(p);
+  }
+
 private:
   void updateRestrictedgridViews()
   {
     constexpr int dim = GridView::dimension;
     std::size_t subdomains = _domainInfo->subdomains().size();
-
-    // create a temporary map from partition index to subdomain index
-    std::map<int,std::vector<int>> parts;
-    for (int d = 0; d<subdomains; d++)
-      for (int p : _domainInfo->subdomain(d))
-        parts[p].push_back(d);
 
     // clear and initialize indices and sizes
     for (int dom=0; dom<subdomains; dom++)
@@ -108,7 +114,7 @@ private:
       auto i = _cellMapper.index(e);
       auto refcell = referenceElement<double,dim>(e.type());
       auto p = _domainInfo->partition(i);
-      for (int subdomain : parts[p])
+      for (int subdomain : _parts[p])
       {
         // every subentity is part of the subdomain
         for (int codim = 0; codim<=dim; codim++)
@@ -133,6 +139,7 @@ private:
   std::vector<std::vector<int>> _indices;
   std::vector<std::shared_ptr<SubdomainIndexSet>> _indexSets;
   std::vector<std::shared_ptr<SubdomainGridView>> _gridViews;
+  std::map<int,std::vector<int>> _parts;
 };
 
 }

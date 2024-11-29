@@ -9,6 +9,11 @@ dune_target_enable_all_packages("advection-reaction-dg")
 set_property(TARGET advection-reaction-dg PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples advection-reaction-dg)
 
+add_executable("cutfem-poisson" cutfem-poisson.cc)
+dune_target_enable_all_packages("cutfem-poisson")
+set_property(TARGET cutfem-poisson PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples cutfem-poisson)
+
 add_executable("interpolation" interpolation.cc)
 dune_target_enable_all_packages("interpolation")
 set_property(TARGET interpolation PROPERTY EXCLUDE_FROM_ALL 1)

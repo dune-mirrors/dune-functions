@@ -93,10 +93,13 @@ public:
       return {};
     if (domain == 0)
       snippets = interface0->volume(tpmc::ReconstructionType::InteriorDomain);
-    if (domain == 1 && dom0)
-      snippets = interface0->volume(tpmc::ReconstructionType::ExteriorDomain);
-    if (domain == 1 && ! dom0)
-      snippets = interface1->volume(tpmc::ReconstructionType::InteriorDomain);
+    if (domain == 1)
+    {
+      if (dom0) snippets = interface0->volume(tpmc::ReconstructionType::ExteriorDomain);
+      if (! dom0) snippets = interface1->volume(tpmc::ReconstructionType::InteriorDomain);
+    }
+    if (domain == 3)
+      snippets = interface1->volume(tpmc::ReconstructionType::ExteriorDomain);
     // create quadrature
     std::vector<QP> newquad;
     for (const auto& geo : snippets)
@@ -582,6 +585,40 @@ void boundaryTreatment (const FEBasis& feBasis, std::vector<char>& dirichletNode
   });
 }
 
+/** \brief Assemble the Laplace stiffness matrix on the given grid view */
+template <class GridView>
+void testQuadrature(const GridView & gridView, CutCellInfo& ccinfo)
+{
+  std::array<double,2> subdomains;
+  std::array<double,2> interfaces;
+  // A loop over all elements of the grid
+  for(const auto& e : elements(gridView))
+  {
+    // bind cutcell infos
+    ccinfo.bind(e);
+
+    auto integrateCell = [](const auto& geom, auto && quad)
+    {
+      double v = 0;
+      for (const auto & qp : quad)
+        v += qp.weight() * geom.integrationElement(qp.position());
+      return v;
+    };
+
+    // evaluate subdomain integrals
+    subdomains[0] += integrateCell(e.geometry(), ccinfo.quadrature(2,0));
+    subdomains[1] += integrateCell(e.geometry(), ccinfo.quadrature(2,1));
+
+    // evaluate interface integrals
+
+  }
+
+  std::cout << "Area subdomain 0 " << subdomains[0] << std::endl;
+  std::cout << "Area subdomain 1 " << subdomains[1] << std::endl;
+
+}
+
+
 ///
 template<typename GridView, typename F>
 auto createDomainInfo(const GridView& gridView, const F& levelSet0, const F& levelSet1)
@@ -689,6 +726,15 @@ int main (int argc, char *argv[]) try
   auto levelset1 = Functions::makeDiscreteGlobalBasisFunction<double>(levelSetBasis, lx1);
 
   CutCellInfo ccinfo(levelset0, levelset1);
+
+  // a small test to check the generation of quadrature rules works
+  {
+    testQuadrature(gridView, ccinfo);
+    auto pi = StandardMathematicalConstants<double>::pi();
+
+    std::cout << "Reference 0 " << R0*R0*pi << std::endl;
+    std::cout << "Reference 1 " << (R1*R1-R0*R0)*pi << std::endl;
+  }
 
   /////////////////////////////////////////////////////////
   //   Choose a finite element space

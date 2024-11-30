@@ -10,8 +10,10 @@
 #include <cmath>
 
 #include <dune/common/bitsetvector.hh>
-#include <dune/common/math.hh>
 #include <dune/common/rangeutilities.hh>
+#include <dune/common/parametertree.hh>
+#include <dune/common/parametertreeparser.hh>
+#include <dune/common/math.hh>
 
 #include <dune/geometry/quadraturerules.hh>
 #include <dune/geometry/multilineargeometry.hh>
@@ -38,7 +40,8 @@
 using namespace Dune;
 
 // material properties...
-std::vector<double> D{0.01,100};
+// std::vector<double> D{0.01,100};
+std::vector<double> D{1,1};
 
 // this is a quick and dirty implementation, using many
 // shortcuts as we know we work on a YaspGrid in 2D
@@ -116,6 +119,14 @@ public:
     }
     return newquad;
   }
+  auto interface(int iface) const
+  {
+    if (iface == 0)
+      return interface0->interface();
+    if (iface == 1)
+      return interface1->interface();
+    assert(false);
+  }
   FieldVector<double,2> interfaceNormal;
   FieldVector<double,2> boundaryNormal;
 private:
@@ -186,7 +197,7 @@ void assembleCouplings(const Element& element, const FENode& node, MatrixType& e
 
   const auto& node0 = node.child(_0);
   const auto& node1 = node.child(_1);
-  const auto& lfe0 = node0.finiteElement();
+  const auto& lfe0 = node0.finiteElement(); // we know that lfe0 and lfe1 are identical
   const auto& lfe1 = node1.finiteElement();
 
   // only do something if both function spaces are active
@@ -197,27 +208,39 @@ void assembleCouplings(const Element& element, const FENode& node, MatrixType& e
   const int dim = Element::dimension;
   auto geometry = element.geometry();
 
-  // pseudo intersection (we know there is currently only one!)
-  double weight = std::sqrt(2.0);
-  Dune::FieldVector<double,2> normal {weight,weight};
+  auto globalGeometry = [&](const auto & g)
+  {
+    std::vector<FieldVector<double,2>> corners;
+    for (std::size_t i = 0; i < g.corners(); i++)
+      corners.push_back(geometry.global(g.corner(i)));
+    MultiLinearGeometry<double,1,2> global(g.type(), corners);
+    return global;
+  };
 
-#if 0
-  for (auto&& intersection : interface)
+  auto h = std::sqrt(element.geometry().volume());
+
+  // integrate along interface
+  auto interface = ccinfo.interface(0);
+
+  for (auto&& geom : interface)
   {
     // Get a quadrature rule
     int order = 3;
-    const auto& quad = QuadratureRules<double, dim-1>::rule(intersection.type(), order);
+    const auto& quad = QuadratureRules<double, dim-1>::rule(geom.type(), order);
+
+    // mapping from snippet to global coordinates
+    auto global = globalGeometry(geom);
 
     // Loop over all quadrature points
-    for (size_t pt=0; pt < quad.size(); pt++) {
-
-      auto positionInElement = intersection.geometryInInside().global(quadPoint.position());
+    for (auto && qp : quad)
+    {
 
       // Position of the current quadrature point in the reference element
-      const FieldVector<double,dim>& quadPos = quad[pt].position();
+      const auto& quadPos = qp.position();
+      auto positionInElement = geom.global(quadPos);
 
       // The inverse Jacobian of the map from the reference element to the element
-      const auto& jacobianInverse = geometry.jacobianInverse(quadPos);
+      const auto& jacobianInverse = geometry.jacobianInverse(positionInElement);
 
       // The values of the shape functions at the quadrature point
       // --- we know both subdomains use the same shape functions
@@ -227,7 +250,7 @@ void assembleCouplings(const Element& element, const FENode& node, MatrixType& e
       // The gradients of the shape functions on the reference element
       // --- we know both subdomains use the same shape functions
       std::vector<FieldMatrix<double,1,dim> > referenceJacobians;
-      lfe0.localBasis().evaluateJacobian(quadPos, referenceJacobians);
+      lfe0.localBasis().evaluateJacobian(positionInElement, referenceJacobians);
 
       // Compute the shape function gradients on the real element
       std::vector<FieldMatrix<double,1,dim> > jacobians(referenceJacobians.size());
@@ -235,44 +258,175 @@ void assembleCouplings(const Element& element, const FENode& node, MatrixType& e
         jacobians[i] = referenceJacobians[i] * jacobianInverse;
 
       // The multiplicative factor in the integral transformation formula
-      const double integrationElement = geometry.integrationElement(quadPos);
+      const double integrationElement = geometry.integrationElement(positionInElement);
 
       // auto factor = intersection.integrationOuterNormal(quadPoint.position());
-      auto n = intersection.integrationOuterNormal(quadPoint.position());
+      auto normal = ccinfo.interfaceNormal; // pointing from dom0 to dom1
+      double factor = qp.weight() * global.integrationElement(quadPos);
 
       // Compute the actual matrix entries
-      for (size_t i=0; i<values.size(); i++)
-        for (size_t j=0; j<values.size(); j++ )
+      for (size_t i=0; i<values.size(); i++) // col -> trial function
+        for (size_t j=0; j<values.size(); j++ ) // row -> test function
         {
-          // row: test / col: trial
-          // inside/inside
+          // [[ x ]]      = +- x * n
+          auto jp_u = values[i][0] * normal;
+          auto jp_v = values[j][0] * normal;
+          // {{ grad x }} = 1/2 grad x
+          auto av_grad_u = jacobians[i][0] / 2.0;
+          auto av_grad_v = jacobians[j][0] / 2.0;
+
+          // assemble
+          double eta = 4.0;
+          auto weak_form = [&](int dom_trial, int dom_test)
           {
-            size_t row = lfe0.localIndex(i);
-            size_t col = lfe0.localIndex(j);
-            elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j])) * quad[pt].weight() * integrationElement;
+            //     - {{ grad v }} [[ u ]] - {{ grad u }} [[ v ]] + eta / h [[ u ]] [[ v ]]
+            int sign_jp_u = dom_trial == 0 ? 1 : -1;
+            int sign_jp_v = dom_test  == 0 ? 1 : -1;
+            return -   av_grad_v * jp_u        * sign_jp_u
+                   -   av_grad_u * jp_v        * sign_jp_v
+                   + eta / h * (jp_u * jp_v)     * sign_jp_u * sign_jp_v;
+          };
+
+          // col: trial / row: test
+          // u inside / v inside
+          {
+            size_t col = node0.localIndex(i);
+            size_t row = node0.localIndex(j);
+            elementMatrix[row][col] += weak_form(0,0) * factor;
           }
-          // inside/outside
+          // u inside / v outside
           {
-            size_t row = lfe0.localIndex(i);
-            size_t col = lfe1.localIndex(j);
-            elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j])) * quad[pt].weight() * integrationElement;
+            size_t col = node0.localIndex(i);
+            size_t row = node1.localIndex(j);
+            elementMatrix[row][col] += weak_form(0,1) * factor;
           }
-          // outside/inside
+          // u outside / v inside
           {
-            size_t row = lfe1.localIndex(i);
-            size_t col = lfe0.localIndex(j);
-            elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j])) * quad[pt].weight() * integrationElement;
+            size_t col = node1.localIndex(i);
+            size_t row = node0.localIndex(j);
+            elementMatrix[row][col] += weak_form(1,0) * factor;
           }
-          // outside/outside
+          // u outside / v outside
           {
-            size_t row = lfe1.localIndex(i);
-            size_t col = lfe1.localIndex(j);
-            elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j])) * quad[pt].weight() * integrationElement;
+            size_t col = node1.localIndex(i);
+            size_t row = node1.localIndex(j);
+            elementMatrix[row][col] += weak_form(1,1) * factor;
           }
         }
     }
   }
-#endif
+}
+
+// Compute the stiffness matrix for a single element
+template <class Element, class FENode, class MatrixType>
+void assembleBoundary(const Element& element, const FENode& node, MatrixType& elementMatrix, const CutCellInfo& ccinfo)
+{
+  using namespace Indices;
+
+  // const auto& node0 = node.child(_0);
+  const auto& node1 = node.child(_1); // we know only domain 1 has boundary intersections
+  // const auto& lfe0 = node0.finiteElement();
+  const auto& lfe1 = node1.finiteElement();
+
+  // only do something if both function spaces are active
+  if (node1.size() == 0) return;
+
+  // assemble nitsche term
+
+  const int dim = Element::dimension;
+  auto geometry = element.geometry();
+
+  auto globalGeometry = [&](const auto & g)
+  {
+    std::vector<FieldVector<double,2>> corners;
+    for (std::size_t i = 0; i < g.corners(); i++)
+      corners.push_back(geometry.global(g.corner(i)));
+    MultiLinearGeometry<double,1,2> global(g.type(), corners);
+    return global;
+  };
+
+  auto h = std::sqrt(element.geometry().volume());
+
+  // integrate along interface
+  auto interface = ccinfo.interface(1);
+
+  for (auto&& geom : interface)
+  {
+    // Get a quadrature rule
+    int order = 3;
+    const auto& quad = QuadratureRules<double, dim-1>::rule(geom.type(), order);
+
+    // mapping from snippet to global coordinates
+    auto global = globalGeometry(geom);
+
+    std::cout << "Local Boundary Segments: " << geometry.center() << std::endl;
+
+    // Loop over all quadrature points
+    for (auto && qp : quad)
+    {
+
+      // Position of the current quadrature point in the reference element
+      const auto& quadPos = qp.position();
+      auto positionInElement = geom.global(quadPos);
+
+      // The inverse Jacobian of the map from the reference element to the element
+      const auto& jacobianInverse = geometry.jacobianInverse(positionInElement);
+
+      // The values of the shape functions at the quadrature point
+      // --- we know both subdomains use the same shape functions
+      std::vector<FieldVector<double,1> > values;
+      lfe1.localBasis().evaluateFunction(positionInElement, values);
+
+      // The gradients of the shape functions on the reference element
+      // --- we know both subdomains use the same shape functions
+      std::vector<FieldMatrix<double,1,dim> > referenceJacobians;
+      lfe1.localBasis().evaluateJacobian(positionInElement, referenceJacobians);
+
+      // Compute the shape function gradients on the real element
+      std::vector<FieldMatrix<double,1,dim> > jacobians(referenceJacobians.size());
+      for (size_t i=0; i<jacobians.size(); i++)
+        jacobians[i] = referenceJacobians[i] * jacobianInverse;
+
+      // The multiplicative factor in the integral transformation formula
+      const double integrationElement = geometry.integrationElement(positionInElement);
+
+      // auto factor = intersection.integrationOuterNormal(quadPoint.position());
+      auto normal = ccinfo.boundaryNormal; // pointing outwards
+      double factor = qp.weight() * global.integrationElement(quadPos);
+
+      // Compute the actual matrix entries
+      for (size_t i=0; i<values.size(); i++) // col -> trial function
+        for (size_t j=0; j<values.size(); j++ ) // row -> test function
+        {
+          // [[ x ]]      = +- x * n
+          auto jp_u = values[i][0] * normal;
+          auto jp_v = values[j][0] * normal;
+          // {{ grad x }} = 1/2 grad x
+          auto av_grad_u = jacobians[i][0] / 2.0;
+          auto av_grad_v = jacobians[j][0] / 2.0;
+
+          // assemble
+          double eta = 4.0;
+          auto weak_form = [&](int dom_trial, int dom_test)
+          {
+            //     - {{ grad v }} [[ u ]] - {{ grad u }} [[ v ]] + eta / h [[ u ]] [[ v ]]
+            int sign_jp_u = dom_trial == 0 ? 1 : -1;
+            int sign_jp_v = dom_test  == 0 ? 1 : -1;
+            return     av_grad_v * jp_u        * sign_jp_u
+                   -   av_grad_u * jp_v        * sign_jp_v
+                   + eta / h * (jp_u * jp_v)     * sign_jp_u * sign_jp_v;
+          };
+
+          // col: trial / row: test
+          // u inside / v inside
+          {
+            size_t col = node1.localIndex(i);
+            size_t row = node1.localIndex(j);
+            elementMatrix[row][col] += weak_form(0,0) * factor;
+          }
+        }
+    }
+  }
 }
 
 // Compute the stiffness matrix for a single element
@@ -296,8 +450,10 @@ void getLocalMatrix(const LocalView& localView, const CutCellInfo& ccinfo, Matri
     assemblePoisson(element, feTree.child(_0), elementMatrix, ccinfo, 0); // inner
   if (feTree.child(_1).active())
     assemblePoisson(element, feTree.child(_1), elementMatrix, ccinfo, 1); // outer
-  if (feTree.child(_0).active() && feTree.child(_1).active())
-    assembleCouplings(element, feTree, elementMatrix, ccinfo);
+  // if (feTree.child(_0).active() && feTree.child(_1).active())
+  //   assembleCouplings(element, feTree, elementMatrix, ccinfo);
+  // if (feTree.child(_1).active())
+  assembleBoundary(element, feTree, elementMatrix, ccinfo);
 }
 
 
@@ -605,16 +761,42 @@ void testQuadrature(const GridView & gridView, CutCellInfo& ccinfo)
       return v;
     };
 
+    auto integrateInterface = [](const auto& geom, auto && interface, auto && normal)
+    {
+      double v = 0;
+      for (const auto & g : interface)
+      {
+        std::vector<FieldVector<double,2>> corners;
+        for (std::size_t i = 0; i < g.corners(); i++)
+          corners.push_back(geom.global(g.corner(i)));
+        MultiLinearGeometry<double,1,2> global(g.type(), corners);
+
+        const auto& quad = QuadratureRules<double,1>::rule(g.type(), 2);
+        for (const auto & qp : quad)
+        {
+          // update integral
+          v += qp.weight()
+            * global.integrationElement(qp.position());
+        }
+      }
+      return v;
+    };
+
     // evaluate subdomain integrals
     subdomains[0] += integrateCell(e.geometry(), ccinfo.quadrature(2,0));
     subdomains[1] += integrateCell(e.geometry(), ccinfo.quadrature(2,1));
 
     // evaluate interface integrals
+    interfaces[0] += integrateInterface(e.geometry(), ccinfo.interface(0), ccinfo.interfaceNormal);
+    interfaces[1] += integrateInterface(e.geometry(), ccinfo.interface(1), ccinfo.interfaceNormal);
 
   }
 
-  std::cout << "Area subdomain 0 " << subdomains[0] << std::endl;
-  std::cout << "Area subdomain 1 " << subdomains[1] << std::endl;
+  std::cout << "Area      domain 0    " << subdomains[0] << std::endl;
+  std::cout << "Area      domain 1    " << subdomains[1] << std::endl;
+
+  std::cout << "Length    interface 0 " << interfaces[0] << std::endl;
+  std::cout << "Length    interface 1 " << interfaces[1] << std::endl;
 
 }
 
@@ -685,6 +867,10 @@ int main (int argc, char *argv[]) try
   // Set up MPI, if available
   MPIHelper::instance(argc, argv);
 
+  // read options
+  ParameterTree params;
+  ParameterTreeParser::readOptions(argc, argv, params);
+
   ///////////////////////////////////
   //   Generate the grid
   ///////////////////////////////////
@@ -692,7 +878,7 @@ int main (int argc, char *argv[]) try
   constexpr int dim = 2;
   double center = 0.5;
   Dune::YaspGrid<dim> grid{ {1.0,1.0}, {3,3} };
-  grid.globalRefine(4);
+  grid.globalRefine(params.get("grid.refine", 3));
   auto gridView = grid.leafGridView();
   using GridView = decltype(gridView);
 
@@ -701,10 +887,10 @@ int main (int argc, char *argv[]) try
   //   based on level-sets
   ///////////////////////////////////
 
-  double R0 = 0.3;
-  double R1 = 0.45;
-  double freq = 10;
-  double ampl = 0.3;
+  double R0   = params.get("domain.R0", -0.3);
+  double R1   = params.get("domain.R0", 0.45);
+  double freq = params.get("domain.freq", 10);
+  double ampl = params.get("domain.ampl", 0.2);
   auto l0 = [&](auto x) {
     x -= center;
     return 10*(x*x - R0*R0) + ampl * std::sin(freq * std::atan2(x[0],x[1]));
@@ -728,12 +914,17 @@ int main (int argc, char *argv[]) try
   CutCellInfo ccinfo(levelset0, levelset1);
 
   // a small test to check the generation of quadrature rules works
+  if (params.get("test.integral",false))
   {
     testQuadrature(gridView, ccinfo);
     auto pi = StandardMathematicalConstants<double>::pi();
 
-    std::cout << "Reference 0 " << R0*R0*pi << std::endl;
-    std::cout << "Reference 1 " << (R1*R1-R0*R0)*pi << std::endl;
+    std::cout << "Reference domain 0    " << R0*R0*pi << std::endl;
+    std::cout << "Reference domain 1    " << (R1*R1-R0*R0)*pi << std::endl;
+    std::cout << "Reference interface 0 " << 2*R0*pi << std::endl;
+    std::cout << "Reference interface 1 " << 2*R1*pi << std::endl;
+
+    return 0;
   }
 
   /////////////////////////////////////////////////////////

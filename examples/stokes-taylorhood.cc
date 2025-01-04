@@ -46,10 +46,10 @@ using namespace Dune;
 
 // Compute the stiffness matrix for a single element
 // { local_assembler_signature_begin }
-template <class LocalView>
+template <class LocalView, class MatrixType>
 void getLocalMatrix(
         const LocalView& localView,
-        Matrix<FieldMatrix<double,1,1>>& elementMatrix)
+        MatrixType& elementMatrix)
 // { local_assembler_signature_end }
 {
   // Get the grid element from the local FE basis view
@@ -120,7 +120,7 @@ void getLocalMatrix(
         {
           size_t row = localView.tree().child(_0,k).localIndex(i);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_row}@*/
           size_t col = localView.tree().child(_0,k).localIndex(j);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_column}@*/
-          elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j]))
+          elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j]))[0][0]
                                      * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vv_element_matrix}@*/
         }
     // { velocity_velocity_coupling_end }
@@ -147,10 +147,10 @@ void getLocalMatrix(
           size_t pIndex = localView.tree().child(_1).localIndex(j);   /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_column}@*/
 
           elementMatrix[vIndex][pIndex] -=                    /*@\label{li:stokes_taylorhood_update_vp_element_matrix_a}@*/
-                  jacobians[i][0][k] * pressureValues[j]
+                  jacobians[i][0][k] * pressureValues[j][0]
                   * quadPoint.weight() * integrationElement;
           elementMatrix[pIndex][vIndex] -=
-                  jacobians[i][0][k] * pressureValues[j]
+                  jacobians[i][0][k] * pressureValues[j][0]
                   * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vp_element_matrix_b}@*/
         }
     // { velocity_pressure_coupling_end }
@@ -270,7 +270,7 @@ void assembleStokesMatrix(const Basis& basis, MatrixType& matrix)
     // Now let's get the element stiffness matrix
     // A dense matrix is used for the element stiffness matrix
     // { setup_element_stiffness_begin }
-    Matrix<FieldMatrix<double,1,1> > elementMatrix;
+    Matrix<double> elementMatrix;
     getLocalMatrix(localView, elementMatrix);
     // { setup_element_stiffness_end }
 

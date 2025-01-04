@@ -78,7 +78,7 @@ void getLocalMatrix(const LocalView& localView, MatrixType& elementMatrix)
     // Compute the actual matrix entries
     for (size_t i=0; i<elementMatrix.N(); i++)
       for (size_t j=0; j<elementMatrix.M(); j++ )
-        elementMatrix[i][j] += (jacobians[i] * transpose(jacobians[j])) * quad[pt].weight() * integrationElement;
+        elementMatrix[i][j] += (jacobians[i] * transpose(jacobians[j]))[0][0] * quad[pt].weight() * integrationElement;
 
   }
 
@@ -86,9 +86,9 @@ void getLocalMatrix(const LocalView& localView, MatrixType& elementMatrix)
 
 
 // Compute the source term for a single element
-template <class LocalView, class LocalVolumeTerm>
+template <class LocalView, class VectorType, class LocalVolumeTerm>
 void getVolumeTerm( const LocalView& localView,
-                    BlockVector<FieldVector<double,1> >& localRhs,
+                    VectorType& localRhs,
                     LocalVolumeTerm&& localVolumeTerm)
 {
   // Get the grid element from the local FE basis view
@@ -125,7 +125,7 @@ void getVolumeTerm( const LocalView& localView,
 
     // Actually compute the vector entries
     for (size_t i=0; i<localRhs.size(); i++)
-      localRhs[i] += shapeFunctionValues[i] * functionValue * quad[pt].weight() * integrationElement;
+      localRhs[i] += shapeFunctionValues[i][0] * functionValue * quad[pt].weight() * integrationElement;
 
   }
 
@@ -212,7 +212,7 @@ void assembleLaplaceMatrix(const FEBasis& feBasis,
 
     // Now let's get the element stiffness matrix
     // A dense matrix is used for the element stiffness matrix
-    Matrix<FieldMatrix<double,1,1> > elementMatrix;
+    Matrix<double> elementMatrix;
     getLocalMatrix(localView, elementMatrix);
 
     // Add element stiffness matrix onto the global stiffness matrix
@@ -232,7 +232,7 @@ void assembleLaplaceMatrix(const FEBasis& feBasis,
     }
 
     // Now get the local contribution to the right-hand side vector
-    BlockVector<FieldVector<double,1> > localRhs;
+    BlockVector<double> localRhs;
     localVolumeTerm.bind(e);
     getVolumeTerm(localView, localRhs, localVolumeTerm);
 

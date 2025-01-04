@@ -67,7 +67,7 @@ void testScalarBasisConst(const Basis& feBasis,
       for (size_t i=0; i<quad.size(); i++)
       {
         lFE.localBasis().evaluateFunction(quad[i].position(), values);
-        double sum = std::accumulate(values.begin(), values.end(), 0.0);
+        double sum = std::accumulate(values.begin(), values.end(), FieldVector<double,1>(0.0))[0];
 
         if (std::abs(sum-1.0) > 1e-5)
           DUNE_THROW(Exception, "Basis is no partition of unity, even though it is supposed to be! Error occurred for geometry type: " << e.type());
@@ -171,7 +171,7 @@ void testScalarBasisConst(const Basis& feBasis,
       // Actually compute the vector entries
       for (size_t i=0; i<localFiniteElement.localBasis().size(); i++)
       {
-        integral += localCoefficients[tree.localIndex(i)] * shapeFunctionValues[i] * quad[pt].weight() * integrationElement;
+        integral += localCoefficients[tree.localIndex(i)] * shapeFunctionValues[i][0] * quad[pt].weight() * integrationElement;
       }
     }
 

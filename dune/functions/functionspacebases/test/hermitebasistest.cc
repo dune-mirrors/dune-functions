@@ -52,7 +52,7 @@ int main (int argc, char* argv[])
 
       using SignatureTag = Dune::Functions::SignatureTag<Range(Domain)>;
       auto f = [](const Domain& x) -> Range {
-        return x*x;
+        return Range{x*x};
       };
       auto df = [](const Domain& x) -> Jacobian {
         return Jacobian{2.0*x};
@@ -85,10 +85,10 @@ int main (int argc, char* argv[])
     using Jacobian = Dune::FieldMatrix<double,1,2>;
     using SignatureTag = Dune::Functions::SignatureTag<Range(Domain)>;
 
-    auto f = [](const auto& x) {
-      return x[0]*x[0] + x[1]*x[1];
+    auto f = [](const auto& x) -> Range {
+      return Range(x[0]*x[0] + x[1]*x[1]);
     };
-    auto df = [](const auto& x) {
+    auto df = [](const auto& x) -> Jacobian {
       return Jacobian({{2*x[0],2*x[1]}});
     };
     auto ff = Dune::Functions::makeDifferentiableFunctionFromCallables(SignatureTag(), f, df);

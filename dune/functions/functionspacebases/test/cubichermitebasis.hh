@@ -104,9 +104,9 @@ class CubicHermiteLocalBasis
       const auto& J = elementJacobian_;
       out.resize(refValues.size());
       out[0][0] = refValues[0];
-      out[1][0] = J*refValues[1] / (*localSubEntityMeshSize_)[1];
+      out[1][0] = J[0][0]*refValues[1] / (*localSubEntityMeshSize_)[1];
       out[2][0] = refValues[2];
-      out[3][0] = J*refValues[3] / (*localSubEntityMeshSize_)[1];;
+      out[3][0] = J[0][0]*refValues[3] / (*localSubEntityMeshSize_)[1];;
     }
     if constexpr (dim==2)
     {
@@ -253,6 +253,7 @@ class CubicHermiteLocalInterpolation
 {
   using ElementJacobianInverse = Dune::FieldMatrix<DF, dim,dim>;
   using LocalSubEntityMeshSize = std::vector<double>;
+  using Domain = Dune::FieldVector<DF, dim>;
 
 public:
 
@@ -261,42 +262,60 @@ public:
     localSubEntityMeshSize_ = &localSubEntityMeshSize;
   }
 
+private:
+
+  template<typename C, typename F>
+    requires requires(F f, Domain x) { { f(x) } -> std::convertible_to<C>; }
+  static decltype(auto) evaluate (const F& f, const Domain& x)
+  {
+    return f(x);
+  }
+
+  template<typename C, typename F>
+    requires requires(F f, Domain x) { { f(x)[0] } -> std::convertible_to<C>; }
+  static decltype(auto) evaluate (const F& f, const Domain& x)
+  {
+    return f(x)[0];
+  }
+
+public:
+
   template<class F, class C>
   void interpolate(const F& f, std::vector<C>& out) const
   {
-    using Domain = Dune::FieldVector<DF, dim>;
     auto&& df = derivative(f);
     if constexpr (dim==1)
     {
       out.resize(4);
-      out[0] = f(0);
-      out[1] = df(0) * (*localSubEntityMeshSize_)[1];
-      out[2] = f(1);
-      out[3] = df(1) * (*localSubEntityMeshSize_)[3];
+      out[0] = evaluate<C>(f,Domain(0));
+      out[1] = df(Domain(0))[0][0] * (*localSubEntityMeshSize_)[1];
+      out[2] = evaluate<C>(f,Domain(1));
+      out[3] = df(Domain(1))[0][0] * (*localSubEntityMeshSize_)[3];
     }
     if constexpr (dim==2)
     {
       if constexpr (not reduced)
       {
         out.resize(10);
-        out[9] = f(Domain({1.0/3.0,1.0/3.0}));
+        out[9] = evaluate<C>(f,Domain({1.0/3.0,1.0/3.0}));
       }
       if constexpr (reduced)
         out.resize(9);
       auto J0 = df(Domain({0,0}));
       auto J1 = df(Domain({1,0}));
       auto J2 = df(Domain({0,1}));
-      out[0] = f(Domain({0,0}));
+      out[0] = evaluate<C>(f,Domain({0,0}));
       out[1] = J0[0][0] * (*localSubEntityMeshSize_)[1];
       out[2] = J0[0][1] * (*localSubEntityMeshSize_)[2];
-      out[3] = f(Domain({1,0}));
+      out[3] = evaluate<C>(f,Domain({1,0}));
       out[4] = J1[0][0] * (*localSubEntityMeshSize_)[4];
       out[5] = J1[0][1] * (*localSubEntityMeshSize_)[5];
-      out[6] = f(Domain({0,1}));
+      out[6] = evaluate<C>(f,Domain({0,1}));
       out[7] = J2[0][0] * (*localSubEntityMeshSize_)[7];
       out[8] = J2[0][1] * (*localSubEntityMeshSize_)[8];
     }
   }
+
 private:
   const LocalSubEntityMeshSize* localSubEntityMeshSize_;
 };

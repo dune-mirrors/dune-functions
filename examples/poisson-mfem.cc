@@ -139,7 +139,7 @@ void getLocalMatrix(const LocalView& localView,
         size_t pressureIndex = localView.tree().child(_1).localIndex(j);
 
         // Pre-compute matrix contribution
-        double tmp = (fluxDivergence[i] * pressureValues[j]) * quadPoint.weight() * integrationElement;
+        double tmp = (fluxDivergence[i] * pressureValues[j][0]) * quadPoint.weight() * integrationElement;
 
         elementMatrix[fluxIndex][pressureIndex] += tmp;
         elementMatrix[pressureIndex][fluxIndex] += tmp;
@@ -150,9 +150,9 @@ void getLocalMatrix(const LocalView& localView,
 
 
 // Compute the source term for a single element
-template <class LocalView, class LocalVolumeTerm>
+template <class LocalView, class VectorType, class LocalVolumeTerm>
 void getVolumeTerm( const LocalView& localView,
-                    BlockVector<FieldVector<double,1> >& localRhs,
+                    VectorType& localRhs,
                     LocalVolumeTerm&& localVolumeTerm)
 {
   // Get the grid element from the local FE basis view
@@ -195,7 +195,7 @@ void getVolumeTerm( const LocalView& localView,
     for (size_t j=0; j<pressureLocalFiniteElement.size(); j++)
     {
       size_t pressureIndex = localView.tree().child(_1).localIndex(j);
-      localRhs[pressureIndex] += - pressureValues[j] * functionValue * quadPoint.weight() * integrationElement;
+      localRhs[pressureIndex] += - pressureValues[j][0] * functionValue * quadPoint.weight() * integrationElement;
     }
   }
 }
@@ -268,7 +268,7 @@ void assembleMixedPoissonMatrix(const Basis& basis,
 
     // Now let's get the element stiffness matrix
     // A dense matrix is used for the element stiffness matrix
-    Matrix<FieldMatrix<double,1,1> > elementMatrix;
+    Matrix<double> elementMatrix;
     getLocalMatrix(localView, elementMatrix);
 
     // Add element stiffness matrix onto the global stiffness matrix
@@ -315,7 +315,7 @@ void assembleMixedPoissonRhs(const Basis& basis,
     localView.bind(element);
 
     // Now get the local contribution to the right-hand side vector
-    BlockVector<FieldVector<double,1> > localRhs;
+    BlockVector<double> localRhs;
     localVolumeTerm.bind(element);
     getVolumeTerm(localView, localRhs, localVolumeTerm);
 

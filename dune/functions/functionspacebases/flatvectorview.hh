@@ -29,30 +29,20 @@ struct FlatVectorBackend
 {
 
   template<class VV, class Index>
-    requires Concept::HasIndexAccess<VV, Index>
   static decltype(auto) getEntry(VV&& v, const Index& i)
   {
-    return v[i];
-  }
-
-  template<class VV, class Index>
-    requires (not Concept::HasIndexAccess<VV, Index>)
-  static decltype(auto) getEntry(VV&& v, const Index&)
-  {
-    return std::forward<VV>(v);
+    if constexpr(Concept::HasIndexAccess<VV, Index>)
+      return v[i];
+    else
+      return std::forward<VV>(v);
   }
 
   template<class VV>
-    requires Concept::HasSizeMethod<VV>
   static auto size(const VV& v)
   {
-    return Dune::Hybrid::size(v);
-  }
-
-  template<class VV>
-    requires (not Concept::HasSizeMethod<VV>)
-  static auto size(const VV&)
-  {
+    if constexpr (Concept::HasSizeMethod<VV>)
+      return Dune::Hybrid::size(v);
+    else
     return Dune::index_constant<1>{};
   }
 };

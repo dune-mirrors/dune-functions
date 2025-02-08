@@ -76,16 +76,6 @@ concept PowerBasisNode = N::isPower && BasisNode<N>;
 template<class N, class GridView>
 concept CompositeBasisNode = N::isComposite && BasisNode<N>;
 
-// Concept for a DynamicPowerBasisNode in a local ansatz tree
-template<class GridView>
-struct DynamicPowerBasisNode : Refines<BasisNode>
-{
-  template<class N>
-  auto require(const N& node) -> decltype(
-    requireBaseOf<Dune::Functions::DynamicPowerBasisNode<typename N::ChildType>, N>(),
-    requireConcept<BasisTree<GridView>, typename N::ChildType>()
-  );
-};
 
 namespace Impl {
 

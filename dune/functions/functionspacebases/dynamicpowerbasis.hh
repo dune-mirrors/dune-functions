@@ -44,6 +44,7 @@ namespace Functions {
  * \tparam SPB  The child pre-basis
  */
 template<class IMS, class SPB>
+  requires Concept::PreBasis<SPB>
 class DynamicPowerPreBasis
 {
   static const bool isBlocked = std::is_same_v<IMS,BasisFactory::BlockedLexicographic> or std::is_same_v<IMS,BasisFactory::BlockedInterleaved>;
@@ -75,14 +76,12 @@ public:
    * The child factories will be stored as copies
    */
   template<class... SFArgs,
-    disableCopyMove<DynamicPowerPreBasis, SFArgs...> = 0,
-    enableIfConstructible<SubPreBasis, SFArgs...> = 0>
-  explicit DynamicPowerPreBasis(std::size_t c, SFArgs&&... sfArgs) :
-    children_(c),
-    subPreBasis_(std::forward<SFArgs>(sfArgs)...)
-  {
-    static_assert(models<Concept::PreBasis<GridView>, SubPreBasis>(), "Subprebasis passed to DynamicPowerPreBasis does not model the PreBasis concept.");
-  }
+    disableCopyMove<DynamicPowerPreBasis, SFArgs...> = 0>
+  explicit DynamicPowerPreBasis(std::size_t c, SFArgs&&... sfArgs)
+        requires std::constructible_from<SubPreBasis, SFArgs...>
+    : children_(c)
+    , subPreBasis_(std::forward<SFArgs>(sfArgs)...)
+  {}
 
   //! Initialize the global indices
   void initializeIndices()

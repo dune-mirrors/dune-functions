@@ -28,12 +28,12 @@ namespace Imp {
 namespace Concept {
 
 template<class C, class size_type>
-concept HasDynamicIndexAccess = requires(C&& c, size_type idx) {
+concept HasDynamicIndexAccess = requires(C c, size_type idx) {
   c[idx];
 };
 
 template<class C>
-concept HasStaticIndexAccess = requires(C&& c) {
+concept HasStaticIndexAccess = requires(C c) {
   c[Dune::Indices::_0];
 };
 
@@ -81,7 +81,7 @@ auto hybridIndexAccess(C&& c, const I& i, F&& f)
  * \param f A functor to call with the result of operator[]
  */
 template<class C, class I, class F>
-  requires (not Imp::Concept::HasDynamicIndexAccess<C,I>)
+  // requires (not Imp::Concept::HasDynamicIndexAccess<C,I>)
 decltype(auto) hybridIndexAccess(C&& c, const I& i, F&& f)
 {
   using Size = decltype(Hybrid::size(c));

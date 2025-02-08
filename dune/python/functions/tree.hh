@@ -103,13 +103,13 @@ struct hasFiniteElement<Tree, void_t<typename Tree::FiniteElement>>
   : std::true_type
 {};
 
-template< typename Tree > requires !hasFiniteElement<Tree>::value
+template< typename Tree > requires (!hasFiniteElement<Tree>::value)
 void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree> >&)
 {
   /* Nothing. */
 }
 
-template< typename Tree > requires hasFiniteElement<Tree>::value
+template< typename Tree > requires (hasFiniteElement<Tree>::value)
 void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree> >& cls)
 {
   // this should probably be fixed in dune-localfunctions

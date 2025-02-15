@@ -14,6 +14,7 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/common/promotiontraits.hh>
 #include <dune/common/typetraits.hh>
+#include <dune/common/concepts/number.hh>
 
 namespace Dune {
 namespace Functions {
@@ -53,8 +54,7 @@ struct DefaultDerivativeTraits
  *
  * Specialization for Signature = double(double)
  */
-template<typename K1, typename K2>
-  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+template<Dune::Concept::Number K1, Dune::Concept::Number K2>
 struct DefaultDerivativeTraits< K1(K2) >
 {
   //! \copydoc DefaultDerivativeTraits::Range
@@ -71,8 +71,7 @@ struct DefaultDerivativeTraits< K1(K2) >
  *
  * Specialization for Signature = K(FieldVector<K,n>)
  */
-template<typename K1, typename K2, int n>
-  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+template<Dune::Concept::Number K1, Dune::Concept::Number K2, int n>
 struct DefaultDerivativeTraits<K1(FieldVector<K2,n>)>
 {
   //! \copydoc DefaultDerivativeTraits::Range
@@ -89,8 +88,7 @@ struct DefaultDerivativeTraits<K1(FieldVector<K2,n>)>
  *
  * Specialization for Signature = FieldVector<K,m>(FieldVector<K,n>)
  */
-template<typename K1, typename K2, int n, int m>
-  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+template<Dune::Concept::Number K1, Dune::Concept::Number K2, int n, int m>
 struct DefaultDerivativeTraits<FieldVector<K1,m>(FieldVector<K2,n>)>
 {
   //! \copydoc DefaultDerivativeTraits::Range
@@ -107,8 +105,7 @@ struct DefaultDerivativeTraits<FieldVector<K1,m>(FieldVector<K2,n>)>
  *
  * Specialization for Signature = FieldMatrix<K,1,m>(FieldVector<K,n>)
  */
-template<typename K1, typename K2, int n, int m>
-  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+template<Dune::Concept::Number K1, Dune::Concept::Number K2, int n, int m>
 struct DefaultDerivativeTraits<FieldMatrix<K1,1,m>(FieldVector<K2,n>)>
 {
   //! \copydoc DefaultDerivativeTraits::Range

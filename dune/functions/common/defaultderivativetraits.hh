@@ -12,6 +12,8 @@
 
 #include <dune/common/fvector.hh>
 #include <dune/common/fmatrix.hh>
+#include <dune/common/promotiontraits.hh>
+#include <dune/common/typetraits.hh>
 
 namespace Dune {
 namespace Functions {
@@ -51,11 +53,13 @@ struct DefaultDerivativeTraits
  *
  * Specialization for Signature = double(double)
  */
-template<>
-struct DefaultDerivativeTraits< double(double) >
+template<typename K1, typename K2>
+  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+struct DefaultDerivativeTraits< K1(K2) >
 {
   //! \copydoc DefaultDerivativeTraits::Range
-  typedef double Range;
+  typedef typename Dune::PromotionTraits<K1, K2>::PromotedType K;
+  typedef K Range;
 };
 
 /**
@@ -67,10 +71,12 @@ struct DefaultDerivativeTraits< double(double) >
  *
  * Specialization for Signature = K(FieldVector<K,n>)
  */
-template<typename K, int n>
-struct DefaultDerivativeTraits<K(FieldVector<K,n>)>
+template<typename K1, typename K2, int n>
+  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+struct DefaultDerivativeTraits<K1(FieldVector<K2,n>)>
 {
   //! \copydoc DefaultDerivativeTraits::Range
+  typedef typename Dune::PromotionTraits<K1, K2>::PromotedType K;
   typedef FieldVector<K,n> Range;
 };
 
@@ -83,10 +89,12 @@ struct DefaultDerivativeTraits<K(FieldVector<K,n>)>
  *
  * Specialization for Signature = FieldVector<K,m>(FieldVector<K,n>)
  */
-template<typename K, int n, int m>
-struct DefaultDerivativeTraits<FieldVector<K,m>(FieldVector<K,n>)>
+template<typename K1, typename K2, int n, int m>
+  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+struct DefaultDerivativeTraits<FieldVector<K1,m>(FieldVector<K2,n>)>
 {
   //! \copydoc DefaultDerivativeTraits::Range
+  typedef typename Dune::PromotionTraits<K1, K2>::PromotedType K;
   typedef FieldMatrix<K,m,n> Range;
 };
 
@@ -99,10 +107,12 @@ struct DefaultDerivativeTraits<FieldVector<K,m>(FieldVector<K,n>)>
  *
  * Specialization for Signature = FieldMatrix<K,1,m>(FieldVector<K,n>)
  */
-template<typename K, int n, int m>
-struct DefaultDerivativeTraits<FieldMatrix<K,1,m>(FieldVector<K,n>)>
+template<typename K1, typename K2, int n, int m>
+  requires (Dune::IsNumber<K1>::value && Dune::IsNumber<K2>::value)
+struct DefaultDerivativeTraits<FieldMatrix<K1,1,m>(FieldVector<K2,n>)>
 {
   //! \copydoc DefaultDerivativeTraits::Range
+  typedef typename Dune::PromotionTraits<K1, K2>::PromotedType K;
   typedef FieldMatrix<K,m,n> Range;
 };
 

@@ -10,9 +10,13 @@
 #include <type_traits>
 #include <dune/common/exceptions.hh>
 
+#include <dune/geometry/type.hh>
+
 #include <dune/localfunctions/lagrange.hh>
 #include <dune/localfunctions/lagrange/equidistantpoints.hh>
 #include <dune/localfunctions/lagrange/lagrangelfecache.hh>
+
+#include <dune/grid/common/mcmgmapper.hh>
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
@@ -67,6 +71,194 @@ class LagrangePreBasis :
   static const int dim = GV::dimension;
   static const bool useDynamicOrder = (k<0);
 
+  static Dune::MCMGLayout dofLayout(unsigned int order)
+  {
+    return [order](Dune::GeometryType type, int dim) -> std::size_t {
+      if (order==0)
+        return type.dim() == dim;
+      if (type.isSimplex())
+        return Dune::binomial(order-1, type.dim());
+      if (type.isCube())
+        return Dune::power(order-1, type.dim());
+      if (type.isPyramid() and (order>2))
+        return (order-2)*(order-1)*(2*order-3)/6;
+      if (type.isPrism() and (order>1))
+        return (order-1)*(order-1)*(order-2)/2;
+      return 0;
+    };
+  }
+
+  // The following methods compute orientations of line/triangle/quadrilateral
+  // in the following sense: Given a range of global indices (or IDs) of the vertices
+  // the computed orientation is a number that indicates how the geometry has
+  // to be reoriented to match the reference orientation.
+  //
+  // For a 1d line this is a simple bit indicating if it has to be flipped
+  // corresponding to a reflection along the x-axis.
+  // For a 2d triangle/quadrilateral the bits indicate the refelctions needed
+  // to get the desired orientation:
+  // Bit 0: Reflect along the x-axis
+  // Bit 1: Reflect along the y-axis
+  // Bit 2: Reflect across the diagonal
+  // Notice that the order of these operations does matter and they
+  // have to be executed in order with the significance of the bit.
+
+  template<class VertexIndices>
+  auto computeLineOrientation(const VertexIndices& vertexIndices) const
+  {
+    return vertexIndices[0] > vertexIndices[1];
+  }
+
+  template<class VertexIndices>
+  auto computeTriangleOrientation(const VertexIndices& vertexIndices) const
+  {
+    auto flipVertices = std::bitset<3>();
+    flipVertices[0] = vertexIndices[0] > vertexIndices[1];
+    if (flipVertices[0])
+    {
+      flipVertices[1] = vertexIndices[1] > vertexIndices[2];
+      flipVertices[2] = vertexIndices[0] > vertexIndices[2];
+    }
+    else
+    {
+      flipVertices[1] = vertexIndices[0] > vertexIndices[2];
+      flipVertices[2] = vertexIndices[1] > vertexIndices[2];
+    }
+    return flipVertices.to_ulong();
+  }
+
+  template<class VertexIndices>
+  auto computeQuadrilateralOrientation(const VertexIndices& vertexIndices) const
+  {
+    std::size_t i_min = 0;
+    for(auto i: Dune::range(1, 4))
+      if (vertexIndices[i] < vertexIndices[i_min])
+        i_min = i;
+    auto flipVertices = std::bitset<3>(i_min);
+    if (i_min==0)
+      flipVertices[2] = vertexIndices[1] > vertexIndices[2];
+    else if (i_min==1)
+      flipVertices[2] = vertexIndices[0] > vertexIndices[3];
+    else if (i_min==2)
+      flipVertices[2] = vertexIndices[0] < vertexIndices[3];
+    else if (i_min==3)
+      flipVertices[2] = vertexIndices[1] < vertexIndices[2];
+    return flipVertices.to_ulong();
+  }
+
+  // The following methods flip DOFs indices according to the orientation
+  // as computed by the preceding methods. For a line we simple need
+  // to reverse the order-1 DOFs. For triangle/quadrilateral we us
+  // precomputed tables.
+  //
+  // Given a point p in the subentity identified by its local index i
+  // wrt the reference element orientation, these methods compute the
+  // local index j of this point with respect to the global orientation.
+  // To find j we can apply the global to local transformation to p.
+  // Then the local index of the obtained point wrt the reference element
+  // orientation is j.
+  auto flipLineDOF(auto index, auto orientation) const
+  {
+    if (orientation==1)
+      index = order()-2-index;
+    return index;
+  }
+
+  auto flipTriangleDOF(auto index, auto orientation) const
+  {
+    return triangleFlipTable_[orientation][index];
+  }
+
+  auto flipQuadrilateralDOF(auto index, auto orientation) const
+  {
+    return quadrilateralFlipTable_[orientation][index];
+  }
+
+  // The following methods compute flip tables for DOFs associated to a triangle/quadrilateral.
+  // Given an orientation as computed by the preceding methods, the corresponding row of
+  // the table gives the renumbering of the DOFs associated with the subentity such
+  // that the orientation matches with the global indices and is thus unique.
+
+  static auto computeTriangleFlipTable(int order)
+  {
+    auto flipTable = std::array<std::vector<std::size_t>, 8>();
+    if (order<3)
+      return flipTable;
+    // Number of DOFs on the base line
+    std::size_t m = order-2;
+    // Total number of DOFs
+    std::size_t n = m*(m+1)/2;
+    // In order to reflect we need to flip pairs of vertices.
+    // To do this we first map flat DOF indices to barycentric
+    // multi-indices wrt. the vertices and summing up to m-1.
+    // Then the DOF reorientation of a vertex flip simply
+    // requires to flip the corresponding components of the
+    // barycentric multi-index.
+    using BarycentricIndex = std::array<std::size_t, 3>;
+    auto barycentricIndices = std::vector<BarycentricIndex>();
+    for(auto i : Dune::range(m))
+      for(auto j : Dune::range(m-i))
+        barycentricIndices.push_back(BarycentricIndex{m-1-(i+j), j, i});
+    auto flatToBarycentric = [&](auto i) { return barycentricIndices[i]; };
+    auto barycentricToFlat = [&](auto b) { return b[1] + m*b[2] - b[2]*(b[2]-1)/2; };
+    // Loop of all 8 orinetations
+    for(auto j : Dune::range(8))
+    {
+      flipTable[j].resize(n);
+      for(auto i : Dune::range(n))
+      {
+        auto b = flatToBarycentric(i);
+        // Bit 0: Reflect along x-axis -> flip vertex 0 and 1
+        if (j & (1 << 0))
+          std::swap(b[0], b[1]);
+        // Bit 1: Reflect along y-axis -> flip vertex 0 and 2
+        if (j & (1 << 1))
+          std::swap(b[0], b[2]);
+        // Bit 2: Reflect across diagonal -> flip vertex 1 and 2
+        if (j & (1 << 2))
+          std::swap(b[1], b[2]);
+        flipTable[j][i] = barycentricToFlat(b);
+      }
+    }
+    return flipTable;
+  }
+
+  static auto computeQuadrilateralFlipTable(int order)
+  {
+    auto flipTable = std::array<std::vector<std::size_t>, 8>();
+    if (order<2)
+      return flipTable;
+    // Number of DOFs on the base line
+    std::size_t m = order-1;
+    // Total number of DOFs
+    std::size_t n = m*m;
+    // In order to reflect we map the flat DOF index into a cartesian
+    // multi-index wrt. the x- and y-axis.
+    using CartesianIndex = std::array<std::size_t, 3>;
+    auto flatToCartesian = [&](auto i) { return CartesianIndex{i % m, i / m}; };
+    auto cartesianToFlat = [&](auto c) { return c[0] + m*c[1]; };
+    for(auto j : Dune::range(8))
+    {
+      flipTable[j].resize(n);
+      for(auto i : Dune::range(n))
+      {
+        auto c = flatToCartesian(i);
+        // Bit 0: Reflect along x-axis -> reverse x-index
+        if (j & (1 << 0))
+          c[0] = m-1-c[0];
+        // Bit 1: Reflect along y-axis -> reverse y-index
+        if (j & (1 << 1))
+          c[1] = m-1-c[1];
+        // Bit 2: Reflect across diagonal -> flip x- and y-index
+        if (j & (1 << 2))
+          std::swap(c[0], c[1]);
+        flipTable[j][i] = cartesianToFlat(c);
+      }
+    }
+    return flipTable;
+  }
+
+
 public:
 
   //! The grid view that the FE basis is defined on
@@ -86,41 +278,17 @@ public:
   //! Constructor for a given grid view object and run-time order
   LagrangePreBasis(const GridView& gv, unsigned int order) :
     gridView_(gv), order_(order)
+    , mapper_(gridView_, dofLayout(useDynamicOrder ? order : k))
   {
     if (!useDynamicOrder && order!=std::numeric_limits<unsigned int>::max())
       DUNE_THROW(RangeError, "Template argument k has to be -1 when supplying a run-time order!");
-
-    for (int i=0; i<=dim; i++)
-    {
-      dofsPerCube_[i] = computeDofsPerCube(i);
-      dofsPerSimplex_[i] = computeDofsPerSimplex(i);
-    }
-    dofsPerPrism_ = computeDofsPerPrism();
-    dofsPerPyramid_ = computeDofsPerPyramid();
   }
 
   //! Initialize the global indices
   void initializeIndices()
   {
-    vertexOffset_        = 0;
-    edgeOffset_            = vertexOffset_          + dofsPerCube(0) * ((size_type)gridView_.size(dim));
-
-    if (dim>=2)
-    {
-      triangleOffset_      = edgeOffset_            + dofsPerCube(1) * ((size_type) gridView_.size(dim-1));
-
-      quadrilateralOffset_ = triangleOffset_        + dofsPerSimplex(2) * ((size_type)gridView_.size(Dune::GeometryTypes::triangle));
-    }
-
-    if (dim==3) {
-      tetrahedronOffset_   = quadrilateralOffset_ + dofsPerCube(2) * ((size_type)gridView_.size(Dune::GeometryTypes::quadrilateral));
-
-      prismOffset_         = tetrahedronOffset_   +   dofsPerSimplex(3) * ((size_type)gridView_.size(Dune::GeometryTypes::tetrahedron));
-
-      hexahedronOffset_    = prismOffset_         +   dofsPerPrism() * ((size_type)gridView_.size(Dune::GeometryTypes::prism));
-
-      pyramidOffset_       = hexahedronOffset_    +   dofsPerCube(3) * ((size_type)gridView_.size(Dune::GeometryTypes::hexahedron));
-    }
+    triangleFlipTable_ = computeTriangleFlipTable(order());
+    quadrilateralFlipTable_ = computeQuadrilateralFlipTable(order());
   }
 
   //! Obtain the grid view that the basis is defined on
@@ -133,6 +301,7 @@ public:
   void update (const GridView& gv)
   {
     gridView_ = gv;
+    mapper_.update(gridView_);
   }
 
   /**
@@ -146,31 +315,7 @@ public:
   //! Get the total dimension of the space spanned by this basis
   size_type dimension() const
   {
-    switch (dim)
-    {
-      case 1:
-        return dofsPerCube(0) * ((size_type)gridView_.size(dim))
-          + dofsPerCube(1) * ((size_type)gridView_.size(dim-1));
-      case 2:
-      {
-        return dofsPerCube(0) * ((size_type)gridView_.size(dim))
-          + dofsPerCube(1) * ((size_type)gridView_.size(dim-1))
-          + dofsPerSimplex(2) * ((size_type)gridView_.size(Dune::GeometryTypes::triangle))
-          + dofsPerCube(2) * ((size_type)gridView_.size(Dune::GeometryTypes::quadrilateral));
-      }
-      case 3:
-      {
-        return dofsPerCube(0) * ((size_type)gridView_.size(dim))
-          + dofsPerCube(1) * ((size_type)gridView_.size(dim-1))
-          + dofsPerSimplex(2) * ((size_type)gridView_.size(Dune::GeometryTypes::triangle))
-          + dofsPerCube(2) * ((size_type)gridView_.size(Dune::GeometryTypes::quadrilateral))
-          + dofsPerSimplex(3) * ((size_type)gridView_.size(Dune::GeometryTypes::tetrahedron))
-          + dofsPerPyramid() * ((size_type)gridView_.size(Dune::GeometryTypes::pyramid))
-          + dofsPerPrism() * ((size_type)gridView_.size(Dune::GeometryTypes::prism))
-          + dofsPerCube(3) * ((size_type)gridView_.size(Dune::GeometryTypes::hexahedron));
-      }
-    }
-    DUNE_THROW(Dune::NotImplemented, "No size method for " << dim << "d grids available yet!");
+    return mapper_.size();
   }
 
   //! Get the maximal number of DOFs associated to node for any element
@@ -181,120 +326,89 @@ public:
     return power(order()+1, (unsigned int)GV::dimension);
   }
 
-  template<typename It>
+//  auto computeFaceOrientations(const typename Node::Element& element) const
+//  {
+//    const auto& indexSet = gridView().indexSet();
+//    const auto& re = Dune::referenceElement<double,dim>(element.type());
+
+//    auto globalVertexIndicesOfFace = [&](auto faceIndex, auto faceCodim) {
+//      return Dune::transformedRangeView(re.subEntities(faceIndex, faceCodim, dim), [&](auto localVertexIndex) {
+//        return indexSet.subIndex(element, localVertexIndex, dim);
+//      });
+//    };
+
+//    if constexpr (dim==2)
+//    {
+//      auto orientations = std::array<std::array<std::size_t, 6>, 1>();
+//      for(auto i : Dune::range(re.size(1)))
+//      {
+//          orientations[0][i] = computeLineOrientation(globalVertexIndicesOfFace(i, 1));
+//      }
+//      return orientations;
+//    }
+//    if constexpr (dim==3)
+//    {
+//      auto orientations = std::array<std::array<std::size_t, 6>, 1>();
+//      for(auto i : Dune::range(re.size(1)))
+//      {
+//        if (re.type(i, 1).isTriangle())
+//          orientations[i] = computeTriangleOrientation(globalVertexIndicesOfFace(i, 1));
+//      }
+//      return orientations;
+//    }
+//  }
+
+  template<class Node, class It>
   It indices(const Node& node, It it) const
   {
-    for (size_type i = 0, end = node.finiteElement().size() ; i < end ; ++it, ++i)
+    const auto& element = node.element();
+    const auto& localCoefficients = node.finiteElement().localCoefficients();
+    const auto& indexSet = gridView().indexSet();
+    const auto& re = Dune::referenceElement<double,dim>(element.type());
+    auto globalVertexIndicesOfFace = [&](auto faceIndex, auto faceCodim) {
+      return Dune::transformedRangeView(re.subEntities(faceIndex, faceCodim, dim), [&](auto localVertexIndex) {
+        return indexSet.subIndex(element, localVertexIndex, dim);
+      });
+    };
+
+    // Instead of computing the orientation of the subentity for each
+    // affected DOF, we may want to precompute them once per subentity
+    // in advance
+//    auto faceOrientations = computeFaceOrientations(node.element());
+
+    for(auto localIndex : Dune::range(localCoefficients.size()))
     {
-      Dune::LocalKey localKey = node.finiteElement().localCoefficients().localKey(i);
-      const auto& gridIndexSet = gridView().indexSet();
-      const auto& element = node.element();
-
-      // The dimension of the entity that the current dof is related to
-      auto dofDim = dim - localKey.codim();
-
-      // Test for a vertex dof
-      // The test for k==1 is redundant, but having it here allows the compiler to conclude
-      // at compile-time that the dofDim==0 case is the only one that will ever happen.
-      // This leads to measurable speed-up: see
-      //   https://gitlab.dune-project.org/staging/dune-functions/issues/30
-      if (k==1 || dofDim==0) {
-        *it = {{ (size_type)(gridIndexSet.subIndex(element,localKey.subEntity(),dim)) }};
-        continue;
+      auto localKey = localCoefficients.localKey(localIndex);
+      auto globalBaseIndex = mapper_.subIndex(element, localKey.subEntity(), localKey.codim());
+      auto globalIndex = globalBaseIndex + localKey.index();
+      if constexpr(dim == 2)
+      {
+        if ((localKey.codim() == 1) and (order()>2))
+        {
+          auto orientation = computeLineOrientation(globalVertexIndicesOfFace(localKey.subEntity(), localKey.codim()));
+          globalIndex = globalBaseIndex + flipLineDOF(localKey.index(), orientation);
+        }
       }
-
-      if (dofDim==1)
-        {  // edge dof
-          if (dim==1)  // element dof -- any local numbering is fine
-            {
-              *it = {{ edgeOffset_
-                       + dofsPerCube(1) * ((size_type)gridIndexSet.subIndex(element,0,0))
-                       + localKey.index() }};
-              continue;
-            }
-          else
-            {
-              const auto refElement
-                = Dune::referenceElement<double,dim>(element.type());
-
-              // We have to reverse the numbering if the local element edge is
-              // not aligned with the global edge.
-              auto v0 = (size_type)gridIndexSet.subIndex(element,refElement.subEntity(localKey.subEntity(),localKey.codim(),0,dim),dim);
-              auto v1 = (size_type)gridIndexSet.subIndex(element,refElement.subEntity(localKey.subEntity(),localKey.codim(),1,dim),dim);
-              bool flip = (v0 > v1);
-              *it = {{ (flip)
-                       ? edgeOffset_
-                       + dofsPerCube(1)*((size_type)gridIndexSet.subIndex(element,localKey.subEntity(),localKey.codim()))
-                       + (dofsPerCube(1)-1)-localKey.index()
-                       : edgeOffset_
-                       + dofsPerCube(1)*((size_type)gridIndexSet.subIndex(element,localKey.subEntity(),localKey.codim()))
-                       + localKey.index() }};
-              continue;
-            }
-        }
-
-      if (dofDim==2)
+      if constexpr(dim == 3)
+      {
+        if ((localKey.codim() == 2) and (order()>2))
         {
-          if (dim==2)   // element dof -- any local numbering is fine
-            {
-              if (element.type().isTriangle())
-                {
-                  *it = {{ triangleOffset_ + dofsPerSimplex(2)*((size_type)gridIndexSet.subIndex(element,0,0)) + localKey.index() }};
-                  continue;
-                }
-              else if (element.type().isQuadrilateral())
-                {
-                  *it = {{ quadrilateralOffset_ + dofsPerCube(2)*((size_type)gridIndexSet.subIndex(element,0,0)) + localKey.index() }};
-                  continue;
-                }
-              else
-                DUNE_THROW(Dune::NotImplemented, "2d elements have to be triangles or quadrilaterals");
-            } else
-            {
-              const auto refElement
-                = Dune::referenceElement<double,dim>(element.type());
-
-              if (order()>3)
-                DUNE_THROW(Dune::NotImplemented, "LagrangeBasis for 3D grids is only implemented if k<=3");
-
-              if (order()==3 and !refElement.type(localKey.subEntity(), localKey.codim()).isTriangle())
-                DUNE_THROW(Dune::NotImplemented, "LagrangeBasis for 3D grids with k==3 is only implemented if the grid is a simplex grid");
-
-              *it = {{ triangleOffset_ + ((size_type)gridIndexSet.subIndex(element,localKey.subEntity(),localKey.codim())) }};
-              continue;
-            }
+          auto orientation = computeLineOrientation(globalVertexIndicesOfFace(localKey.subEntity(), localKey.codim()));
+          globalIndex = globalBaseIndex + flipLineDOF(localKey.index(), orientation);
         }
-
-      if (dofDim==3)
+        else if (re.type(localKey.subEntity(), localKey.codim()).isTriangle() and (order()>3))
         {
-          if (dim==3)   // element dof -- any local numbering is fine
-            {
-              if (element.type().isTetrahedron())
-                {
-                  *it = {{ tetrahedronOffset_ + dofsPerSimplex(3)*((size_type)gridIndexSet.subIndex(element,0,0)) + localKey.index() }};
-                  continue;
-                }
-              else if (element.type().isHexahedron())
-                {
-                  *it = {{ hexahedronOffset_ + dofsPerCube(3)*((size_type)gridIndexSet.subIndex(element,0,0)) + localKey.index() }};
-                  continue;
-                }
-              else if (element.type().isPrism())
-                {
-                  *it = {{ prismOffset_ + dofsPerPrism()*((size_type)gridIndexSet.subIndex(element,0,0)) + localKey.index() }};
-                  continue;
-                }
-              else if (element.type().isPyramid())
-                {
-                  *it = {{ pyramidOffset_ + dofsPerPyramid()*((size_type)gridIndexSet.subIndex(element,0,0)) + localKey.index() }};
-                  continue;
-                }
-              else
-                DUNE_THROW(Dune::NotImplemented, "3d elements have to be tetrahedra, hexahedra, prisms, or pyramids");
-            } else
-            DUNE_THROW(Dune::NotImplemented, "Grids of dimension larger than 3 are no supported");
+          auto orientation = computeTriangleOrientation(globalVertexIndicesOfFace(localKey.subEntity(), localKey.codim()));
+          globalIndex = globalBaseIndex + flipTriangleDOF(localKey.index(), orientation);
         }
-      DUNE_THROW(Dune::NotImplemented, "Grid contains elements not supported for the LagrangeBasis");
+        else if (re.type(localKey.subEntity(), localKey.codim()).isQuadrilateral() and (order()>2))
+        {
+          auto orientation = computeQuadrilateralOrientation(globalVertexIndicesOfFace(localKey.subEntity(), localKey.codim()));
+          globalIndex = globalBaseIndex + flipQuadrilateralDOF(localKey.index(), orientation);
+        }
+      }
+      *it = {{ (size_type)(globalIndex) }};
+      ++it;
     }
     return it;
   }
@@ -311,65 +425,9 @@ protected:
   // Run-time order, only valid if k<0
   unsigned int order_;
 
-  //! Number of degrees of freedom assigned to a simplex (without the ones assigned to its faces!)
-  size_type dofsPerSimplex(std::size_t simplexDim) const
-  {
-    return useDynamicOrder ? dofsPerSimplex_[simplexDim] : computeDofsPerSimplex(simplexDim);
-  }
-
-  //! Number of degrees of freedom assigned to a cube (without the ones assigned to its faces!)
-  size_type dofsPerCube(std::size_t cubeDim) const
-  {
-    return useDynamicOrder ? dofsPerCube_[cubeDim] : computeDofsPerCube(cubeDim);
-  }
-
-  size_type dofsPerPrism() const
-  {
-    return useDynamicOrder ? dofsPerPrism_ : computeDofsPerPrism();
-  }
-
-  size_type dofsPerPyramid() const
-  {
-    return useDynamicOrder ? dofsPerPyramid_ : computeDofsPerPyramid();
-  }
-
-  //! Number of degrees of freedom assigned to a simplex (without the ones assigned to its faces!)
-  size_type computeDofsPerSimplex(std::size_t simplexDim) const
-  {
-    return order() == 0 ? (dim == simplexDim ? 1 : 0) : Dune::binomial(std::size_t(order()-1),simplexDim);
-  }
-
-  //! Number of degrees of freedom assigned to a cube (without the ones assigned to its faces!)
-  size_type computeDofsPerCube(std::size_t cubeDim) const
-  {
-    return order() == 0 ? (dim == cubeDim ? 1 : 0) : Dune::power(order()-1, cubeDim);
-  }
-
-  size_type computeDofsPerPrism() const
-  {
-    return order() == 0 ? (dim == 3 ? 1 : 0) : (order()-1)*(order()-1)*(order()-2)/2;
-  }
-
-  size_type computeDofsPerPyramid() const
-  {
-    return order() == 0 ? (dim == 3 ? 1 : 0) : (order()-2)*(order()-1)*(2*order()-3)/6;
-  }
-
-  // When the order is given at run-time, the following numbers are pre-computed:
-  std::array<size_type,dim+1> dofsPerSimplex_;
-  std::array<size_type,dim+1> dofsPerCube_;
-  size_type dofsPerPrism_;
-  size_type dofsPerPyramid_;
-
-  size_type vertexOffset_;
-  size_type edgeOffset_;
-  size_type triangleOffset_;
-  size_type quadrilateralOffset_;
-  size_type tetrahedronOffset_;
-  size_type pyramidOffset_;
-  size_type prismOffset_;
-  size_type hexahedronOffset_;
-
+  Dune::MultipleCodimMultipleGeomTypeMapper<GridView> mapper_;
+  std::array<std::vector<std::size_t>, 8> triangleFlipTable_;
+  std::array<std::vector<std::size_t>, 8> quadrilateralFlipTable_;
 };
 
 

@@ -27,8 +27,8 @@
 #include <vector>
 
 #include <dune/common/classname.hh>
-#include<dune/common/fmatrix.hh>
-#include<dune/common/fvector.hh>
+#include <dune/common/fmatrix.hh>
+#include <dune/common/fvector.hh>
 #include <dune/common/transpose.hh>
 
 #include <dune/geometry/quadraturerules.hh>
@@ -58,9 +58,10 @@ public:
   static int constexpr dimRange = FE::Traits::LocalBasisType::Traits::dimRange;
 
   ShapeFunctionAsCallableWithDerivative(const FE &fe, int shapeFunction, Element const &element)
-      : fe_(fe), shapeFunction_(shapeFunction), e_(element)
-  {
-  }
+    : fe_(fe)
+    , shapeFunction_(shapeFunction)
+    , e_(element)
+  {}
 
   RangeType operator()(DomainType x) const
   {
@@ -80,10 +81,21 @@ public:
   Element const &e_;
 };
 
+// Test whether a Finite Element has an `evaluateHessian(...)` method and exports `HessianType`.
+template<class FE, class = void>
+struct hasEvaluateHessian{
+  static constexpr bool value = false;
+};
+
+template<class FE>
+struct hasEvaluateHessian<FE, std::void_t<decltype(std::declval<FE>().evaluateHessian(FE::Traits::LocalBasisType::Traits::DomainType, FE::Traits::LocalBasisType::Traits::HessianType))>>
+{
+  static constexpr bool value = true;
+};
+
 // The derivative of one shape function
 // implements Dune::Functions::DifferentiableFunction
-
-template <class FE, class Element>
+template<class FE, class Element>
 class ShapeFunctionDerivativeAsCallable : public ShapeFunctionAsCallableWithDerivative<FE, Element>
 {
 
@@ -105,28 +117,41 @@ public:
 
   auto friend derivative(ShapeFunctionDerivativeAsCallable const &t)
   {
-    // TODO provide an SFINAE protected version that uses hessian(...)
-    return [&t](typename Base::DomainType const &x)
-    {
-      std::array<Dune::FieldMatrix<typename Base::RangeFieldType, Base::dim, Base::dim>, Base::dimRange> referenceHessian, hessian;
-      std::vector<typename Base::ValueType> partials;
-      std::array<unsigned int, Base::dim> dir;
-      for (std::size_t i = 0; i < Base::dim; ++i)
-        for (std::size_t j = 0; j < Base::dim; ++j)
-        {
-          dir = {};
-          dir[i]++;
-          dir[j]++;
-          t.fe_.localBasis().partial(dir, x, partials);
-          for (std::size_t k = 0; k < Base::dimRange; ++k)
-            referenceHessian[k][i][j] = partials[t.shapeFunction_][k];
-        }
-      hessian = 0;
-      auto JIT = t.e_.geometry().jacobianInverseTransposed(x);
-      for (std::size_t k = 0; k < Base::dimRange; ++k)
-        hessian[k] = JIT * referenceHessian[k] * transpose(JIT);
-      return hessian;
-    };
+    if constexpr (hasEvaluateHessian<FE>::value){
+      return [t](typename Base::DomainType const& x){
+
+        std::array<typename FE::Traits::LocalBasisType::Traits::HessianType, Base::dimRange> hessian;
+        std::vector<typename FE::Traits::LocalBasisType::Traits::HessianType> referenceHessians;
+        t.fe_.localBasis().evaluateHessian(x, referenceHessians);
+        auto JIT = t.e_.geometry().jacobianInverseTransposed(x);
+        for (std::size_t k = 0; k < Base::dimRange; ++k)
+          hessian[k] = JIT * referenceHessians[k] * transpose(JIT);
+        return hessian;
+      };
+    }
+    else {
+      return [t](typename Base::DomainType const &x)
+      {
+        std::array<Dune::FieldMatrix<typename Base::RangeFieldType, Base::dim, Base::dim>, Base::dimRange> referenceHessian, hessian;
+        std::vector<typename Base::RangeType> partials;
+        std::array<unsigned int, Base::dim> dir;
+        for (std::size_t i = 0; i < Base::dim; ++i)
+          for (std::size_t j = 0; j < Base::dim; ++j)
+          {
+            dir = {};
+            dir[i]++;
+            dir[j]++;
+            t.fe_.localBasis().partial(dir, x, partials);
+            for (std::size_t k = 0; k < Base::dimRange; ++k)
+              referenceHessian[k][i][j] = partials[t.shapeFunction_][k];
+          }
+        hessian = 0;
+        auto JIT = t.e_.geometry().jacobianInverseTransposed(x);
+        for (std::size_t k = 0; k < Base::dimRange; ++k)
+          hessian[k] = JIT * referenceHessian[k] * transpose(JIT);
+        return hessian;
+      };
+    }
   }
 
 };
@@ -166,7 +191,8 @@ bool testLocalInterpolation(const FE &fe, Element const &element)
     // Check if interpolation weights are equal to coefficients
     for (std::size_t j = 0; j < coeff.size(); ++j)
     {
-      if (std::abs(coeff[j] - (i == j)) > TOL)
+      using std::abs;
+      if (abs(coeff[j] - (i == j)) > TOL)
       {
         std::cout << std::setprecision(16);
         std::cout << "Bug in LocalInterpolation for finite element type " << Dune::className(fe)
@@ -209,7 +235,6 @@ bool testCanRepresentDifferentiableConstants(const FE &fe, unsigned order = 5)
 {
   typedef typename FE::Traits::LocalBasisType LB;
   using RangeType = typename LB::Traits::RangeType;
-  // using JacobianType = typename LB::Traits::JacobianType;
   bool success = true;
 
   // Construct the constant '1' function
@@ -251,7 +276,7 @@ bool testCanRepresentDifferentiableConstants(const FE &fe, unsigned order = 5)
   return success;
 }
 
-/** \brief Call tests for given finite element on a Grid element element
+/** \brief Call tests for given finite element on a grid element
  *  \relates testFE
  * \param derivativePointSkip This is a small predicate class that allows to skip certain
  *   points when testing the derivative implementations.  It exists because some

@@ -28,7 +28,9 @@
 struct CheckBasisFlag {};
 struct AllowZeroBasisFunctions {};
 
-// Enable Checks that compare evaluateJacobian/partial methods up to order diffOrder with a finite Difference approximation, check duality, and representation of constants on each element in the gridView
+// Enable checks that compare evaluateJacobian/partial methods up to order diffOrder with a
+// finite difference approximation, check duality, and representation of constants on each
+// element in the gridView
 template<int i = 1>
 struct CheckLocalFiniteElementFlag
 {
@@ -251,7 +253,7 @@ Dune::TestSuite checkNonZeroShapeFunctions(const LocalFiniteElement& fe, std::si
 }
 
   /**
-   * Check that finite Element returned by localView fullfilles properties of Local Finite Element
+   * Check that finite element returned by localView fulfills properties of local finite element
    * This test corresponds to a dune-localfunctions test, but for a bound, i.e. possibly transformed, FE
    *  This is called by checkLocalView()
    */
@@ -311,19 +313,19 @@ Dune::TestSuite checkLocalView(const Basis& basis, const LocalView& localView, F
   {
     auto e = localView.element();
     Dune::TypeTree::forEachLeafNode(
-        localView.tree(), [&](const auto &node, auto &&treePath)
+        localView.tree(), [&](const auto &node, [[maybe_unused]] auto &&treePath)
         { test.subTest(checkLocalFiniteElement<0>(node.finiteElement(), e)); });
   } else if constexpr (IsContained<CheckLocalFiniteElementFlag<1>,
                               Flags...>::value) {
       auto e = localView.element();
       Dune::TypeTree::forEachLeafNode(
-          localView.tree(), [&](const auto &node, auto &&treePath)
+          localView.tree(), [&](const auto &node, [[maybe_unused]] auto &&treePath)
           { test.subTest(checkLocalFiniteElement<1>(node.finiteElement(), e)); });
   } else if constexpr (IsContained<CheckLocalFiniteElementFlag<2>,
                                     Flags...>::value) {
       auto e = localView.element();
       Dune::TypeTree::forEachLeafNode(
-          localView.tree(), [&](const auto &node, auto &&treePath)
+          localView.tree(), [&](const auto &node, [[maybe_unused]] auto &&treePath)
           { test.subTest(checkLocalFiniteElement<2>(node.finiteElement(), e)); });
   }
 

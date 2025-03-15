@@ -14,8 +14,7 @@
 #include <dune/common/bitsetvector.hh>
 #include <dune/common/referencehelper.hh>
 
-#include <dune/typetree/traversal.hh>
-
+//#include <dune/functions/common/traversal.hh>
 #include <dune/functions/gridfunctions/gridviewfunction.hh>
 #include <dune/functions/common/functionconcepts.hh>
 

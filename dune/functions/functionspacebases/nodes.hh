@@ -12,12 +12,12 @@
 
 #include <dune/common/indices.hh>
 
-#include <dune/typetree/leafnode.hh>
-#include <dune/typetree/powernode.hh>
-#include <dune/typetree/dynamicpowernode.hh>
-#include <dune/typetree/compositenode.hh>
-#include <dune/typetree/traversal.hh>
-#include <dune/typetree/visitor.hh>
+#include <dune/functions/common/leafnode.hh>
+#include <dune/functions/common/powernode.hh>
+#include <dune/functions/common/dynamicpowernode.hh>
+#include <dune/functions/common/compositenode.hh>
+#include <dune/functions/common/traversal.hh>
+#include <dune/functions/common/visitor.hh>
 
 namespace Dune {
   namespace Functions {

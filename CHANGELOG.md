@@ -10,6 +10,8 @@ corresponding version of the Dune core modules.
 
 # Master (will become release 2.11)
 
+- The `dune-functions` module does not depend on `dune-typetree` anymore.
+  All required code from `dune-typetree` is now stored in `dune-functions` itself.
 - The `LagrangeDG(Pre)Basis` supports selecting the polynomial order at runtime.
   Its static variables `LagrangeDGPreBasis::dofsPer.*` are deprecated.
 - Add function wrappers `CoarseFunctionOnFineGridView` and `FineFunctionOnCoarseGridView`

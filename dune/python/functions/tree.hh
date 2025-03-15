@@ -36,7 +36,6 @@ void registerTree_(pybind11::handle scope, const char* name = "Tree");
 template<typename Tree>
 void registerTreeCommon(pybind11::class_<Tree, std::shared_ptr<Tree>>& cls)
 {
-  /* dune-typetree properties */
   cls.def_property_readonly_static("isComposite", [](pybind11::object) { return Tree::isComposite; });
   cls.def_property_readonly_static("isLeaf", [](pybind11::object) { return Tree::isLeaf; });
   cls.def_property_readonly_static("isPower", [](pybind11::object) { return Tree::isPower; });

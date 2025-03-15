@@ -13,8 +13,8 @@
 
 #include <dune/functions/functionspacebases/concepts.hh>
 
-#include <dune/typetree/traversal.hh>
-#include <dune/typetree/visitor.hh>
+// #include <dune/typetree/traversal.hh>
+// #include <dune/typetree/visitor.hh>
 
 
 namespace Dune {

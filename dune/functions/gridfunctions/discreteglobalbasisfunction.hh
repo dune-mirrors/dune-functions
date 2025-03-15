@@ -14,8 +14,7 @@
 
 #include <dune/grid/utility/hierarchicsearch.hh>
 
-#include <dune/typetree/treecontainer.hh>
-
+#include <dune/functions/common/treecontainer.hh>
 #include <dune/functions/functionspacebases/hierarchicnodetorangemap.hh>
 #include <dune/functions/functionspacebases/flatvectorview.hh>
 #include <dune/functions/gridfunctions/gridviewentityset.hh>

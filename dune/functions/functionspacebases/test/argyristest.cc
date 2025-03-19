@@ -50,28 +50,5 @@ int main(int argc, char *argv[])
   test.subTest(checkBasis(basis, EnableContinuityCheck(),
                           EnableDifferentiabilityCheck(),
                           CheckLocalFiniteElementFlag<2>()));
-
-  auto lv = basis.localView();
-  std::size_t repeat = 100000;
-  Dune::Timer t;
-  for (auto&& i : Dune::range(repeat))
-    lv.bind(*std::begin(elements(gridView)));
-  std::cout<<"Binding took "<<t.elapsed()<<"s\n";
-  auto const& lb = lv.tree().finiteElement().localBasis();
-  std::vector<Dune::FieldVector<double,1>> out;
-  t.reset();
-  for (auto&& i : Dune::range(repeat))
-    lb.evaluateFunction({0.,0.},out);
-  std::cout<<"Evaluations took "<<t.elapsed()<<"s\n";
-  std::vector<Dune::FieldMatrix<double,1,2>> gradients;
-  t.reset();
-  for (auto&& i : Dune::range(repeat))
-    lb.evaluateJacobian({0.,0.},gradients);
-  std::cout<<"Jacobian Evaluations took "<<t.elapsed()<<"s\n";
-  std::vector<Dune::FieldMatrix<double,2,2>> hessian;
-  t.reset();
-  for (auto&& i : Dune::range(repeat))
-    lb.evaluateHessian({0.,0.},hessian);
-  std::cout<<"Hessian Evaluations took "<<t.elapsed()<<"s\n";
   return test.exit();
 }

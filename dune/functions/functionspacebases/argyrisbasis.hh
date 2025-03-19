@@ -8,9 +8,6 @@
 
 #include <algorithm>
 #include <array>
-#include <dune/istl/bcrsmatrix.hh>
-#include <type_traits>
-#include <vector>
 
 #include <dune/common/exceptions.hh>
 #include <dune/common/fmatrix.hh>
@@ -23,18 +20,18 @@
 #include <dune/localfunctions/common/localfiniteelementtraits.hh>
 #include <dune/localfunctions/common/localkey.hh>
 
+#include <dune/functions/analyticfunctions/monomialset.hh>
 #include <dune/functions/common/mapperutilities.hh>
+#include <dune/functions/functionspacebases/cubichermitebasis.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/functionaldescriptor.hh>
-#include <dune/functions/functionspacebases/cubichermitebasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/transformedfiniteelementmixin.hh>
-#include <dune/functions/analyticfunctions/monomialset.hh>
 
 /**
  * \file Argyrisbasis.hh
- * \brief This file provides an implementation of the cubic Argyris finite element in 1 to 3 dimensions.
+ * \brief This file provides an implementation of the cubic Argyris finite element.
  *
  * For reference, see[Ciarlet, The Finite Element Method for Elliptic Problems, 2002].
  * It contains in the following order:
@@ -129,7 +126,7 @@ namespace Dune::Functions
       /**
        * \brief Get the Argyris Coefficients Matrix
        * \return FieldMatrix<F, size, size>
-       *  where size is the dimension of the cubic polynomial space
+       *  where size is the dimension of the quintic polynomial space (21)
        *
        * This returns the basis transformation matrix from a monomial
        * basis to the Argyris basis on the reference domain.
@@ -569,7 +566,7 @@ namespace Dune::Functions
      * \tparam R Type used for function values
      * \tparam dim dimension of the reference element
      */
-    template<class D, class R, int mode = 0>
+    template<class D, class R>
     class ArgyrisLocalFiniteElement
       : public Impl::TransformedFiniteElementMixin<ArgyrisLocalFiniteElement<D,R>, ArgyrisLocalBasisTraits<D, R>>
     {
@@ -578,114 +575,6 @@ namespace Dune::Functions
       static constexpr int dim = 2;
 
     public:
-    ArgyrisLocalFiniteElement()
-    :transformationMatrixSparse(21, 21, BCRSMatrix<R>::random)
-    {
-      transformationMatrixSparse.setrowsize(0,3);
-      transformationMatrixSparse.setrowsize(1,4);
-      transformationMatrixSparse.setrowsize(2,4);
-      transformationMatrixSparse.setrowsize(3,5);
-      transformationMatrixSparse.setrowsize(4,5);
-      transformationMatrixSparse.setrowsize(5,5);
-      transformationMatrixSparse.setrowsize(6,3);
-      transformationMatrixSparse.setrowsize(7,4);
-      transformationMatrixSparse.setrowsize(8,4);
-      transformationMatrixSparse.setrowsize(9,5);
-      transformationMatrixSparse.setrowsize(10,5);
-      transformationMatrixSparse.setrowsize(11,5);
-      transformationMatrixSparse.setrowsize(12,3);
-      transformationMatrixSparse.setrowsize(13,4);
-      transformationMatrixSparse.setrowsize(14,4);
-      transformationMatrixSparse.setrowsize(15,5);
-      transformationMatrixSparse.setrowsize(16,5);
-      transformationMatrixSparse.setrowsize(17,5);
-      transformationMatrixSparse.setrowsize(18,1);
-      transformationMatrixSparse.setrowsize(19,1);
-      transformationMatrixSparse.setrowsize(20,1);
-      transformationMatrixSparse.endrowsizes();
-      transformationMatrixSparse.addindex(0,0);
-      transformationMatrixSparse.addindex(0,18);
-      transformationMatrixSparse.addindex(0,19);
-      transformationMatrixSparse.addindex(1,1);
-      transformationMatrixSparse.addindex(1,2);
-      transformationMatrixSparse.addindex(1,18);
-      transformationMatrixSparse.addindex(1,19);
-      transformationMatrixSparse.addindex(2,1);
-      transformationMatrixSparse.addindex(2,2);
-      transformationMatrixSparse.addindex(2,18);
-      transformationMatrixSparse.addindex(2,19);
-      transformationMatrixSparse.addindex(3,3);
-      transformationMatrixSparse.addindex(3,4);
-      transformationMatrixSparse.addindex(3,5);
-      transformationMatrixSparse.addindex(3,18);
-      transformationMatrixSparse.addindex(3,19);
-      transformationMatrixSparse.addindex(4,3);
-      transformationMatrixSparse.addindex(4,4);
-      transformationMatrixSparse.addindex(4,5);
-      transformationMatrixSparse.addindex(4,18);
-      transformationMatrixSparse.addindex(4,19);
-      transformationMatrixSparse.addindex(5,3);
-      transformationMatrixSparse.addindex(5,4);
-      transformationMatrixSparse.addindex(5,5);
-      transformationMatrixSparse.addindex(5,18);
-      transformationMatrixSparse.addindex(5,19);
-      transformationMatrixSparse.addindex(6,6);
-      transformationMatrixSparse.addindex(6,18);
-      transformationMatrixSparse.addindex(6,20);
-      transformationMatrixSparse.addindex(7,7);
-      transformationMatrixSparse.addindex(7,8);
-      transformationMatrixSparse.addindex(7,18);
-      transformationMatrixSparse.addindex(7,20);
-      transformationMatrixSparse.addindex(8,7);
-      transformationMatrixSparse.addindex(8,8);
-      transformationMatrixSparse.addindex(8,18);
-      transformationMatrixSparse.addindex(8,20);
-      transformationMatrixSparse.addindex(9,9);
-      transformationMatrixSparse.addindex(9,10);
-      transformationMatrixSparse.addindex(9,11);
-      transformationMatrixSparse.addindex(9,18);
-      transformationMatrixSparse.addindex(9,20);
-      transformationMatrixSparse.addindex(10,9);
-      transformationMatrixSparse.addindex(10,10);
-      transformationMatrixSparse.addindex(10,11);
-      transformationMatrixSparse.addindex(10,18);
-      transformationMatrixSparse.addindex(10,20);
-      transformationMatrixSparse.addindex(11,9);
-      transformationMatrixSparse.addindex(11,10);
-      transformationMatrixSparse.addindex(11,11);
-      transformationMatrixSparse.addindex(11,18);
-      transformationMatrixSparse.addindex(11,20);
-      transformationMatrixSparse.addindex(12,12);
-      transformationMatrixSparse.addindex(12,19);
-      transformationMatrixSparse.addindex(12,20);
-      transformationMatrixSparse.addindex(13,13);
-      transformationMatrixSparse.addindex(13,14);
-      transformationMatrixSparse.addindex(13,19);
-      transformationMatrixSparse.addindex(13,20);
-      transformationMatrixSparse.addindex(14,13);
-      transformationMatrixSparse.addindex(14,14);
-      transformationMatrixSparse.addindex(14,19);
-      transformationMatrixSparse.addindex(14,20);
-      transformationMatrixSparse.addindex(15,15);
-      transformationMatrixSparse.addindex(15,16);
-      transformationMatrixSparse.addindex(15,17);
-      transformationMatrixSparse.addindex(15,19);
-      transformationMatrixSparse.addindex(15,20);
-      transformationMatrixSparse.addindex(16,15);
-      transformationMatrixSparse.addindex(16,16);
-      transformationMatrixSparse.addindex(16,17);
-      transformationMatrixSparse.addindex(16,19);
-      transformationMatrixSparse.addindex(16,20);
-      transformationMatrixSparse.addindex(17,15);
-      transformationMatrixSparse.addindex(17,16);
-      transformationMatrixSparse.addindex(17,17);
-      transformationMatrixSparse.addindex(17,19);
-      transformationMatrixSparse.addindex(17,20);
-      transformationMatrixSparse.addindex(18,18);
-      transformationMatrixSparse.addindex(19,19);
-      transformationMatrixSparse.addindex(20,20);
-      transformationMatrixSparse.endindices();
-    }
       /** \brief Export number types, dimensions, etc.
        */
       using size_type = std::size_t;
@@ -800,188 +689,6 @@ namespace Dune::Functions
           theta[i][2][1] = vertexJacobians_[i][1][0] * vertexJacobians_[i][1][1];
           theta[i][2][2] = vertexJacobians_[i][1][1] * vertexJacobians_[i][1][1];
         }
-
-        if constexpr (mode == 1)
-        {
-          auto &[b_0, b_1, b_2] = b;
-          auto &[J_0, J_1, J_2] = vertexJacobians_;
-          auto &[theta_0, theta_1, theta_2] = theta;
-          auto & h = averageVertexMeshSize_;
-          auto & o = edgeOrientation_;
-          std::array<Dune::FieldVector<R, 2>, 3> const &t = globalTangents;
-          transformationMatrixDense[0][0] = 1;
-          transformationMatrixDense[0][18] = -15.0/8.0*b_0[1][0]/l[0];
-          transformationMatrixDense[0][19] = -15.0/8.0*b_1[1][0]/l[1];
-          transformationMatrixDense[1][1] = J_0[0][0]*h[0];
-          transformationMatrixDense[1][2] = J_0[0][1]*h[0];
-          transformationMatrixDense[1][18] = -0.4375*b_0[1][0]*h[0]*t[0][0];
-          transformationMatrixDense[1][19] = -0.4375*b_1[1][0]*h[0]*t[1][0];
-          transformationMatrixDense[2][1] = J_0[1][0]*h[0];
-          transformationMatrixDense[2][2] = J_0[1][1]*h[0];
-          transformationMatrixDense[2][18] = -0.4375*b_0[1][0]*h[0]*t[0][1];
-          transformationMatrixDense[2][19] = -0.4375*b_1[1][0]*h[0]*t[1][1];
-          transformationMatrixDense[3][3] = h[0] * h[0]*theta_0[0][0];
-          transformationMatrixDense[3][4] = h[0] * h[0]*theta_0[0][1];
-          transformationMatrixDense[3][5] = h[0] * h[0]*theta_0[0][2];
-          transformationMatrixDense[3][18] = -1.0/32.0*b_0[1][0]*h[0] * h[0]*l[0]*tau[0][0];
-          transformationMatrixDense[3][19] = -1.0/32.0*b_1[1][0]*h[0] * h[0]*l[1]*tau[1][0];
-          transformationMatrixDense[4][3] = h[0] * h[0]*theta_0[1][0];
-          transformationMatrixDense[4][4] = h[0] * h[0]*theta_0[1][1];
-          transformationMatrixDense[4][5] = h[0] * h[0]*theta_0[1][2];
-          transformationMatrixDense[4][18] = -1.0/32.0*b_0[1][0]*h[0] * h[0]*l[0]*tau[0][1];
-          transformationMatrixDense[4][19] = -1.0/32.0*b_1[1][0]*h[0] * h[0]*l[1]*tau[1][1];
-          transformationMatrixDense[5][3] = h[0] * h[0]*theta_0[2][0];
-          transformationMatrixDense[5][4] = h[0] * h[0]*theta_0[2][1];
-          transformationMatrixDense[5][5] = h[0] * h[0]*theta_0[2][2];
-          transformationMatrixDense[5][18] = -1.0/32.0*b_0[1][0]*h[0] * h[0]*l[0]*tau[0][2];
-          transformationMatrixDense[5][19] = -1.0/32.0*b_1[1][0]*h[0] * h[0]*l[1]*tau[1][2];
-          transformationMatrixDense[6][6] = 1;
-          transformationMatrixDense[6][18] = (15.0/8.0)*b_0[1][0]/l[0];
-          transformationMatrixDense[6][20] = -15.0/8.0*b_2[1][0]/l[2];
-          transformationMatrixDense[7][7] = J_1[0][0]*h[1];
-          transformationMatrixDense[7][8] = J_1[0][1]*h[1];
-          transformationMatrixDense[7][18] = -0.4375*b_0[1][0]*h[1]*t[0][0];
-          transformationMatrixDense[7][20] = -0.4375*b_2[1][0]*h[1]*t[2][0];
-          transformationMatrixDense[8][7] = J_1[1][0]*h[1];
-          transformationMatrixDense[8][8] = J_1[1][1]*h[1];
-          transformationMatrixDense[8][18] = -0.4375*b_0[1][0]*h[1]*t[0][1];
-          transformationMatrixDense[8][20] = -0.4375*b_2[1][0]*h[1]*t[2][1];
-          transformationMatrixDense[9][9] = h[1] * h[1]*theta_1[0][0];
-          transformationMatrixDense[9][10] = h[1] * h[1]*theta_1[0][1];
-          transformationMatrixDense[9][11] = h[1] * h[1]*theta_1[0][2];
-          transformationMatrixDense[9][18] = (1.0/32.0)*b_0[1][0]*h[1] * h[1]*l[0]*tau[0][0];
-          transformationMatrixDense[9][20] = -1.0/32.0*b_2[1][0]*h[1] * h[1]*l[2]*tau[2][0];
-          transformationMatrixDense[10][9] = h[1] * h[1]*theta_1[1][0];
-          transformationMatrixDense[10][10] = h[1] * h[1]*theta_1[1][1];
-          transformationMatrixDense[10][11] = h[1] * h[1]*theta_1[1][2];
-          transformationMatrixDense[10][18] = (1.0/32.0)*b_0[1][0]*h[1] * h[1]*l[0]*tau[0][1];
-          transformationMatrixDense[10][20] = -1.0/32.0*b_2[1][0]*h[1] * h[1]*l[2]*tau[2][1];
-          transformationMatrixDense[11][9] = h[1] * h[1]*theta_1[2][0];
-          transformationMatrixDense[11][10] = h[1] * h[1]*theta_1[2][1];
-          transformationMatrixDense[11][11] = h[1] * h[1]*theta_1[2][2];
-          transformationMatrixDense[11][18] = (1.0/32.0)*b_0[1][0]*h[1] * h[1]*l[0]*tau[0][2];
-          transformationMatrixDense[11][20] = -1.0/32.0*b_2[1][0]*h[1] * h[1]*l[2]*tau[2][2];
-          transformationMatrixDense[12][12] = 1;
-          transformationMatrixDense[12][19] = (15.0/8.0)*b_1[1][0]/l[1];
-          transformationMatrixDense[12][20] = (15.0/8.0)*b_2[1][0]/l[2];
-          transformationMatrixDense[13][13] = J_2[0][0]*h[2];
-          transformationMatrixDense[13][14] = J_2[0][1]*h[2];
-          transformationMatrixDense[13][19] = -0.4375*b_1[1][0]*h[2]*t[1][0];
-          transformationMatrixDense[13][20] = -0.4375*b_2[1][0]*h[2]*t[2][0];
-          transformationMatrixDense[14][13] = J_2[1][0]*h[2];
-          transformationMatrixDense[14][14] = J_2[1][1]*h[2];
-          transformationMatrixDense[14][19] = -0.4375*b_1[1][0]*h[2]*t[1][1];
-          transformationMatrixDense[14][20] = -0.4375*b_2[1][0]*h[2]*t[2][1];
-          transformationMatrixDense[15][15] = h[2] * h[2]*theta_2[0][0];
-          transformationMatrixDense[15][16] = h[2] * h[2]*theta_2[0][1];
-          transformationMatrixDense[15][17] = h[2] * h[2]*theta_2[0][2];
-          transformationMatrixDense[15][19] = (1.0/32.0)*b_1[1][0]*h[2] * h[2]*l[1]*tau[1][0];
-          transformationMatrixDense[15][20] = (1.0/32.0)*b_2[1][0]*h[2] * h[2]*l[2]*tau[2][0];
-          transformationMatrixDense[16][15] = h[2] * h[2]*theta_2[1][0];
-          transformationMatrixDense[16][16] = h[2] * h[2]*theta_2[1][1];
-          transformationMatrixDense[16][17] = h[2] * h[2]*theta_2[1][2];
-          transformationMatrixDense[16][19] = (1.0/32.0)*b_1[1][0]*h[2] * h[2]*l[1]*tau[1][1];
-          transformationMatrixDense[16][20] = (1.0/32.0)*b_2[1][0]*h[2] * h[2]*l[2]*tau[2][1];
-          transformationMatrixDense[17][15] = h[2] * h[2]*theta_2[2][0];
-          transformationMatrixDense[17][16] = h[2] * h[2]*theta_2[2][1];
-          transformationMatrixDense[17][17] = h[2] * h[2]*theta_2[2][2];
-          transformationMatrixDense[17][19] = (1.0/32.0)*b_1[1][0]*h[2] * h[2]*l[1]*tau[1][2];
-          transformationMatrixDense[17][20] = (1.0/32.0)*b_2[1][0]*h[2] * h[2]*l[2]*tau[2][2];
-          transformationMatrixDense[18][18] = b_0[0][0]*(o[0] ? -1 : 1);
-          transformationMatrixDense[19][19] = b_1[0][0]*(o[1] ? -1 : 1);
-          transformationMatrixDense[20][20] = b_2[0][0]*(o[2] ? -1 : 1);
-        }
-        if constexpr (mode == 2)
-        {
-          auto &[b_0, b_1, b_2] = b;
-          auto &[J_0, J_1, J_2] = vertexJacobians_;
-          auto &[theta_0, theta_1, theta_2] = theta;
-          auto & h = averageVertexMeshSize_;
-          auto & o = edgeOrientation_;
-          std::array<Dune::FieldVector<R, 2>, 3> const &t = globalTangents;
-          transformationMatrixSparse[0][0] = 1;
-          transformationMatrixSparse[0][18] = -15.0/8.0*b_0[1][0]/l[0];
-          transformationMatrixSparse[0][19] = -15.0/8.0*b_1[1][0]/l[1];
-          transformationMatrixSparse[1][1] = J_0[0][0]*h[0];
-          transformationMatrixSparse[1][2] = J_0[0][1]*h[0];
-          transformationMatrixSparse[1][18] = -0.4375*b_0[1][0]*h[0]*t[0][0];
-          transformationMatrixSparse[1][19] = -0.4375*b_1[1][0]*h[0]*t[1][0];
-          transformationMatrixSparse[2][1] = J_0[1][0]*h[0];
-          transformationMatrixSparse[2][2] = J_0[1][1]*h[0];
-          transformationMatrixSparse[2][18] = -0.4375*b_0[1][0]*h[0]*t[0][1];
-          transformationMatrixSparse[2][19] = -0.4375*b_1[1][0]*h[0]*t[1][1];
-          transformationMatrixSparse[3][3] = h[0] * h[0]*theta_0[0][0];
-          transformationMatrixSparse[3][4] = h[0] * h[0]*theta_0[0][1];
-          transformationMatrixSparse[3][5] = h[0] * h[0]*theta_0[0][2];
-          transformationMatrixSparse[3][18] = -1.0/32.0*b_0[1][0]*h[0] * h[0]*l[0]*tau[0][0];
-          transformationMatrixSparse[3][19] = -1.0/32.0*b_1[1][0]*h[0] * h[0]*l[1]*tau[1][0];
-          transformationMatrixSparse[4][3] = h[0] * h[0]*theta_0[1][0];
-          transformationMatrixSparse[4][4] = h[0] * h[0]*theta_0[1][1];
-          transformationMatrixSparse[4][5] = h[0] * h[0]*theta_0[1][2];
-          transformationMatrixSparse[4][18] = -1.0/32.0*b_0[1][0]*h[0] * h[0]*l[0]*tau[0][1];
-          transformationMatrixSparse[4][19] = -1.0/32.0*b_1[1][0]*h[0] * h[0]*l[1]*tau[1][1];
-          transformationMatrixSparse[5][3] = h[0] * h[0]*theta_0[2][0];
-          transformationMatrixSparse[5][4] = h[0] * h[0]*theta_0[2][1];
-          transformationMatrixSparse[5][5] = h[0] * h[0]*theta_0[2][2];
-          transformationMatrixSparse[5][18] = -1.0/32.0*b_0[1][0]*h[0] * h[0]*l[0]*tau[0][2];
-          transformationMatrixSparse[5][19] = -1.0/32.0*b_1[1][0]*h[0] * h[0]*l[1]*tau[1][2];
-          transformationMatrixSparse[6][6] = 1;
-          transformationMatrixSparse[6][18] = (15.0/8.0)*b_0[1][0]/l[0];
-          transformationMatrixSparse[6][20] = -15.0/8.0*b_2[1][0]/l[2];
-          transformationMatrixSparse[7][7] = J_1[0][0]*h[1];
-          transformationMatrixSparse[7][8] = J_1[0][1]*h[1];
-          transformationMatrixSparse[7][18] = -0.4375*b_0[1][0]*h[1]*t[0][0];
-          transformationMatrixSparse[7][20] = -0.4375*b_2[1][0]*h[1]*t[2][0];
-          transformationMatrixSparse[8][7] = J_1[1][0]*h[1];
-          transformationMatrixSparse[8][8] = J_1[1][1]*h[1];
-          transformationMatrixSparse[8][18] = -0.4375*b_0[1][0]*h[1]*t[0][1];
-          transformationMatrixSparse[8][20] = -0.4375*b_2[1][0]*h[1]*t[2][1];
-          transformationMatrixSparse[9][9] = h[1] * h[1]*theta_1[0][0];
-          transformationMatrixSparse[9][10] = h[1] * h[1]*theta_1[0][1];
-          transformationMatrixSparse[9][11] = h[1] * h[1]*theta_1[0][2];
-          transformationMatrixSparse[9][18] = (1.0/32.0)*b_0[1][0]*h[1] * h[1]*l[0]*tau[0][0];
-          transformationMatrixSparse[9][20] = -1.0/32.0*b_2[1][0]*h[1] * h[1]*l[2]*tau[2][0];
-          transformationMatrixSparse[10][9] = h[1] * h[1]*theta_1[1][0];
-          transformationMatrixSparse[10][10] = h[1] * h[1]*theta_1[1][1];
-          transformationMatrixSparse[10][11] = h[1] * h[1]*theta_1[1][2];
-          transformationMatrixSparse[10][18] = (1.0/32.0)*b_0[1][0]*h[1] * h[1]*l[0]*tau[0][1];
-          transformationMatrixSparse[10][20] = -1.0/32.0*b_2[1][0]*h[1] * h[1]*l[2]*tau[2][1];
-          transformationMatrixSparse[11][9] = h[1] * h[1]*theta_1[2][0];
-          transformationMatrixSparse[11][10] = h[1] * h[1]*theta_1[2][1];
-          transformationMatrixSparse[11][11] = h[1] * h[1]*theta_1[2][2];
-          transformationMatrixSparse[11][18] = (1.0/32.0)*b_0[1][0]*h[1] * h[1]*l[0]*tau[0][2];
-          transformationMatrixSparse[11][20] = -1.0/32.0*b_2[1][0]*h[1] * h[1]*l[2]*tau[2][2];
-          transformationMatrixSparse[12][12] = 1;
-          transformationMatrixSparse[12][19] = (15.0/8.0)*b_1[1][0]/l[1];
-          transformationMatrixSparse[12][20] = (15.0/8.0)*b_2[1][0]/l[2];
-          transformationMatrixSparse[13][13] = J_2[0][0]*h[2];
-          transformationMatrixSparse[13][14] = J_2[0][1]*h[2];
-          transformationMatrixSparse[13][19] = -0.4375*b_1[1][0]*h[2]*t[1][0];
-          transformationMatrixSparse[13][20] = -0.4375*b_2[1][0]*h[2]*t[2][0];
-          transformationMatrixSparse[14][13] = J_2[1][0]*h[2];
-          transformationMatrixSparse[14][14] = J_2[1][1]*h[2];
-          transformationMatrixSparse[14][19] = -0.4375*b_1[1][0]*h[2]*t[1][1];
-          transformationMatrixSparse[14][20] = -0.4375*b_2[1][0]*h[2]*t[2][1];
-          transformationMatrixSparse[15][15] = h[2] * h[2]*theta_2[0][0];
-          transformationMatrixSparse[15][16] = h[2] * h[2]*theta_2[0][1];
-          transformationMatrixSparse[15][17] = h[2] * h[2]*theta_2[0][2];
-          transformationMatrixSparse[15][19] = (1.0/32.0)*b_1[1][0]*h[2] * h[2]*l[1]*tau[1][0];
-          transformationMatrixSparse[15][20] = (1.0/32.0)*b_2[1][0]*h[2] * h[2]*l[2]*tau[2][0];
-          transformationMatrixSparse[16][15] = h[2] * h[2]*theta_2[1][0];
-          transformationMatrixSparse[16][16] = h[2] * h[2]*theta_2[1][1];
-          transformationMatrixSparse[16][17] = h[2] * h[2]*theta_2[1][2];
-          transformationMatrixSparse[16][19] = (1.0/32.0)*b_1[1][0]*h[2] * h[2]*l[1]*tau[1][1];
-          transformationMatrixSparse[16][20] = (1.0/32.0)*b_2[1][0]*h[2] * h[2]*l[2]*tau[2][1];
-          transformationMatrixSparse[17][15] = h[2] * h[2]*theta_2[2][0];
-          transformationMatrixSparse[17][16] = h[2] * h[2]*theta_2[2][1];
-          transformationMatrixSparse[17][17] = h[2] * h[2]*theta_2[2][2];
-          transformationMatrixSparse[17][19] = (1.0/32.0)*b_1[1][0]*h[2] * h[2]*l[1]*tau[1][2];
-          transformationMatrixSparse[17][20] = (1.0/32.0)*b_2[1][0]*h[2] * h[2]*l[2]*tau[2][2];
-          transformationMatrixSparse[18][18] = b_0[0][0]*(o[0] ? -1 : 1);
-          transformationMatrixSparse[19][19] = b_1[0][0]*(o[1] ? -1 : 1);
-          transformationMatrixSparse[20][20] = b_2[0][0]*(o[2] ? -1 : 1);
-        }
-
       }
 
     protected:
@@ -1003,64 +710,62 @@ namespace Dune::Functions
         using std::pow;
         assert(inValues.size() == size());
         assert(outValues.size() == inValues.size());
-        if constexpr (mode == 0){
-          // compability with sympy code below
-          auto &[b_0, b_1, b_2] = b;
-          auto &[J_0, J_1, J_2] = vertexJacobians_;
-          auto &[theta_0, theta_1, theta_2] = theta;
-          auto & h = averageVertexMeshSize_;
-          auto & o = edgeOrientation_;
-          std::array<Dune::FieldVector<R, 2>, 3> const &t = globalTangents;
-          // This code is generated with sympy
-          outValues[0] = -15.0/8.0*b_0[1][0]*inValues[18]/l[0] - 15.0/8.0*b_1[1][0]*inValues[19]/l[1] + inValues[0];
-          outValues[1] = (J_0[0][0]*inValues[1] + J_0[0][1]*inValues[2] - 0.4375*b_0[1][0]*inValues[18]*t[0][0] - 0.4375*b_1[1][0]*inValues[19]*t[1][0])*h[0];
-          outValues[2] = (J_0[1][0]*inValues[1] + J_0[1][1]*inValues[2] - 0.4375*b_0[1][0]*inValues[18]*t[0][1] - 0.4375*b_1[1][0]*inValues[19]*t[1][1])*h[0];
-          outValues[3] = (-1.0/32.0*b_0[1][0]*inValues[18]*l[0]*tau[0][0] - 1.0/32.0*b_1[1][0]*inValues[19]*l[1]*tau[1][0] + inValues[3]*theta_0[0][0] + inValues[4]*theta_0[0][1] + inValues[5]*theta_0[0][2])*h[0] * h[0];
-          outValues[4] = (-1.0/32.0*b_0[1][0]*inValues[18]*l[0]*tau[0][1] - 1.0/32.0*b_1[1][0]*inValues[19]*l[1]*tau[1][1] + inValues[3]*theta_0[1][0] + inValues[4]*theta_0[1][1] + inValues[5]*theta_0[1][2])*h[0] * h[0];
-          outValues[5] = (-1.0/32.0*b_0[1][0]*inValues[18]*l[0]*tau[0][2] - 1.0/32.0*b_1[1][0]*inValues[19]*l[1]*tau[1][2] + inValues[3]*theta_0[2][0] + inValues[4]*theta_0[2][1] + inValues[5]*theta_0[2][2])*h[0] * h[0];
-          outValues[6] = (15.0/8.0)*b_0[1][0]*inValues[18]/l[0] - 15.0/8.0*b_2[1][0]*inValues[20]/l[2] + inValues[6];
-          outValues[7] = (J_1[0][0]*inValues[7] + J_1[0][1]*inValues[8] - 0.4375*b_0[1][0]*inValues[18]*t[0][0] - 0.4375*b_2[1][0]*inValues[20]*t[2][0])*h[1];
-          outValues[8] = (J_1[1][0]*inValues[7] + J_1[1][1]*inValues[8] - 0.4375*b_0[1][0]*inValues[18]*t[0][1] - 0.4375*b_2[1][0]*inValues[20]*t[2][1])*h[1];
-          outValues[9] = ((1.0/32.0)*b_0[1][0]*inValues[18]*l[0]*tau[0][0] - 1.0/32.0*b_2[1][0]*inValues[20]*l[2]*tau[2][0] + inValues[9]*theta_1[0][0] + inValues[10]*theta_1[0][1] + inValues[11]*theta_1[0][2])*h[1] * h[1];
-          outValues[10] = ((1.0/32.0)*b_0[1][0]*inValues[18]*l[0]*tau[0][1] - 1.0/32.0*b_2[1][0]*inValues[20]*l[2]*tau[2][1] + inValues[9]*theta_1[1][0] + inValues[10]*theta_1[1][1] + inValues[11]*theta_1[1][2])*h[1] * h[1];
-          outValues[11] = ((1.0/32.0)*b_0[1][0]*inValues[18]*l[0]*tau[0][2] - 1.0/32.0*b_2[1][0]*inValues[20]*l[2]*tau[2][2] + inValues[9]*theta_1[2][0] + inValues[10]*theta_1[2][1] + inValues[11]*theta_1[2][2])*h[1] * h[1];
-          outValues[12] = (15.0/8.0)*b_1[1][0]*inValues[19]/l[1] + (15.0/8.0)*b_2[1][0]*inValues[20]/l[2] + inValues[12];
-          outValues[13] = (J_2[0][0]*inValues[13] + J_2[0][1]*inValues[14] - 0.4375*b_1[1][0]*inValues[19]*t[1][0] - 0.4375*b_2[1][0]*inValues[20]*t[2][0])*h[2];
-          outValues[14] = (J_2[1][0]*inValues[13] + J_2[1][1]*inValues[14] - 0.4375*b_1[1][0]*inValues[19]*t[1][1] - 0.4375*b_2[1][0]*inValues[20]*t[2][1])*h[2];
-          outValues[15] = ((1.0/32.0)*b_1[1][0]*inValues[19]*l[1]*tau[1][0] + (1.0/32.0)*b_2[1][0]*inValues[20]*l[2]*tau[2][0] + inValues[15]*theta_2[0][0] + inValues[16]*theta_2[0][1] + inValues[17]*theta_2[0][2])*h[2] * h[2];
-          outValues[16] = ((1.0/32.0)*b_1[1][0]*inValues[19]*l[1]*tau[1][1] + (1.0/32.0)*b_2[1][0]*inValues[20]*l[2]*tau[2][1] + inValues[15]*theta_2[1][0] + inValues[16]*theta_2[1][1] + inValues[17]*theta_2[1][2])*h[2] * h[2];
-          outValues[17] = ((1.0/32.0)*b_1[1][0]*inValues[19]*l[1]*tau[1][2] + (1.0/32.0)*b_2[1][0]*inValues[20]*l[2]*tau[2][2] + inValues[15]*theta_2[2][0] + inValues[16]*theta_2[2][1] + inValues[17]*theta_2[2][2])*h[2] * h[2];
-          outValues[18] = b_0[0][0]*inValues[18]*(o[0] ? -1 : 1);
-          outValues[19] = b_1[0][0]*inValues[19]*(o[1] ? -1 : 1);
-          outValues[20] = b_2[0][0]*inValues[20]*(o[2] ? -1 : 1);
-        }
-        else if constexpr (mode == 1){
-          transformationMatrixDense.mv(inValues, outValues);
-        }
-        else if constexpr (mode == 2){
-          transformationMatrixSparse.mv(inValues, outValues);
-        }
+        // compatibility with sympy code below
+        auto &[b_0, b_1, b_2] = b;
+        auto &[J_0, J_1, J_2] = vertexJacobians_;
+        auto &[theta_0, theta_1, theta_2] = theta;
+        auto & h = averageVertexMeshSize_;
+        auto & o = edgeOrientation_;
+        std::array<Dune::FieldVector<R, 2>, 3> const &t = globalTangents;
+        // This code is generated with sympy.
+        // It a matrix free implementation of the matrix V in Kirbys paper.
+        outValues[0] = -15.0/8.0*b_0[1][0]*inValues[18]/l[0] - 15.0/8.0*b_1[1][0]*inValues[19]/l[1] + inValues[0];
+        outValues[1] = (J_0[0][0]*inValues[1] + J_0[0][1]*inValues[2] - 0.4375*b_0[1][0]*inValues[18]*t[0][0] - 0.4375*b_1[1][0]*inValues[19]*t[1][0])*h[0];
+        outValues[2] = (J_0[1][0]*inValues[1] + J_0[1][1]*inValues[2] - 0.4375*b_0[1][0]*inValues[18]*t[0][1] - 0.4375*b_1[1][0]*inValues[19]*t[1][1])*h[0];
+        outValues[3] = (-1.0/32.0*b_0[1][0]*inValues[18]*l[0]*tau[0][0] - 1.0/32.0*b_1[1][0]*inValues[19]*l[1]*tau[1][0] + inValues[3]*theta_0[0][0] + inValues[4]*theta_0[0][1] + inValues[5]*theta_0[0][2])*h[0] * h[0];
+        outValues[4] = (-1.0/32.0*b_0[1][0]*inValues[18]*l[0]*tau[0][1] - 1.0/32.0*b_1[1][0]*inValues[19]*l[1]*tau[1][1] + inValues[3]*theta_0[1][0] + inValues[4]*theta_0[1][1] + inValues[5]*theta_0[1][2])*h[0] * h[0];
+        outValues[5] = (-1.0/32.0*b_0[1][0]*inValues[18]*l[0]*tau[0][2] - 1.0/32.0*b_1[1][0]*inValues[19]*l[1]*tau[1][2] + inValues[3]*theta_0[2][0] + inValues[4]*theta_0[2][1] + inValues[5]*theta_0[2][2])*h[0] * h[0];
+        outValues[6] = (15.0/8.0)*b_0[1][0]*inValues[18]/l[0] - 15.0/8.0*b_2[1][0]*inValues[20]/l[2] + inValues[6];
+        outValues[7] = (J_1[0][0]*inValues[7] + J_1[0][1]*inValues[8] - 0.4375*b_0[1][0]*inValues[18]*t[0][0] - 0.4375*b_2[1][0]*inValues[20]*t[2][0])*h[1];
+        outValues[8] = (J_1[1][0]*inValues[7] + J_1[1][1]*inValues[8] - 0.4375*b_0[1][0]*inValues[18]*t[0][1] - 0.4375*b_2[1][0]*inValues[20]*t[2][1])*h[1];
+        outValues[9] = ((1.0/32.0)*b_0[1][0]*inValues[18]*l[0]*tau[0][0] - 1.0/32.0*b_2[1][0]*inValues[20]*l[2]*tau[2][0] + inValues[9]*theta_1[0][0] + inValues[10]*theta_1[0][1] + inValues[11]*theta_1[0][2])*h[1] * h[1];
+        outValues[10] = ((1.0/32.0)*b_0[1][0]*inValues[18]*l[0]*tau[0][1] - 1.0/32.0*b_2[1][0]*inValues[20]*l[2]*tau[2][1] + inValues[9]*theta_1[1][0] + inValues[10]*theta_1[1][1] + inValues[11]*theta_1[1][2])*h[1] * h[1];
+        outValues[11] = ((1.0/32.0)*b_0[1][0]*inValues[18]*l[0]*tau[0][2] - 1.0/32.0*b_2[1][0]*inValues[20]*l[2]*tau[2][2] + inValues[9]*theta_1[2][0] + inValues[10]*theta_1[2][1] + inValues[11]*theta_1[2][2])*h[1] * h[1];
+        outValues[12] = (15.0/8.0)*b_1[1][0]*inValues[19]/l[1] + (15.0/8.0)*b_2[1][0]*inValues[20]/l[2] + inValues[12];
+        outValues[13] = (J_2[0][0]*inValues[13] + J_2[0][1]*inValues[14] - 0.4375*b_1[1][0]*inValues[19]*t[1][0] - 0.4375*b_2[1][0]*inValues[20]*t[2][0])*h[2];
+        outValues[14] = (J_2[1][0]*inValues[13] + J_2[1][1]*inValues[14] - 0.4375*b_1[1][0]*inValues[19]*t[1][1] - 0.4375*b_2[1][0]*inValues[20]*t[2][1])*h[2];
+        outValues[15] = ((1.0/32.0)*b_1[1][0]*inValues[19]*l[1]*tau[1][0] + (1.0/32.0)*b_2[1][0]*inValues[20]*l[2]*tau[2][0] + inValues[15]*theta_2[0][0] + inValues[16]*theta_2[0][1] + inValues[17]*theta_2[0][2])*h[2] * h[2];
+        outValues[16] = ((1.0/32.0)*b_1[1][0]*inValues[19]*l[1]*tau[1][1] + (1.0/32.0)*b_2[1][0]*inValues[20]*l[2]*tau[2][1] + inValues[15]*theta_2[1][0] + inValues[16]*theta_2[1][1] + inValues[17]*theta_2[1][2])*h[2] * h[2];
+        outValues[17] = ((1.0/32.0)*b_1[1][0]*inValues[19]*l[1]*tau[1][2] + (1.0/32.0)*b_2[1][0]*inValues[20]*l[2]*tau[2][2] + inValues[15]*theta_2[2][0] + inValues[16]*theta_2[2][1] + inValues[17]*theta_2[2][2])*h[2] * h[2];
+        outValues[18] = b_0[0][0]*inValues[18]*(o[0] ? -1 : 1);
+        outValues[19] = b_1[0][0]*inValues[19]*(o[1] ? -1 : 1);
+        outValues[20] = b_2[0][0]*inValues[20]*(o[2] ? -1 : 1);
       }
 
     private:
-
       typename Impl::ArgyrisReferenceLocalBasis<D, R> basis_;
       typename Traits::LocalCoefficientsType coefficients_;
       typename Traits::LocalInterpolationType interpolation_;
       // the transformation to correct the lack of affine equivalence boils down to
-      // one transformation matrix per vertex
+      // matrix without blockstructure, because the normal derivative dofs interact nontrivially
+      // with the others, for details see Kirby's paper.
+      // The following geometric information is needed
+      // the jacobians per vertex
       std::array<Dune::FieldMatrix<R, dim, dim>, dim+1> vertexJacobians_;
+      // a three by three matrix per vertex formalizing the rotation of the hessian in voigt notation
+      std::array<FieldMatrix<R, 3, 3>, 3> theta;
+      // the edge lengths
+      FieldVector<R, 3> l;
+      // the global tangent vectors (normalized)
+      std::array<FieldVector<R, 2>, 3> globalTangents;
+      // Geometric quantities without trivial meaning
+      std::array<FieldVector<R, 3>, 3> tau;
+      std::array<FieldMatrix<R, 2, 2>, 3> b;
+      // Additionally, we collect some global information
       // the local state, i.e. a collection of global information restricted to this element
       std::array<D, dim+1> averageVertexMeshSize_;
       std::bitset<3> edgeOrientation_;
 
-      FieldVector<R, 3> l;
-      std::array<FieldVector<R, 2>, 3> globalTangents;
-      std::array<FieldVector<R, 3>, 3> tau;
-      std::array<FieldMatrix<R, 2, 2>, 3> b;
-      std::array<FieldMatrix<R, 3, 3>, 3> theta;
-      Dune::FieldMatrix<R, 21, 21> transformationMatrixDense;
-      Dune::BCRSMatrix<R> transformationMatrixSparse;
     };
 
   } // end namespace Impl
@@ -1205,9 +910,7 @@ namespace Dune::Functions
       edgeOrientations_ = Impl::computeEdgeOrientations(elementMapper_);
     }
 
-    /**
-     * \brief Create tree node
-     */
+    //! Create tree node
     Node makeNode() const
     {
       return Node{vertexMapper_, elementMapper_, averageVertexMeshSize_, edgeOrientations_};

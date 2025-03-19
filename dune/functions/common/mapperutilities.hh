@@ -113,7 +113,50 @@ namespace Impl {
     return subEntityMeshSize;
   }
 
+  /**
+   * \brief Computes a consistent orientation of edges for a two dimensional grid.
+   */
+  template<class ElementMapper>
+  std::vector<std::bitset<3>> computeEdgeOrientations(ElementMapper mapper)
+  {
+    constexpr int dim = 2;
+    static_assert(dim == ElementMapper::GridView::dimension);
 
+    auto const& gridView = mapper.gridView();
+    std::vector<std::bitset<3>> orientations;
+    orientations.resize(gridView.size(0));
+    // compute orientation for all elements
+    unsigned short orientation = 0;
+    auto const& idSet = gridView.grid().globalIdSet();
+
+    for (const auto &element : elements(gridView))
+    {
+      const auto &refElement = referenceElement(element);
+      auto elementIndex = mapper.index(element);
+
+      orientation = 0;
+
+      for (std::size_t i = 0; i < element.subEntities(dim - 1); i++)
+      {
+        // Local vertex indices within the element
+        auto localV0 = refElement.subEntity(i, dim - 1, 0, dim);
+        auto localV1 = refElement.subEntity(i, dim - 1, 1, dim);
+
+        // Global vertex indices within the grid
+        auto globalV0 = idSet.subId(element, localV0, dim);
+        auto globalV1 = idSet.subId(element, localV1, dim);
+
+        // The edge is flipped if the local ordering disagrees with global ordering
+        if ((localV0 < localV1 && globalV0 > globalV1)
+            || (localV0 > localV1 && globalV0 < globalV1))
+        {
+          orientation |= (1 << i);
+        }
+      }
+      orientations[elementIndex] = orientation;
+    }
+    return orientations;
+  }
 
 } // end namespace Impl
 

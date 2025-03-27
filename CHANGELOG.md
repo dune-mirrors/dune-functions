@@ -35,7 +35,11 @@ corresponding version of the Dune core modules.
   Hermite-type C1 elements.
 - The deprecated header `functionspacebases/sizeinfo.hh` was removed.
 - The deprecated header `functionspacebases/defaultnodetorangemap.hh` was removed.
-- The deprecated header `functionspacebases/hierarchicvectorwrapper.hh` was removed.
+- The deprecated header `functionspacebases/hierarchicvectorwrapper.hh`was removed.
+- The consistency guarantees between leaf-nodes and the corresponding
+  finiteElement got relaxed. This is necessary to add multidomain
+  support. The change is that if `node.size() == 0` accessing `finiteElement`
+  is undefined behaviour. These changes are also reflected in the updated tests.
 
 ## Release 2.10
 

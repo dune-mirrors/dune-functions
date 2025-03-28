@@ -84,9 +84,9 @@ public:
   //! Template mapping root tree path to type of created tree node
   using Node = CompositeBasisNode<typename SPB::Node...>;
 
-  static constexpr size_type maxMultiIndexSize = std::max({SPB::maxMultiIndexSize...}) + isBlocked;
-  static constexpr size_type minMultiIndexSize = std::min({SPB::minMultiIndexSize...}) + isBlocked;
-  static constexpr size_type multiIndexBufferSize = std::max({SPB::multiIndexBufferSize...}) + isBlocked;
+  static constexpr size_type maxMultiIndexSize = std::max({size_type{SPB::maxMultiIndexSize}...}) + isBlocked;
+  static constexpr size_type minMultiIndexSize = std::min({size_type{SPB::minMultiIndexSize}...}) + isBlocked;
+  static constexpr size_type multiIndexBufferSize = std::max({size_type{SPB::multiIndexBufferSize}...}) + isBlocked;
 
   /**
    * \brief Constructor for given child pre-basis objects

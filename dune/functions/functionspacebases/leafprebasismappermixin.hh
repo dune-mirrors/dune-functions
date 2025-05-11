@@ -120,10 +120,13 @@ public:
   template<class Node, class It>
   It indices(const Node& node, It it) const
   {
-    for(const auto& globalIndex : subIndexRange(mapper_, node.element(), node.finiteElement().localCoefficients()))
+    if (node.size() != 0)
     {
-      *it = {{ (size_type)globalIndex }};
-      ++it;
+      for(const auto& globalIndex : subIndexRange(mapper_, node.element(), node.finiteElement().localCoefficients()))
+      {
+        *it = {{ (size_type)globalIndex }};
+        ++it;
+      }
     }
     return it;
   }

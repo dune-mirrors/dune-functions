@@ -157,6 +157,8 @@ void interpolateLocal(VectorBackend& vector, const BitVectorBackend& bitVector, 
     using FiniteElementRangeField = typename FiniteElement::Traits::LocalBasisType::Traits::RangeFieldType;
 
     auto interpolationCoefficients = std::vector<FiniteElementRangeField>();
+    if (node.size() == 0)
+      return;
     auto&& fe = node.finiteElement();
     auto localF_RE = ComponentFunction(std::cref(localF), [&](auto&& y) { return nodeToRangeEntry(node, treePath, y); });
 

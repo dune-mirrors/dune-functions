@@ -184,7 +184,7 @@ public:
   template<typename It>
   It indices(const Node& node, It it) const
   {
-    for (size_type i = 0, end = node.finiteElement().size() ; i < end ; ++it, ++i)
+    for (size_type i = 0, end = node.size() ; i < end ; ++it, ++i)
     {
       Dune::LocalKey localKey = node.finiteElement().localCoefficients().localKey(i);
       const auto& gridIndexSet = gridView().indexSet();
@@ -440,6 +440,7 @@ public:
    */
   const FiniteElement& finiteElement() const
   {
+    assert(finiteElement_);
     return *finiteElement_;
   }
 
@@ -447,8 +448,13 @@ public:
   void bind(const Element& e)
   {
     element_ = &e;
-    finiteElement_ = &(cache_.get(element_->type()));
-    this->setSize(finiteElement_->size());
+    if (*element_ != Element{}) {
+      finiteElement_ = &(cache_.get(element_->type()));
+      this->setSize(finiteElement_->size());
+    } else {
+      finiteElement_ = nullptr;
+      this->setSize(0);
+    }
   }
 
 protected:

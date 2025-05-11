@@ -130,11 +130,14 @@ public:
   template<class Node, class It>
   It indices(const Node& node, It it) const
   {
-    size_type elementOffset = Base::mapper_.index(node.element());
-    for(auto i : Dune::range(node.size()))
+    if (node.size() != 0)
     {
-      *it = {{ (size_type)(elementOffset+i) }};
-      ++it;
+      size_type elementOffset = Base::mapper_.index(node.element());
+      for(auto i : Dune::range(node.size()))
+      {
+        *it = {{ (size_type)(elementOffset+i) }};
+        ++it;
+      }
     }
     return it;
   }

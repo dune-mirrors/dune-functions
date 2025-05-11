@@ -40,6 +40,10 @@ dune_add_test(SOURCES raviartthomasbasistest.cc LABELS quick)
 
 dune_add_test(SOURCES subspacebasistest.cc LABELS quick)
 
+if(TARGET Dune::MultiDomainGrid)
+  dune_add_test(SOURCES multidomainbasistest.cc LABELS quick)
+endif()
+
 dune_add_test(SOURCES compositebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES makebasistest.cc LABELS quick)

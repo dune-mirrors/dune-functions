@@ -284,6 +284,8 @@ namespace Dune::Functions {
     using Grid = typename HostGridView::Grid;
     using ctype = typename Grid::ctype;
     using IndexSet = SubDomainIndexSet<HostGridView>;
+    using Intersection = typename HostGridView::Intersection;
+    using IntersectionIterator = typename HostGridView::IntersectionIterator;
 
     //! Codim specific typedefs
     template<int codim>

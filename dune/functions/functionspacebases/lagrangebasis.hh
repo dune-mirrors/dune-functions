@@ -9,15 +9,21 @@
 
 #include <type_traits>
 #include <dune/common/exceptions.hh>
+#include <dune/common/hybridutilities.hh>
+#include <dune/common/rangeutilities.hh>
 
 #include <dune/localfunctions/lagrange.hh>
-#include <dune/localfunctions/lagrange/equidistantpoints.hh>
+#include <dune/localfunctions/common/localfiniteelement.hh>
 #include <dune/localfunctions/lagrange/lagrangelfecache.hh>
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 
+// set a maximal order up to which a dynamic-to-static lookup is implemented
+#ifndef DUNE_FUNCTIONS_MAX_RUNTIME_LAGRANGE_ORDER
+#define DUNE_FUNCTIONS_MAX_RUNTIME_LAGRANGE_ORDER 16
+#endif
 
 namespace Dune {
 namespace Functions {
@@ -379,17 +385,43 @@ class LagrangeNode :
   public LeafBasisNode
 {
   // Stores LocalFiniteElement implementations with run-time order as a function of GeometryType
-  template<typename Domain, typename Range, int dim>
+  template<typename Domain, typename Range, int dim, int max_k = DUNE_FUNCTIONS_MAX_RUNTIME_LAGRANGE_ORDER>
   class LagrangeRunTimeLFECache
   {
+    using LocalBasisTraits = typename P0LocalBasis<Domain,Range,dim>::Traits;
+
   public:
-    using FiniteElementType = LagrangeLocalFiniteElement<EquidistantPointSet,dim,Domain,Range>;
+    using FiniteElementType = LocalFiniteElement<LocalBasisTraits>;
 
     const FiniteElementType& get(GeometryType type)
     {
       auto i = data_.find(type);
-      if (i==data_.end())
-        i = data_.emplace(type,FiniteElementType(type,order_)).first;
+      if (i==data_.end()) {
+        if (order_ == 0)
+          i = data_.emplace(type,P0LocalFiniteElement<Domain,Range,dim>(type)).first;
+        else {
+          i = Dune::Hybrid::switchCases(Dune::StaticIntegralRange<int, max_k, 1>{}, order_, [&](auto order) {
+            if (type.isSimplex())
+              return data_.emplace(type,LagrangeSimplexLocalFiniteElement<Domain,Range,dim,order>{}).first;
+            else if (type.isCube())
+              return data_.emplace(type,LagrangeCubeLocalFiniteElement<Domain,Range,dim,order>{}).first;
+            else if constexpr(dim == 3) {
+              if (type.isPrism())
+                return data_.emplace(type,LagrangePrismLocalFiniteElement<Domain,Range,order>{}).first;
+              else if (type.isPyramid())
+                return data_.emplace(type,LagrangePyramidLocalFiniteElement<Domain,Range,order>{}).first;
+            }
+            DUNE_THROW(Dune::NotImplemented, "Unsupported GeometryType.");
+            return data_.end();
+          }, [&]{
+            return data_.end();
+          });
+        }
+      }
+
+      if (i==data_.end()) {
+        DUNE_THROW(Dune::NotImplemented, "The requested RunTimeLFE is not available. Maybe increase the maximal polynomial order, currently fixed to " << max_k);
+      }
       return (*i).second;
     }
 
@@ -401,7 +433,7 @@ class LagrangeNode :
   static constexpr bool useDynamicOrder = (k<0);
 
   using FiniteElementCache = std::conditional_t<(useDynamicOrder),
-                                                       LagrangeRunTimeLFECache<typename GV::ctype, R, dim>,
+                                                       LagrangeRunTimeLFECache<typename GV::ctype, R, dim, useDynamicOrder ? DUNE_FUNCTIONS_MAX_RUNTIME_LAGRANGE_ORDER : 1>,
                                                        LagrangeLocalFiniteElementCache<typename GV::ctype, R, dim, std::max(k,0)>
                                                       >;
 

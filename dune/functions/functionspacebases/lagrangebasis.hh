@@ -400,7 +400,7 @@ class LagrangeNode :
         if (order_ == 0)
           i = data_.emplace(type,P0LocalFiniteElement<Domain,Range,dim>(type)).first;
         else {
-          i = Dune::Hybrid::switchCases(Dune::StaticIntegralRange<int, max_k, 1>{}, order_, [&](auto order) {
+          i = Dune::Hybrid::switchCases(Dune::StaticIntegralRange<int, max_k+1, 1>{}, order_, [&](auto order) {
             if (type.isSimplex())
               return data_.emplace(type,LagrangeSimplexLocalFiniteElement<Domain,Range,dim,order>{}).first;
             else if (type.isCube())
@@ -414,13 +414,10 @@ class LagrangeNode :
             DUNE_THROW(Dune::NotImplemented, "Unsupported GeometryType.");
             return data_.end();
           }, [&]{
+            DUNE_THROW(Dune::NotImplemented, "The requested RunTimeLFE is not available. Maybe increase the maximal polynomial order, currently fixed to " << max_k);
             return data_.end();
           });
         }
-      }
-
-      if (i==data_.end()) {
-        DUNE_THROW(Dune::NotImplemented, "The requested RunTimeLFE is not available. Maybe increase the maximal polynomial order, currently fixed to " << max_k);
       }
       return (*i).second;
     }

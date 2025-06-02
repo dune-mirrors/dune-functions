@@ -242,21 +242,21 @@ namespace Dune::Functions {
       using Element = typename HGV::template Codim<0>::Entity;
     public:
 
-      using HostElementIterator = typename HGV::template Codim<0>::Partition<pit>::Iterator;
+      using HostElementIterator = typename HGV::template Codim<0>::template Partition<pit>::Iterator;
 
-      ElementIterator(const SubDomainGridView& gridView, HostElementIterator&& it, HostElementIterator&& endIt)
-        : gridView_(&gridView)
+      ElementIterator(const SubDomainIndexSet<HGV>& indexSet, HostElementIterator&& it, HostElementIterator&& endIt)
+        : indexSet_(&indexSet)
         , hostIt_(std::move(it))
         , hostEndIt_(std::move(endIt))
       {
-        while ((hostIt_!= hostEndIt_) and (not gridView_->contains(*hostIt_)))
+        while ((hostIt_!= hostEndIt_) and (not indexSet_->contains(*hostIt_)))
           ++hostIt_;
       }
 
       ElementIterator& operator++()
       {
         ++hostIt_;
-        while ((hostIt_!= hostEndIt_) and (not gridView_->contains(*hostIt_)))
+        while ((hostIt_!= hostEndIt_) and (not indexSet_->contains(*hostIt_)))
           ++hostIt_;
         return *this;
       }
@@ -274,7 +274,7 @@ namespace Dune::Functions {
     private:
       HostElementIterator hostIt_;
       HostElementIterator hostEndIt_;
-      const SubDomainGridView* gridView_;
+      const SubDomainIndexSet<HGV>* indexSet_;
     };
 
   public:
@@ -341,18 +341,18 @@ namespace Dune::Functions {
 
     //! Create an iterator pointing to the begin of the range.
     template<int codim, PartitionIteratorType pit = All_Partition>
-    typename Codim<codim>::Partition<pit>::Iterator begin() const
+    typename Codim<codim>::template Partition<pit>::Iterator begin() const
     {
       static_assert(codim==0, "SubDomainGridView::begin<codim> is only implemented for codim=0");
-      return {*this, hostGridView().template begin<codim, pit>(), hostGridView().template end<codim, pit>()};
+      return {indexSet(), hostGridView().template begin<codim, pit>(), hostGridView().template end<codim, pit>()};
     }
 
     //! Create an iterator pointing to the end of the range.
     template<int codim, PartitionIteratorType pit = All_Partition>
-    typename Codim<codim>::Partition<pit>::Iterator end() const
+    typename Codim<codim>::template Partition<pit>::Iterator end() const
     {
       static_assert(codim==0, "SubDomainGridView::end<codim> is only implemented for codim=0");
-      return {*this, hostGridView().template end<codim, pit>(), hostGridView().template end<codim, pit>()};
+      return {indexSet(), hostGridView().template end<codim, pit>(), hostGridView().template end<codim, pit>()};
     }
 
     decltype(auto) comm() const

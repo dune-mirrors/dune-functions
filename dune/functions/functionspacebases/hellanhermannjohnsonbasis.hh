@@ -17,7 +17,9 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/rangeutilities.hh>
+#include <dune/common/tensordot.hh>
 
+#include <dune/geometry/quadraturerules.hh>
 #include <dune/grid/common/mcmgmapper.hh>
 
 #include <dune/localfunctions/common/localbasis.hh>
@@ -104,7 +106,7 @@ namespace Dune::Functions
           localKeys_[6] = LocalKey(0,0,0);
           localKeys_[7] = LocalKey(0,0,1);
           localKeys_[8] = LocalKey(0,0,2);
-        } else if constexpr(k == 1) {
+        } else if constexpr(k == 2) {
           std::size_t idx = 0;
           // edge DOFs
           for (unsigned int s = 0; s < 3; ++s)
@@ -352,12 +354,12 @@ namespace Dune::Functions
           //...
 
           auto J = geometry_->jacobian(x);
-          auto Jt = transposed(J);
+          auto Jt = transpose(J);
           auto dx = geometry_->integrationElement(x);
 
           for (std::size_t i = 0; i < inValues.size(); ++i)
           {
-            outValues[i] = J * inValues[i] * Jt;
+            outValues[i] = tensordot<1>(tensordot<1>(J, inValues[i]), Jt);
             outValues[i] /= Dune::power(dx,2);
           }
         }
@@ -391,17 +393,20 @@ namespace Dune::Functions
      * evaluate the derivatives of f.
      *
      */
-    template<class D, int dim, unsigned int k>
+    template<class E, unsigned int k>
     class HellanHermannJohnsonLocalInterpolation
     {
+      using Element = E;
+      using Geometry = typename E::Geometry;
+      static constexpr int dim = Geometry::mydimension;
+      using D = typename Geometry::ctype;
+
       using size_type = std::size_t;
 
       static constexpr unsigned int size()
       {
         return HellanHermannJohnsonLocalCoefficients<dim,k>::size();
       }
-
-      using FunctionalDescriptor = Dune::Functions::Impl::FunctionalDescriptor<dim>;
 
     public:
 
@@ -410,9 +415,30 @@ namespace Dune::Functions
 
       /** \brief bind the Interpolation to an element and a local state.
        */
-      template<class Element>
       void bind(Element const& element)
-      {}
+      {
+        geometry_.emplace(element.geometry());
+      }
+
+      template <class F>
+      struct LocalValuedFunction
+      {
+        LocalValuedFunction(const F& f, const Geometry& geometry)
+          : f_(f), geometry_(geometry)
+        {}
+
+        // Apply the inverse Piola transform
+        auto operator() (const typename Geometry::LocalCoordinate& xi) const
+        {
+          auto Ji = geometry_.jacobianInverse(xi);
+          auto Jit = transpose(Ji);
+          auto dx = geometry_.integrationElement(xi);
+          return tensordot<1>(tensordot<1>(Ji, f_(xi)), Jit) * (dx*dx);
+        }
+
+        F const& f_;
+        Geometry const& geometry_;
+      };
 
       /** \brief Evaluate a given function and its derivatives at the nodes
        *
@@ -425,9 +451,113 @@ namespace Dune::Functions
       void interpolate(const F& f, std::vector<C>& out) const
       {
         out.resize(size());
-        auto const& refElement = Dune::ReferenceElements<D, dim>::simplex();
-        // ...
+        auto refElem = referenceElement(*geometry_);
+
+        auto local_f = LocalValuedFunction{f, *geometry_};
+        auto const& edgeQuadRule = Dune::QuadratureRules<D,dim-1>::rule(refElem.type(0,1), 4);
+        auto const& cellQuadRule = Dune::QuadratureRules<D,dim>::rule(refElem.type(), 4);
+
+        // 1. integral moments over the edges
+        if constexpr (k == 0) {
+          for (int i = 0; i < refElem.size(1); ++i) {
+            auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
+            auto geoInCell = refElem.template geometry<1>(i);
+
+            out[i] = C(0);
+            D edgeLength = 0;
+            for (auto const& [x,w] : edgeQuadRule) {
+              auto dx = geoInCell.integrationElement(x) * w;
+              edgeLength += dx;
+
+              out[i] += tensordot<1>(tensordot<1>(n,local_f(geoInCell.global(x))),n);
+            }
+            out[i] *= edgeLength;
+          }
+        }
+        else if constexpr (k == 1) {
+          for (int i = 0; i < refElem.size(1); ++i) {
+            auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
+            auto geoInCell = refElem.template geometry<1>(i);
+
+            out[2*i] = C(0);
+            out[2*i+1] = C(0);
+            D edgeLength = 0;
+            for (auto const& [x,w] : edgeQuadRule) {
+              auto dx = geoInCell.integrationElement(x) * w;
+              edgeLength += dx;
+
+              auto nVn = tensordot<1>(tensordot<1>(n,local_f(geoInCell.global(x))),n);
+              out[2*i] += (1-x) * nVn;
+              out[2*i+1] += x * nVn;
+            }
+            out[2*i] *= edgeLength;
+            out[2*i+1] *= edgeLength;
+          }
+
+          std::array B{
+            DenseTensor<D,2,2>({{0,1},{1,0}}),
+            DenseTensor<D,2,2>({{-2,1},{1,0}}),
+            DenseTensor<D,2,2>({{0,-1},{-1,2}})
+          };
+
+          for (int i = 0; i < B.size(); ++i) {
+            auto geoInCell = refElem.template geometry<0>(0);
+            out[6+i] = C(0);
+            for (auto const& [x,w] : cellQuadRule) {
+              auto dx = geoInCell.integrationElement(x) * w;
+              out[6+i] += local_f(geoInCell.global(x)).inner(B[i]);
+            }
+          }
+        }
+        else if constexpr (k == 2) {
+          for (int i = 0; i < refElem.size(1); ++i) {
+            auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
+            auto geoInCell = refElem.template geometry<1>(i);
+
+            out[3*i] = C(0);
+            out[3*i+1] = C(0);
+            out[3*i+2] = C(0);
+            D edgeLength = 0;
+            for (auto const& [x,w] : edgeQuadRule) {
+              auto dx = geoInCell.integrationElement(x) * w;
+              edgeLength += dx;
+
+              auto nVn = tensordot<1>(tensordot<1>(n,local_f(geoInCell.global(x))),n);
+              out[3*i] += (2*x*x-3*x+1) * nVn;
+              out[3*i+1] += (x*(2*x-1)) * nVn;
+              out[3*i+2] += (4*x*(1-x)) * nVn;
+            }
+            out[3*i] *= edgeLength;
+            out[3*i+1] *= edgeLength;
+            out[3*i+2] *= edgeLength;
+          }
+
+          auto geoInCell = refElem.template geometry<0>(0);
+          for (int i = 0; i < 9; ++i)
+            out[9+i] = C(0);
+
+          for (auto const& [x,w] : cellQuadRule) {
+            auto dx = geoInCell.integrationElement(x) * w;
+            auto V = local_f(geoInCell.global(x));
+
+            using T = DenseTensor<D,2,2>;
+            out[9]  += V.inner(T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
+            out[10] += V.inner(T({{2*x[0]+2*x[1]-2,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
+            out[11] += V.inner(T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,-2*x[0]-2*x[1]+2}}));
+
+            out[12] += V.inner(T({{0,x[0]},{x[0],0}}));
+            out[13] += V.inner(T({{-2*x[0],x[0]},{x[0],0}}));
+            out[14] += V.inner(T({{0,x[0]},{x[0],2*x[0]}}));
+
+            out[15] += V.inner(T({{0,x[1]},{x[1],0}}));
+            out[16] += V.inner(T({{-2*x[1],x[1]},{x[1],0}}));
+            out[17] += V.inner(T({{0,x[1]},{x[1],2*x[1]}}));
+          }
+        }
       }
+
+    private:
+      std::optional<Geometry> geometry_ = std::nullopt;
     };
 
 
@@ -458,7 +588,7 @@ namespace Dune::Functions
       using Traits = LocalFiniteElementTraits<
           HellanHermannJohnsonLocalBasis<E, R, k>,
           HellanHermannJohnsonLocalCoefficients<dim, k>,
-          HellanHermannJohnsonLocalInterpolation<D, dim, k>>;
+          HellanHermannJohnsonLocalInterpolation<E, k>>;
 
 
       /** \brief Returns object that evaluates degrees of freedom
@@ -535,9 +665,9 @@ namespace Dune::Functions
   public:
     using size_type = std::size_t;
     using Element = typename GV::template Codim<0>::Entity;
-    using FiniteElement = Impl::HellanHermannJohnsonLocalFiniteElement<typename GV::ctype, R, GV::dimension, k>;
+    using FiniteElement = Impl::HellanHermannJohnsonLocalFiniteElement<Element, R, k>;
 
-    HellanHermannJohnsonNode(Mapper const& m)
+    HellanHermannJohnsonNode()
       : element_(nullptr)
     {
       this->setSize(finiteElement_.size());
@@ -567,7 +697,7 @@ namespace Dune::Functions
     }
 
     //! The order of the local basis.
-    unsigned int order() const { return finiteElement_.localBasis().order(); }
+    unsigned int order() const { return k; }
 
   protected:
     FiniteElement finiteElement_;
@@ -586,9 +716,10 @@ namespace Dune::Functions
    */
   template<class GV, unsigned int k, class R>
   class HellanHermannJohnsonPreBasis
-    : public LeafPreBasisMapperMixin<GV>
+    : public LeafPreBasisMapperMixin<GV, Impl::EdgeTwist<typename GV::IndexSet>>
   {
-    using Base = LeafPreBasisMapperMixin<GV>;
+    using Twist = Impl::EdgeTwist<typename GV::IndexSet>;
+    using Base = LeafPreBasisMapperMixin<GV, Twist>;
     using Element = typename GV::template Codim<0>::Entity;
     using D = typename GV::ctype;
     static const std::size_t dim = GV::dimension;
@@ -599,9 +730,9 @@ namespace Dune::Functions
       if constexpr(k == 0)
         return type.isLine() ? 1 : 0;
       else if constexpr(k == 1)
-        return type.isLine() ? 2 : type.dim() == gridDim ? 3 : 0;
+        return type.isLine() ? 2 : int(type.dim()) == gridDim ? 3 : 0;
       else if constexpr(k == 2)
-        return type.isLine() ? 3 : type.dim() == gridDim ? 9 : 0;
+        return type.isLine() ? 3 : int(type.dim()) == gridDim ? 9 : 0;
       else
         return 0;
     }
@@ -620,7 +751,7 @@ namespace Dune::Functions
 
     //! Constructor for a given grid view object
     HellanHermannJohnsonPreBasis(const GV &gv)
-      : Base(gv, hellanHermannJohnsonLayout)
+      : Base(gv, hellanHermannJohnsonLayout, Twist{gv.indexSet(), hellanHermannJohnsonLayout(GeometryTypes::line,dim)})
     {
       static_assert(dim==2, "HellanHermannJohnsonPreBasis only implemented for dim=2");
     }

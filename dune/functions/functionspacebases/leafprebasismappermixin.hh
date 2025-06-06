@@ -18,7 +18,51 @@
 
 
 namespace Dune::Functions {
+namespace Impl {
 
+struct NoTwist
+{
+  template <class Element>
+  unsigned int operator() (const Element& element, unsigned int s, unsigned int c, unsigned int i) const
+  {
+    return i;
+  }
+};
+
+template <class IndexSet>
+struct EdgeTwist
+{
+  static constexpr int dim = IndexSet::dimension;
+
+  /**
+   * \param indexSet The gridView indexSet containing the elements and vertices
+   * \param n  The number of DOFs per edge.
+   */
+  EdgeTwist (const IndexSet& indexSet, unsigned int n)
+    : indexSet_(&indexSet)
+    , n_(n)
+  {}
+
+  template <class Element>
+  unsigned int operator() (const Element& element, unsigned int s, unsigned int c, unsigned int i) const
+  {
+    if (c == 1) {
+      auto refElem = referenceElement(element);
+      auto v0 = indexSet_->subIndex(element,refElem.subEntity(s,c,0,dim),dim);
+      auto v1 = indexSet_->subIndex(element,refElem.subEntity(s,c,1,dim),dim);
+      bool flip = (v0 > v1);
+      return flip ? n_ - i : i;
+    } else {
+      return i;
+    }
+  }
+
+private:
+  const IndexSet* indexSet_;
+  unsigned int n_;
+};
+
+} // end namespace Impl
 
 
 // Helper function returning a random access range
@@ -27,14 +71,15 @@ namespace Dune::Functions {
 // Having this as a member of MCMGMapper would be nice.
 // But this would introduce the LocalCoefficient in dune-grid.
 // This would introduce at least a weak 'conceptual' dependency problem.
-template<class GridView, class LocalCoefficients>
-auto subIndexRange(const Dune::MultipleCodimMultipleGeomTypeMapper<GridView>& mapper, const typename GridView::template Codim<0>::Entity& element, const LocalCoefficients& localCoefficients)
+template<class GridView, class LocalCoefficients, class Twist = Impl::NoTwist>
+auto subIndexRange(const Dune::MultipleCodimMultipleGeomTypeMapper<GridView>& mapper, const typename GridView::template Codim<0>::Entity& element, const LocalCoefficients& localCoefficients, Twist const& twist = {})
 {
   // Here we make use of the 'hidden' (poorly documented) MCMGMapper feature to support
   // multiple DOFs per subentity. However, we do not take care for any reordering.
   return Dune::transformedRangeView(Dune::range(localCoefficients.size()), [&](auto localIndex) {
     auto localKey = localCoefficients.localKey(localIndex);
-    return mapper.subIndex(element, localKey.subEntity(), localKey.codim()) + localKey.index();
+    return mapper.subIndex(element, localKey.subEntity(), localKey.codim())
+      + twist(element, localKey.subEntity(), localKey.codim(), localKey.index());
   });
 }
 
@@ -56,7 +101,7 @@ auto subIndexRange(const Dune::MultipleCodimMultipleGeomTypeMapper<GridView>& ma
  *
  * \tparam GV The grid view the basis is defined on.
  */
-template<typename GV>
+template<typename GV, typename Twist = Impl::NoTwist>
 class LeafPreBasisMapperMixin
     : public LeafPreBasisMixin<LeafPreBasisMapperMixin<GV>>
 {
@@ -71,9 +116,10 @@ public:
   using size_type = std::size_t;
 
   //! Construct from GridView and local DOF layout
-  LeafPreBasisMapperMixin(const GridView& gv, Dune::MCMGLayout layout) :
+  LeafPreBasisMapperMixin(const GridView& gv, Dune::MCMGLayout layout, const Twist& twist = {}) :
     gridView_(gv),
-    mapper_(gridView_, std::move(layout))
+    mapper_(gridView_, std::move(layout)),
+    twist_(twist)
   {}
 
   //! Initialize the global index information
@@ -120,7 +166,7 @@ public:
   template<class Node, class It>
   It indices(const Node& node, It it) const
   {
-    for(const auto& globalIndex : subIndexRange(mapper_, node.element(), node.finiteElement().localCoefficients()))
+    for(const auto& globalIndex : subIndexRange(mapper_, node.element(), node.finiteElement().localCoefficients(), twist_))
     {
       *it = {{ (size_type)globalIndex }};
       ++it;
@@ -131,6 +177,7 @@ public:
 protected:
   GridView gridView_;
   Dune::MultipleCodimMultipleGeomTypeMapper<GridView> mapper_;
+  Twist twist_;
   std::size_t maxNodeSize_;
 };
 

@@ -44,6 +44,8 @@ dune_add_test(SOURCES compositebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES makebasistest.cc LABELS quick)
 
+dune_add_test(SOURCES hellanhermannjohnsonbasistest.cc LABELS quick)
+
 dune_add_test(SOURCES hierarchicallagrangebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES hierarchicallagrangewithelementbubblebasistest.cc LABELS quick)

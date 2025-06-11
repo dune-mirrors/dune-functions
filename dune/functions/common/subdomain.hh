@@ -483,6 +483,12 @@ namespace Dune::Functions {
       indexSet_.insertElement(element);
     }
 
+    //! Check if element is contained in SubDomain
+    bool contains(const typename Codim<0>::Entity& element) const
+    {
+      return indexSet_.contains(element);
+    }
+
   private:
     IndexSet indexSet_;
   };

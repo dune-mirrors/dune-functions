@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <dune/common/exceptions.hh>
+#include <dune/common/iteratorfacades.hh>
 #include <dune/common/iteratorrange.hh>
 #include <dune/common/rangeutilities.hh>
 

@@ -590,7 +590,7 @@ namespace Dune::Functions {
 
 
   /**
-   * \brief Class representing the intersection between two subdomains.
+   * \brief Class representing the intersection between two subdomains
    *
    * Conceptually this represents a range of intersections.
    */
@@ -606,7 +606,7 @@ namespace Dune::Functions {
     using Intersection = typename SubDomainA::GridView::Intersection;
 
     /**
-     * \brief Create interface between two subdomains.
+     * \brief Create interface between two subdomains
      *
      * Notice that the order of the passed subdomains does matter,
      * because the intersections visited by the iterator will
@@ -637,7 +637,7 @@ namespace Dune::Functions {
     /**
      * \brief Begin iterator over all intersection between the subdomains
      *
-     * The iterator will aways have the elements from sub domain A and B
+     * The iterator will always have the elements from sub domain A and B
      * as inside and outside, respectively.
      */
     const auto begin() const
@@ -649,9 +649,7 @@ namespace Dune::Functions {
       }, subDomainA_.gridView().template begin<0>(), subDomainA_.gridView().template end<0>());
     }
 
-    /**
-     * \brief End iterator (sentinel)
-     */
+    //! End iterator (sentinel)
     const auto end() const
     {
       return typename decltype(begin())::SentinelIterator();
@@ -660,6 +658,37 @@ namespace Dune::Functions {
   private:
     const SubDomainA& subDomainA_;
     const SubDomainB& subDomainB_;
+  };
+
+
+
+  /**
+   * \brief Class representing the skeleton of a subdomain
+   *
+   * Conceptually this represents a range of intersections.
+   */
+  template<class SubDomain>
+  class SubDomainSkeleton
+  {
+  public:
+
+    using Intersection = typename SubDomain::GridView::Intersection;
+
+    //! Create skeleton of a subdomain
+    SubDomainSkeleton(const SubDomain& subDomain)
+      : subDomain_(subDomain)
+    {}
+
+    //! Check if intersection is contained in the skeleton of the subdomain
+    bool contains(const Intersection& is) const
+    {
+      if (is.boundary() or not(is.neighbor()))
+        return false;
+      return subDomain_.contains(is.inside()) and subDomain_.contains(is.outside());
+    }
+
+  private:
+    const SubDomain& subDomain_;
   };
 
 

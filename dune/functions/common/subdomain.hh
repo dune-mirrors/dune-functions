@@ -23,6 +23,7 @@
 #include <dune/geometry/typeindex.hh>
 
 #include <dune/grid/common/mcmgmapper.hh>
+#include <dune/grid/common/partitionset.hh>
 
 namespace Dune::Functions {
 

@@ -17,7 +17,6 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/rangeutilities.hh>
-#include <dune/common/tensordot.hh>
 
 #include <dune/geometry/quadraturerules.hh>
 #include <dune/grid/common/mcmgmapper.hh>
@@ -56,14 +55,8 @@ namespace Dune::Functions
    *
    * \ingroup FunctionSpaceBasesImplementations
    *
-   * \note This only works for simplex grids. The Hermite basis is only implemented for degree 3.
-   * \note The Hermite Finite element has the following properties:
-   *   - Its global space is in \f$ C^1 \f$ if 1d otherwise in \f$ H^1 \f$.
-   *   - The reduced version (only 2d) is part of the Discrete Kirchhoff Triangle.
-   *   - Its interpolation evaluates derivatives, i.e. you cannot interpolate into a lambda function.
-   *   - Strongly enforcing boundary conditions is not as simple as with langrange bases
-   *   - It global space is not nested, i.e. the space on a refined grid is not a subspace of the
-   *     space on the coarser grid.
+   * \note This only works for simplex grids.
+   *
    * All arguments passed to the constructor will be forwarded to the constructor
    * of HellanHermannJohnsonPreBasis.
    *
@@ -353,13 +346,12 @@ namespace Dune::Functions
           assert(outValues.size() == inValues.size());
           //...
 
-          auto J = geometry_->jacobian(x);
-          auto Jt = transpose(J);
+          auto Jt = geometry_->jacobianTransposed(x);
           auto dx = geometry_->integrationElement(x);
 
           for (std::size_t i = 0; i < inValues.size(); ++i)
           {
-            outValues[i] = tensordot<1>(tensordot<1>(J, inValues[i]), Jt);
+            outValues[i] = inValues[i].multiDot(Jt,Jt);
             outValues[i] /= Dune::power(dx,2);
           }
         }
@@ -430,10 +422,9 @@ namespace Dune::Functions
         // Apply the inverse Piola transform
         auto operator() (const typename Geometry::LocalCoordinate& xi) const
         {
-          auto Ji = geometry_.jacobianInverse(xi);
-          auto Jit = transpose(Ji);
+          auto Jit = geometry_.jacobianInverseTransposed(xi);
           auto dx = geometry_.integrationElement(xi);
-          return tensordot<1>(tensordot<1>(Ji, f_(xi)), Jit) * (dx*dx);
+          return f_(xi).multiDot(Jit, Jit) * (dx*dx);
         }
 
         F const& f_;
@@ -469,7 +460,7 @@ namespace Dune::Functions
               auto dx = geoInCell.integrationElement(x) * w;
               edgeLength += dx;
 
-              out[i] += tensordot<1>(tensordot<1>(n,local_f(geoInCell.global(x))),n);
+              out[i] += local_f(geoInCell.global(x)).multiDot(n,n);
             }
             out[i] *= edgeLength;
           }
@@ -486,7 +477,7 @@ namespace Dune::Functions
               auto dx = geoInCell.integrationElement(x) * w;
               edgeLength += dx;
 
-              auto nVn = tensordot<1>(tensordot<1>(n,local_f(geoInCell.global(x))),n);
+              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n);
               out[2*i] += (1-x) * nVn;
               out[2*i+1] += x * nVn;
             }
@@ -522,7 +513,7 @@ namespace Dune::Functions
               auto dx = geoInCell.integrationElement(x) * w;
               edgeLength += dx;
 
-              auto nVn = tensordot<1>(tensordot<1>(n,local_f(geoInCell.global(x))),n);
+              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n);
               out[3*i] += (2*x*x-3*x+1) * nVn;
               out[3*i+1] += (x*(2*x-1)) * nVn;
               out[3*i+2] += (4*x*(1-x)) * nVn;

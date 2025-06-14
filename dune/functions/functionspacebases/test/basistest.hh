@@ -470,7 +470,7 @@ struct EnableNormalNormalContinuityCheck : public EnableContinuityCheck
   auto localContinuityCheck() const {
     auto normalJump = [](auto&& jump, auto&& intersection, auto&& x) -> double {
       auto n = intersection.unitOuterNormal(x);
-      return tensordot<1>(tensordot<1>(n,jump),n);
+      return jump.multiDot(n,n);
     };
     return localJumpContinuityCheck(normalJump, order_, tol_);
   }

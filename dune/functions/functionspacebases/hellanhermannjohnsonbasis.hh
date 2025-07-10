@@ -455,14 +455,10 @@ namespace Dune::Functions
             auto geoInCell = refElem.template geometry<1>(i);
 
             out[i] = C(0);
-            D edgeLength = 0;
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              edgeLength += dx;
-
-              out[i] += local_f(geoInCell.global(x)).multiDot(n,n);
+              out[i] += local_f(geoInCell.global(x)).multiDot(n,n) * dx;
             }
-            out[i] *= edgeLength;
           }
         }
         else if constexpr (k == 1) {
@@ -472,17 +468,12 @@ namespace Dune::Functions
 
             out[2*i] = C(0);
             out[2*i+1] = C(0);
-            D edgeLength = 0;
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              edgeLength += dx;
-
-              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n);
+              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n) * dx;
               out[2*i] += (1-x) * nVn;
               out[2*i+1] += x * nVn;
             }
-            out[2*i] *= edgeLength;
-            out[2*i+1] *= edgeLength;
           }
 
           std::array B{
@@ -491,12 +482,12 @@ namespace Dune::Functions
             DenseTensor<D,2,2>({{0,-1},{-1,2}})
           };
 
-          for (int i = 0; i < B.size(); ++i) {
+          for (std::size_t i = 0; i < B.size(); ++i) {
             auto geoInCell = refElem.template geometry<0>(0);
             out[6+i] = C(0);
             for (auto const& [x,w] : cellQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              out[6+i] += local_f(geoInCell.global(x)).inner(B[i]);
+              out[6+i] += local_f(geoInCell.global(x)).inner(B[i]) * dx;
             }
           }
         }
@@ -508,19 +499,13 @@ namespace Dune::Functions
             out[3*i] = C(0);
             out[3*i+1] = C(0);
             out[3*i+2] = C(0);
-            D edgeLength = 0;
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              edgeLength += dx;
-
-              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n);
+              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n) * dx;
               out[3*i] += (2*x*x-3*x+1) * nVn;
               out[3*i+1] += (x*(2*x-1)) * nVn;
               out[3*i+2] += (4*x*(1-x)) * nVn;
             }
-            out[3*i] *= edgeLength;
-            out[3*i+1] *= edgeLength;
-            out[3*i+2] *= edgeLength;
           }
 
           auto geoInCell = refElem.template geometry<0>(0);
@@ -529,7 +514,7 @@ namespace Dune::Functions
 
           for (auto const& [x,w] : cellQuadRule) {
             auto dx = geoInCell.integrationElement(x) * w;
-            auto V = local_f(geoInCell.global(x));
+            auto V = local_f(geoInCell.global(x))*dx;
 
             using T = DenseTensor<D,2,2>;
             out[9]  += V.inner(T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));

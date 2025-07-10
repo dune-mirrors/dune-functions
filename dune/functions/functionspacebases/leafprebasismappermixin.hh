@@ -51,7 +51,7 @@ struct EdgeTwist
       auto v0 = indexSet_->subIndex(element,refElem.subEntity(s,c,0,dim),dim);
       auto v1 = indexSet_->subIndex(element,refElem.subEntity(s,c,1,dim),dim);
       bool flip = (v0 > v1);
-      return flip ? n_ - i : i;
+      return flip ? n_-1 - i : i;
     } else {
       return i;
     }

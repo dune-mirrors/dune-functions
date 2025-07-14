@@ -10,10 +10,12 @@
 
 #include <utility>
 #include <type_traits>
+#include <variant>
 
 #include <dune/common/typetraits.hh>
 #include <dune/common/concept.hh>
 #include <dune/common/hybridutilities.hh>
+#include <dune/common/std/functional.hh>
 
 #include <dune/functions/common/utility.hh>
 
@@ -296,15 +298,54 @@ Result hybridMultiIndexAccess(C&& c, const MultiIndex& index)
 
 
 namespace Imp {
+  // Accessor template allows to wrap the value type of a container during multi-index access.
+  // By default, the access implements an identity map, i.e., directly forwards the passed value.
+  template <class>
+  struct FinalAccessor : Dune::Std::identity {};
+
+  // A BoolProxy type is a wrapper around bool and the access proxy of std::vector<bool>
+  // Internally a std::variant is used. Thus, using thix proxy might be very slow.
+  struct BoolProxy
+  {
+    std::variant<std::reference_wrapper<bool>, decltype(std::declval<std::vector<bool>>()[0])> b;
+
+    BoolProxy& operator= (bool value) {
+      std::visit([&](auto& v) { v = value; }, b);
+      return *this;
+    }
+
+    explicit operator bool () const
+    {
+      return std::visit([&](auto const& v) -> bool { return bool(v); }, b);
+    }
+  };
+
+  // The type bool is wrapped in a BoolProxy type during mutible access.
+  template <>
+  struct FinalAccessor<bool>
+  {
+    BoolProxy operator() (bool& b) const { return BoolProxy{std::ref(b)}; }
+    bool operator() (bool const& b) const { return b; }
+  };
+
+  // The mutable reference type of a std::vector<bool> is wrapped in a BoolProxy.
+  template <>
+  struct FinalAccessor<std::vector<bool>::reference>
+  {
+    BoolProxy operator() (std::vector<bool>::reference b) const { return BoolProxy{b}; }
+    bool operator() (std::vector<bool>::const_reference b) const { return b; }
+  };
 
   template<class C, class MultiIndex, class IsFinal>
   constexpr decltype(auto) resolveDynamicMultiIndex(C&& c, const MultiIndex& multiIndex, const IsFinal& isFinal)
   {
+    FinalAccessor<std::decay_t<C>> accessor{};
+
     // If c is already considered final simply return it,
     // else resolve the next multiIndex entry.
     return Hybrid::ifElse(isFinal(c), [&, c = forwardCapture(std::forward<C>(c))](auto) -> decltype(auto) {
       assert(multiIndex.size() == 0);
-      return c.forward();
+      return accessor(c.forward());
     }, [&](auto) -> decltype(auto) {
       auto hasDynamicAccess = callableCheck([](auto&& cc) -> std::void_t<decltype(cc[0])> {});
 

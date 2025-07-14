@@ -314,7 +314,7 @@ namespace Imp {
       return *this;
     }
 
-    explicit operator bool () const
+    operator bool () const
     {
       return std::visit([&](auto const& v) -> bool { return bool(v); }, b);
     }

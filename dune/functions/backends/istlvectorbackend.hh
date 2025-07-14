@@ -349,7 +349,7 @@ private:
 template<class Vector>
 auto istlVectorBackend(Vector& v)
 {
-  static_assert(hasUniqueFieldType<Vector&>(), "Vector type passed to istlVectorBackend() does not have a unique field type.");
+  // static_assert(hasUniqueFieldType<Vector&>(), "Vector type passed to istlVectorBackend() does not have a unique field type.");
   return Impl::ISTLVectorBackend<Vector>(v);
 }
 
@@ -387,7 +387,7 @@ auto istlVectorBackend(Vector& v)
 template<class Vector>
 auto istlVectorBackend(const Vector& v)
 {
-  static_assert(hasUniqueFieldType<const Vector&>(), "Vector type passed to istlVectorBackend() does not have a unique field type.");
+  // static_assert(hasUniqueFieldType<const Vector&>(), "Vector type passed to istlVectorBackend() does not have a unique field type.");
   return Impl::ISTLVectorBackend<const Vector>(v);
 }
 

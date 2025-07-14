@@ -210,6 +210,19 @@ int main (int argc, char *argv[]) try
     test.subTest(checkISTLVectorBackend<Vector, Coefficient, dim, MultiIndex>("MTBV<V<MTBV<FV<double,1>, double, FV<double,1>>>, BV<FV<double,1>>"));
   }
 
+  {
+    using Vector = Dune::TupleVector<std::vector<std::array<bool,3>>, std::vector<bool>>;
+    using MultiIndex = std::array<int, 3>;
+
+    // Create raw vector
+    Vector x_raw;
+
+    // Create wrapped vector
+    auto x = Dune::Functions::istlVectorBackend(x_raw);
+
+    x_raw[Dune::Indices::_0][0][0] = x[MultiIndex{0,0,0}];
+    x[MultiIndex{0,0,0}] = x_raw[Dune::Indices::_0][0][0];
+  }
 
   return test.exit();
 }

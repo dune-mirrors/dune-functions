@@ -308,6 +308,12 @@ namespace Imp {
     }, [&](auto) -> decltype(auto) {
       auto hasDynamicAccess = callableCheck([](auto&& cc) -> std::void_t<decltype(cc[0])> {});
 
+      if (multiIndex.size()==0)
+      {
+        std::cout << "Exhausted multi index!!!" << std::endl;
+        DUNE_THROW(Dune::RangeError, "Multi-index exhausted");
+      }
+
       // Split multiIndex into first entry and remaining ones.
       auto i = multiIndex[0];
       auto tail = multiIndex.pop();

@@ -172,44 +172,34 @@ int main (int argc, char *argv[]) try
   }
 
   {
-    using VelocityVector = std::vector<Dune::BlockVector<Dune::FieldVector<double,1>>>;
-    using PressureVector = std::vector<Dune::FieldVector<double,1>>;
-    using Coefficient = double;
-    using Vector = Dune::TupleVector<VelocityVector, PressureVector>;
-    using MultiIndex = ReservedVector<std::size_t, 3>;
-    test.subTest(checkISTLVectorBackend<Vector, Coefficient, 2, MultiIndex>("TV<V<BV<FV<double,1>>>, V<FV<doule,1>>>"));
-  }
-
-  {
     static const std::size_t dim = 5;
-    using VelocityVector = std::vector<std::array<Dune::FieldVector<double,1>,dim>>;
+    using VelocityVector = std::vector<std::array<double,dim>>;
     using PressureVector = std::vector<double>;
     using Coefficient = double;
     using Vector = Dune::TupleVector<VelocityVector, PressureVector>;
     using MultiIndex = ReservedVector<std::size_t, 3>;
-    test.subTest(checkISTLVectorBackend<Vector, Coefficient, dim, MultiIndex>("TV<V<A<FV<double,1>,5>>, V<double>>"));
+    test.subTest(checkISTLVectorBackend<Vector, Coefficient, dim, MultiIndex>("TV<V<A<double,5>>, V<double>>"));
   }
 
   {
     static const std::size_t dim = 5;
     using VelocityVector = Dune::BlockVector<Dune::FieldVector<double,dim>>;
-    using PressureVector = Dune::BlockVector<Dune::FieldVector<double,1>>;
+    using PressureVector = Dune::BlockVector<double>;
     using Coefficient = double;
     using Vector = Dune::MultiTypeBlockVector<VelocityVector, PressureVector>;
     using MultiIndex = ReservedVector<std::size_t, 3>;
-    test.subTest(checkISTLVectorBackend<Vector, Coefficient, dim, MultiIndex>("MTBV<BV<FV<double,5>>, BV<FV<double,1>>>"));
+    test.subTest(checkISTLVectorBackend<Vector, Coefficient, dim, MultiIndex>("MTBV<BV<FV<double,5>>, BV<double>>"));
   }
 
   {
     static const std::size_t dim = 3;
-    using VelocityVector = std::vector<Dune::MultiTypeBlockVector<Dune::FieldVector<double,1>, double, Dune::FieldVector<double,1>>>;
-    using PressureVector = Dune::BlockVector<Dune::FieldVector<double,1>>;
+    using VelocityVector = std::vector<Dune::MultiTypeBlockVector<double, double, double>>;
+    using PressureVector = Dune::BlockVector<double>;
     using Coefficient = double;
     using Vector = Dune::MultiTypeBlockVector<VelocityVector, PressureVector>;
     using MultiIndex = ReservedVector<std::size_t, 3>;
-    test.subTest(checkISTLVectorBackend<Vector, Coefficient, dim, MultiIndex>("MTBV<V<MTBV<FV<double,1>, double, FV<double,1>>>, BV<FV<double,1>>"));
+    test.subTest(checkISTLVectorBackend<Vector, Coefficient, dim, MultiIndex>("MTBV<V<MTBV<double, double, FV<double,1>>>, BV<double>"));
   }
-
 
   return test.exit();
 }

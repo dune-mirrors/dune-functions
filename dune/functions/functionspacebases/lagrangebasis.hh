@@ -10,13 +10,14 @@
 #include <type_traits>
 #include <dune/common/exceptions.hh>
 
-#include <dune/localfunctions/lagrange/cache.hh>
+#include <dune/localfunctions/lagrange.hh>
+#include <dune/localfunctions/lagrange/equidistantpoints.hh>
+#include <dune/localfunctions/lagrange/lagrangelfecache.hh>
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 
-#include <dune/grid/common/capabilities.hh>
 
 namespace Dune {
 namespace Functions {
@@ -377,32 +378,32 @@ template<typename GV, int k, typename R>
 class LagrangeNode :
   public LeafBasisNode
 {
+  // Stores LocalFiniteElement implementations with run-time order as a function of GeometryType
+  template<typename Domain, typename Range, int dim>
+  class LagrangeRunTimeLFECache
+  {
+  public:
+    using FiniteElementType = LagrangeLocalFiniteElement<EquidistantPointSet,dim,Domain,Range>;
+
+    const FiniteElementType& get(GeometryType type)
+    {
+      auto i = data_.find(type);
+      if (i==data_.end())
+        i = data_.emplace(type,FiniteElementType(type,order_)).first;
+      return (*i).second;
+    }
+
+    std::map<GeometryType, FiniteElementType> data_;
+    unsigned int order_;
+  };
+
   static constexpr int dim = GV::dimension;
   static constexpr bool useDynamicOrder = (k<0);
 
-  // Compute the GeometryType id in case the grid has only a single GeometryType
-  static constexpr GeometryType::Id geometryTypeId()
-  {
-    if constexpr(Dune::Capabilities::hasSingleGeometryType<typename GV::Grid>::v)
-      return GeometryType(Dune::Capabilities::hasSingleGeometryType<typename GV::Grid>::topologyId, GV::dimension);
-    else
-      return GeometryType::Id(~0u);
-  }
-
-  // Select the static LFECache if k >= 0, else the dynamic LFECache
   using FiniteElementCache = std::conditional_t<(useDynamicOrder),
-    DynamicLagrangeLocalFiniteElementCache<typename GV::ctype,R,dim>,
-    StaticLagrangeLocalFiniteElementCache<geometryTypeId(),typename GV::ctype,R,dim,std::max(k,0)>
-    >;
-
-  // Construct the FiniteElementCache depending on whether the order is dynamic or static
-  static auto makeFiniteElementCache(unsigned int order)
-  {
-    if constexpr (useDynamicOrder)
-      return FiniteElementCache{order};
-    else
-      return FiniteElementCache{};
-  }
+                                                       LagrangeRunTimeLFECache<typename GV::ctype, R, dim>,
+                                                       LagrangeLocalFiniteElementCache<typename GV::ctype, R, dim, std::max(k,0)>
+                                                      >;
 
 public:
 
@@ -412,16 +413,20 @@ public:
 
   //! Constructor without order (uses the compile-time value)
   LagrangeNode() :
-    LagrangeNode(k)
+    finiteElement_(nullptr),
+    element_(nullptr)
   {}
 
   //! Constructor with a run-time order
   LagrangeNode(unsigned int order) :
     order_(order),
-    cache_(makeFiniteElementCache(order)),
     finiteElement_(nullptr),
     element_(nullptr)
-  {}
+  {
+    // Only the cache for the run-time-order case (i.e., k<0), has the 'order_' member
+    if constexpr (useDynamicOrder)
+      cache_.order_ = order;
+  }
 
   //! Return current element, throw if unbound
   const Element& element() const
@@ -450,7 +455,7 @@ protected:
 
   unsigned int order() const
   {
-    return order_;
+    return (useDynamicOrder) ? order_ : k;
   }
 
   // Run-time order, only valid if k<0

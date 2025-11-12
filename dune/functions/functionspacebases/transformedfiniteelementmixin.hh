@@ -12,8 +12,50 @@
 #include <utility>
 #include <vector>
 
-namespace Dune::Functions::Impl {
+#include <array>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include <dune/common/std/type_traits.hh>
+
+namespace Dune::Functions::Impl {
+  namespace TypeDeduction{
+
+    template<class Traits, class Dummy = int >
+    struct JacobianType{
+      using type = bool;
+    };
+
+    template<class Traits>
+    struct JacobianType<Traits, decltype(std::declval<typename Traits::JacobianType>(), 0)>
+    {
+      using type = typename Traits::JacobianType;
+    };
+
+
+    template<class Traits, class Dummy = int >
+    struct HessianType{
+      using type = bool;
+    };
+
+    template<class Traits>
+    struct HessianType<Traits, decltype(std::declval<typename Traits::HessianType>(), 0)>
+    {
+      using type = typename Traits::HessianType;
+    };
+
+    template<class Traits, class Dummy = int >
+    struct DivergenceType{
+      using type = bool;
+    };
+
+    template<class Traits>
+    struct DivergenceType<Traits, decltype(std::declval<typename Traits::DivergenceType>(), 0)>
+    {
+      using type = typename Traits::DivergenceType;
+    };
+  }
 /**
  * \brief Implementation of a dune-localfunctions LocalBasis that applies a
  * linear basis transformation
@@ -24,6 +66,13 @@ namespace Dune::Functions::Impl {
 template<class FEImplementation, class ReferenceLocalBasisTraits>
 class TransformedLocalBasis
 {
+  using JT = TypeDeduction::JacobianType<ReferenceLocalBasisTraits>::type;
+
+  using HT = TypeDeduction::HessianType<ReferenceLocalBasisTraits>::type;
+
+  using DT = TypeDeduction::DivergenceType<ReferenceLocalBasisTraits>::type;
+
+
   public:
     using Traits = ReferenceLocalBasisTraits;
 
@@ -75,7 +124,7 @@ class TransformedLocalBasis
      * \param[out] out The Hessians of all shape functions at the point x
      */
     template<class TT,
-             std::enable_if_t<std::is_same_v<TT, typename Traits::HessianType>, int> = 0>
+             std::enable_if_t<std::is_same_v<TT,HT>, int> = 0>
     void evaluateHessian(const typename Traits::DomainType &x,
                          std::vector<TT> &out) const
     {
@@ -84,6 +133,15 @@ class TransformedLocalBasis
       feImpl_->transform(hessianBuffer_, out);
     }
 
+    template<class TT,
+             std::enable_if_t<std::is_same_v<TT,HT>, int> = 0>
+    void evaluateDivergence(const typename Traits::DomainType &x,
+                         std::vector<TT> &out) const
+    {
+      feImpl_->referenceLocalBasis().evaluateDivergence(x, divergenceBuffer_);
+      out.resize(size());
+      feImpl_->transform(divergenceBuffer_, out);
+    }
     /**
      * \brief Evaluate partial derivatives of any order of all shape functions
      *
@@ -106,8 +164,9 @@ class TransformedLocalBasis
   private:
     FEImplementation const* feImpl_;
     mutable std::vector<typename Traits::RangeType> rangeBuffer_;
-    mutable std::vector<typename Traits::JacobianType> jacobianBuffer_;
-    mutable std::vector<typename Traits::HessianType> hessianBuffer_;
+    mutable std::vector<JT> jacobianBuffer_;
+    mutable std::vector<HT> hessianBuffer_;
+    mutable std::vector<DT> divergenceBuffer_;
 };
 
 

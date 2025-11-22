@@ -120,7 +120,7 @@ void getLocalMatrix(
         {
           size_t row = localView.tree().child(_0,k).localIndex(i);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_row}@*/
           size_t col = localView.tree().child(_0,k).localIndex(j);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_column}@*/
-          elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j]))
+          elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j]))[0][0]
                                      * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vv_element_matrix}@*/
         }
     // { velocity_velocity_coupling_end }
@@ -147,10 +147,10 @@ void getLocalMatrix(
           size_t pIndex = localView.tree().child(_1).localIndex(j);   /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_column}@*/
 
           elementMatrix[vIndex][pIndex] -=                    /*@\label{li:stokes_taylorhood_update_vp_element_matrix_a}@*/
-                  jacobians[i][0][k] * pressureValues[j]
+                  jacobians[i][0][k] * pressureValues[j][0]
                   * quadPoint.weight() * integrationElement;
           elementMatrix[pIndex][vIndex] -=
-                  jacobians[i][0][k] * pressureValues[j]
+                  jacobians[i][0][k] * pressureValues[j][0]
                   * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vp_element_matrix_b}@*/
         }
     // { velocity_pressure_coupling_end }

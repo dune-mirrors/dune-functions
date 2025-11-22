@@ -88,9 +88,9 @@ void getLocalMatrix(const LocalView& localView,
       for (size_t j=0; j<elementMatrix.M(); j++ )
       {
         // First: the reaction part
-        elementMatrix[i][j] += localReactionCoefficient(quadPoint.position()) * values[i] * values[j] * quadPoint.weight() * integrationElement;
+        elementMatrix[i][j] += localReactionCoefficient(quadPoint.position()) * values[i][0] * values[j][0] * quadPoint.weight() * integrationElement;
 
-        elementMatrix[i][j] += ( localVelocityField(quadPoint.position()) * jacobians[i][0]) * values[j] * quadPoint.weight() * integrationElement;
+        elementMatrix[i][j] += ( localVelocityField(quadPoint.position()) * jacobians[i][0]) * values[j][0] * quadPoint.weight() * integrationElement;
       }
   }
 
@@ -164,7 +164,7 @@ void getOffDiagonalLocalMatrix(const Intersection& intersection,
 
     for (size_t i=0; i<insideValues.size(); i++)
       for (size_t j=0; j<outsideValues.size(); j++)
-        elementMatrix[i][j] += factor * insideValues[i] * outsideValues[j] * quadPoint.weight();
+        elementMatrix[i][j] += factor * insideValues[i][0] * outsideValues[j][0] * quadPoint.weight();
   }
 }
 
@@ -206,7 +206,7 @@ void getVolumeTerm( const LocalView& localView,
 
     // Actually compute the vector entries
     for (size_t i=0; i<localRhs.size(); i++)
-      localRhs[i] += shapeFunctionValues[i] * functionValue * quadPoint.weight() * integrationElement;
+      localRhs[i] += shapeFunctionValues[i][0] * functionValue * quadPoint.weight() * integrationElement;
   }
 
 }
@@ -325,7 +325,7 @@ void assembleStiffnessMatrix(const FEBasis& feBasis,
 
     // Now let's get the element stiffness matrix
     // A dense matrix is used for the element stiffness matrix
-    Matrix<FieldMatrix<double,1,1> > elementMatrix;
+    Matrix<double> elementMatrix;
     getLocalMatrix(localView, elementMatrix, localVelocityField, localReactionCoefficient);
 
     // Add element stiffness matrix onto the global stiffness matrix

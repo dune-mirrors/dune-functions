@@ -164,7 +164,7 @@ void getOffDiagonalLocalMatrix(const Intersection& intersection,
 
     for (size_t i=0; i<insideValues.size(); i++)
       for (size_t j=0; j<outsideValues.size(); j++)
-        elementMatrix[i][j] += factor * insideValues[i] * outsideValues[j] * quadPoint.weight();
+        elementMatrix[i][j] += factor * insideValues[i][0] * outsideValues[j][0] * quadPoint.weight();
   }
 }
 

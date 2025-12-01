@@ -91,14 +91,15 @@ namespace Impl {
     using FiniteElement = LocalFiniteElementVirtualInterface<T>;
 
     BDMLocalFiniteElementMap(const GV& gv)
-      : is_(&(gv.indexSet())), orient_(gv.size(0))
+      : elementMapper_(gv, mcmgElementLayout()),
+      orient_(gv.size(0))
     {
       update(gv);
     }
 
     void update(const GV& gv)
     {
-      is_ = &(gv.indexSet());
+      elementMapper_.update(gv);
       orient_.resize(gv.size(0));
 
       cubeVariant_.resize(BDMCubeLocalInfo<dim, D, R, k>::Variants);
@@ -115,13 +116,13 @@ namespace Impl {
       // loop once over the grid
       for(const auto& cell : elements(gv))
       {
-        unsigned int myId = is_->index(cell);
-        orient_[myId] = 0;
+        const auto myIndex = elementMapper_.index(cell);
+        orient_[myIndex] = 0;
 
         for (const auto& intersection : intersections(gv,cell))
         {
-          if (intersection.neighbor() && (is_->index(intersection.outside()) > myId))
-            orient_[myId] |= (1 << intersection.indexInInside());
+          if (intersection.neighbor() && (elementMapper_.index(intersection.outside()) > myIndex))
+            orient_[myIndex] |= (1 << intersection.indexInInside());
         }
       }
     }
@@ -131,15 +132,15 @@ namespace Impl {
     const FiniteElement& find(const EntityType& e) const
     {
       if (e.type().isCube())
-        return *cubeVariant_[orient_[is_->index(e)]];
+        return *cubeVariant_[orient_[elementMapper_.index(e)]];
       else
-        return *simplexVariant_[orient_[is_->index(e)]];
+        return *simplexVariant_[orient_[elementMapper_.index(e)]];
     }
 
     private:
       std::vector<std::shared_ptr<LocalFiniteElementVirtualImp<CubeFiniteElement> > > cubeVariant_;
       std::vector<std::shared_ptr<LocalFiniteElementVirtualImp<SimplexFiniteElement> > > simplexVariant_;
-      const typename GV::IndexSet* is_;
+      Dune::MultipleCodimMultipleGeomTypeMapper<GV> elementMapper_;
       std::vector<unsigned char> orient_;
   };
 
@@ -194,12 +195,7 @@ public:
   BrezziDouglasMariniPreBasis(const GridView& gv) :
     Base(gv, dofLayout()),
     finiteElementMap_(gv)
-  {
-    // There is no inherent reason why the basis shouldn't work for grids with more than one
-    // element types.  Somebody simply has to sit down and implement the missing bits.
-    if (gv.indexSet().types(0).size() > 1)
-      DUNE_THROW(Dune::NotImplemented, "Brezzi-Douglas-Marini basis is only implemented for grids with a single element type");
-  }
+  {}
 
   /* \brief Update the stored grid view, to be called if the grid has changed */
   void update (const GridView& gv)

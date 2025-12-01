@@ -81,14 +81,12 @@ int main (int argc, char* argv[])
   // TODO: Enable this test!
   //testBrezziDouglasMariniBasis<2>(test, quadGridFactory);
 
-#if 0  // TODO: Enable this test!
   std::cout<<"Testing BrezziDouglasMariniBasis in 2D with mixed-element grid\n";
   auto mixed2dGridFactory = [&path]() {
     return GmshReader<UGGrid<2> >::read(path + "hybrid-testgrid-2d.msh");
   };
 
   testBrezziDouglasMariniBasis<1>(test, mixed2dGridFactory);
-#endif
 
 #if 0  // TODO: Enable this test!
   std::cout<<"Testing BrezziDouglasMariniBasis in 3D with simplex grid\n";

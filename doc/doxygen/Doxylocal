@@ -46,7 +46,7 @@ EXAMPLE_PATH           += @top_srcdir@/LICENSES
 HIDE_FRIEND_COMPOUNDS = NO
 
 EXTRA_PACKAGES        = amsmath amssymb
-USE_MATHJAX           = YES
+USE_MATHJAX           = NO
 
 GENERATE_TODOLIST     = NO
 GENERATE_TREEVIEW     = YES

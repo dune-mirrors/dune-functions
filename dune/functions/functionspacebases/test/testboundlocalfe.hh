@@ -30,6 +30,8 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/transpose.hh>
+#include <dune/common/typetraits.hh>
+#include <dune/common/concepts/number.hh>
 
 #include <dune/geometry/quadraturerules.hh>
 #include <dune/geometry/referenceelements.hh>
@@ -41,6 +43,22 @@
 // Shapefunctions need to have a derivative
 template <class LFE, class Element>
 class ShapeFunctionDerivativeAsCallable;
+
+template<class T> requires Dune::Concept::Number<T>
+//  requires (T const& s){ using std::abs; {abs(s)}->std::convertible_to<double>;}
+double norm(T const& number){
+  using std::abs;
+  return abs(number);
+}
+
+template<class T> requires requires (T const& vec){ {vec.two_norm() } ->std::convertible_to<double>; }
+double norm(T const& vec){
+  return vec.two_norm();
+}
+
+
+template<class T>requires requires (T const& mat){ {mat.frobenius_norm() } ->std::convertible_to<double>; }
+double norm(T const& mat){ return mat.frobenius_norm(); }
 
 // This class wraps one shape function of a local finite element as a callable with derivative() method
 // that can be fed to the LocalInterpolation::interpolate method, even if this evaluates derivatives.
@@ -243,7 +261,7 @@ bool testCanRepresentDifferentiableConstants(const FE &fe, unsigned order = 5)
     for (size_t j = 0; j < values.size(); j++)
       sum += coefficients[j] * values[j];
 
-    if ((RangeType(1.0)-sum).two_norm() > TOL)
+    if (norm(RangeType(1.0)-sum) > TOL)
     {
       std::cout << "Finite element type " << Dune::className(fe)
                 << " cannot represent constant functions!" << std::endl;
@@ -347,20 +365,24 @@ bool testBoundFE(const FE &fe, Element const &element, char disabledTests = Disa
   {
     success = testCanRepresentDifferentiableConstants<FE>(fe) and success;
   }
+  if constexpr (hasEvaluateJacobian<FE>){
 
-  if (not(disabledTests & DisableJacobian))
-  {
-    success = testJacobian<FE>(fe, quadOrder, derivativePointSkip) and success;
+    if (not(disabledTests & DisableJacobian))
+    {
+      success = testJacobian<FE>(fe, quadOrder, derivativePointSkip) and success;
+    }
   }
   else
   {
     // make sure diffOrder is 0
     success = (diffOrder == 0) and success;
   }
+  if constexpr (diffOrder > 0){
 
-  if (not(disabledTests & DisableEvaluate))
-  {
-    success = TestPartial::test<FE>(fe, TOL, jacobianTOL, diffOrder, quadOrder, derivativePointSkip) and success;
+    if (not(disabledTests & DisableEvaluate))
+    {
+      success = TestPartial::test<FE>(fe, TOL, jacobianTOL, diffOrder, quadOrder, derivativePointSkip) and success;
+    }
   }
   return success;
 }

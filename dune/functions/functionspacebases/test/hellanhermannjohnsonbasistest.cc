@@ -30,7 +30,7 @@ void testHellanHermannJohnsonBasis(TestSuite& test, const GridView& gridView)
   // Check basis created 'manually'
   {
     Functions::HellanHermannJohnsonBasis<GridView,k> basis(gridView);
-    // test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck()));
+    test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck()));
 
     auto f = [](auto const& x) {
       return Dune::FieldMatrix<double,2,2>({

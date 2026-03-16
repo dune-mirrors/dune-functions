@@ -6,8 +6,10 @@
 
 #include <config.h>
 
-#include <dune/common/densetensor.hh>
+#include <iterator>
+
 #include <dune/common/exceptions.hh>
+#include <dune/common/fmatrix.hh>
 #include <dune/common/parallel/mpihelper.hh>
 
 #include <dune/grid/uggrid.hh>
@@ -15,9 +17,8 @@
 #include <dune/grid/io/file/gmshreader.hh>
 #include <dune/grid/io/file/printgrid.hh>
 #include <dune/functions/functionspacebases/hellanhermannjohnsonbasis.hh>
-
 #include <dune/functions/functionspacebases/test/basistest.hh>
-#include <iterator>
+
 
 using namespace Dune;
 
@@ -32,11 +33,11 @@ void testHellanHermannJohnsonBasis(TestSuite& test, const GridView& gridView)
     // test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck()));
 
     auto f = [](auto const& x) {
-      return Dune::DenseTensor<double,2,2>({
+      return Dune::FieldMatrix<double,2,2>({
         {x[0], 2.0},
         {2.0, 2.0*x[1]}
       });
-      // return Dune::DenseTensor<double,2,2>({
+      // return Dune::FieldMatrix<double,2,2>({
       //   {2*x[0]*x[1],      x[0]*x[0] + x[1]},
       //   {x[0]*x[0] + x[1], (x[0]+x[1])*(x[0]+x[1])}
       // });

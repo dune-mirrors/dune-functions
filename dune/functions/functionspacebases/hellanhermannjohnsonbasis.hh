@@ -212,19 +212,19 @@ namespace Dune::Functions
           // edge 0
           out[0] = sym<Range>(0, -15*xx - 30*xy + 18*x[0] - 15*yy + 18*x[1] - R(9)/2,
                               30*xx + 60*xy - 36*x[0] + 30*yy - 36*x[1] + 9);
-          out[1] = sym<Range>(0, -15*xx + 12*x[0] - R(3)/2, 30*xx - 24*x[0] + 3);
-          out[2] = sym<Range>(0, 15*xx/2 + 15*xy/2 - 15*x[0]/2 - 15*yy/4 + 3*x[1]/2 + R(3)/4,
+          out[1] = sym<Range>(0, 15*xx/2 + 15*xy/2 - 15*x[0]/2 - 15*yy/4 + 3*x[1]/2 + R(3)/4,
                               -15*xx - 15*xy + 15*x[0] + 15*yy/2 - 3*x[1] - R(3)/2);
+          out[2] = sym<Range>(0, -15*xx + 12*x[0] - R(3)/2, 30*xx - 24*x[0] + 3);
 
           // edge 1
           out[3] = sym<Range>(30*xx + 60*xy - 36*x[0] + 30*yy - 36*x[1] + 9, -15*xx - 30*xy + 18*x[0] - 15*yy + 18*x[1] - R(9)/2, 0);
-          out[4] = sym<Range>(30*yy - 24*x[1] + 3, -15*yy + 12*x[1] - R(3)/2, 0);
-          out[5] = sym<Range>(15*xx/2 - 15*xy - 3*x[0] - 15*yy + 15*x[1] - R(3)/2, -15*xx/4 + 15*xy/2 + 3*x[0]/2 + 15*yy/2 - 15*x[1]/2 + R(3)/4, 0);
+          out[4] = sym<Range>(15*xx/2 - 15*xy - 3*x[0] - 15*yy + 15*x[1] - R(3)/2, -15*xx/4 + 15*xy/2 + 3*x[0]/2 + 15*yy/2 - 15*x[1]/2 + R(3)/4, 0);
+          out[5] = sym<Range>(30*yy - 24*x[1] + 3, -15*yy + 12*x[1] - R(3)/2, 0);
 
           // edge 2
           out[6] = sym<Range>(0, 15*xx - 12*x[0] + R(3)/2, 0);
-          out[7] = sym<Range>(0, 15*yy - 12*x[1] + R(3)/2, 0);
-          out[8] = sym<Range>(0, 15*xx/4 + 15*xy - 6*x[0] + 15*yy/4 - 6*x[1] + R(3)/2, 0);
+          out[7] = sym<Range>(0, 15*xx/4 + 15*xy - 6*x[0] + 15*yy/4 - 6*x[1] + R(3)/2, 0);
+          out[8] = sym<Range>(0, 15*yy - 12*x[1] + R(3)/2, 0);
 
           // cell
           out[9] = sym<Range>(-60*xx - 60*xy + 48*x[0], 90*xx + 180*xy - 120*x[0] + 90*yy - 120*x[1] + 36, -60*xy - 60*yy + 48*x[1]);
@@ -507,8 +507,8 @@ namespace Dune::Functions
               auto dx = geoInCell.integrationElement(x) * w;
               auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * vol * dx;
               out[3*i] += (2*x*x-3*x+1) * nVn;
-              out[3*i+1] += (x*(2*x-1)) * nVn;
-              out[3*i+2] += (4*x*(1-x)) * nVn;
+              out[3*i+1] += (4*x*(1-x)) * nVn;
+              out[3*i+2] += (x*(2*x-1)) * nVn;
             }
           }
 

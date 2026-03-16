@@ -68,10 +68,7 @@ public:
     return yy[shapeFunction_];
   }
 
-  friend ShapeFunctionDerivativeAsCallable<FE, Element> derivative(ShapeFunctionAsCallableWithDerivative const &t)
-  {
-    return ShapeFunctionDerivativeAsCallable(t);
-  }
+
 
 public:
   const FE &fe_;
@@ -79,17 +76,19 @@ public:
   Element const &e_;
 };
 
-// Test whether a Finite Element has an `evaluateHessian(...)` method and exports `HessianType`.
-template<class FE, class = void>
-struct hasEvaluateHessian{
-  static constexpr bool value = false;
+
+// Test whether a Finite Element has an `evaluateJacobian(...)` method and exports `JacobianType`.
+template<class FE>
+concept hasEvaluateJacobian = requires (FE const& fe, typename FE::Traits::LocalBasisType::Traits::DomainType x, std::vector<typename FE::Traits::LocalBasisType::Traits::JacobianType>& jacobians)
+{
+  fe.localBasis().evaluateJacobian(x, jacobians);
 };
 
-template<class FE>
-struct hasEvaluateHessian<FE, std::void_t<decltype(std::declval<FE>().evaluateHessian(FE::Traits::LocalBasisType::Traits::DomainType, FE::Traits::LocalBasisType::Traits::HessianType))>>
+template<class FE, class Element> requires hasEvaluateJacobian<FE>
+ShapeFunctionDerivativeAsCallable<FE, Element> derivative(ShapeFunctionAsCallableWithDerivative<FE, Element> const &t)
 {
-  static constexpr bool value = true;
-};
+  return ShapeFunctionDerivativeAsCallable(t);
+}
 
 // The derivative of one shape function
 // implements Dune::Functions::DifferentiableFunction
@@ -113,49 +112,31 @@ public:
     return yy[Base::shapeFunction_] * Base::e_.geometry().jacobianInverse(x);
   }
 
-  auto friend derivative(ShapeFunctionDerivativeAsCallable const &t)
-  {
-    if constexpr (hasEvaluateHessian<FE>::value){
-      return [t](typename Base::DomainType const& x){
-
-        std::array<typename FE::Traits::LocalBasisType::Traits::HessianType, Base::dimRange> hessian;
-        std::vector<typename FE::Traits::LocalBasisType::Traits::HessianType> referenceHessians;
-        t.fe_.localBasis().evaluateHessian(x, referenceHessians);
-        const auto geometryJacobianInverse = t.e_.geometry().jacobianInverse(x);
-        for (std::size_t k = 0; k < Base::dimRange; ++k)
-          hessian[k] = transpose(geometryJacobianInverse) * referenceHessians[k] * geometryJacobianInverse;
-        return hessian;
-      };
-    }
-    else {
-      return [t](typename Base::DomainType const &x)
-      {
-        std::array<Dune::FieldMatrix<typename Base::RangeFieldType, Base::dim, Base::dim>, Base::dimRange> referenceHessian, hessian;
-        std::vector<typename Base::RangeType> partials;
-        std::array<unsigned int, Base::dim> dir;
-        for (std::size_t i = 0; i < Base::dim; ++i)
-          for (std::size_t j = 0; j < Base::dim; ++j)
-          {
-            dir = {};
-            dir[i]++;
-            dir[j]++;
-            t.fe_.localBasis().partial(dir, x, partials);
-            for (std::size_t k = 0; k < Base::dimRange; ++k)
-            {
-              hessian[k][i][j] = 0.0;
-              referenceHessian[k][i][j] = partials[t.shapeFunction_][k];
-            }
-          }
-
-        const auto geometryJacobianInverse = t.e_.geometry().jacobianInverse(x);
-        for (std::size_t k = 0; k < Base::dimRange; ++k)
-          hessian[k] = transpose(geometryJacobianInverse) * referenceHessian[k] * geometryJacobianInverse;
-        return hessian;
-      };
-    }
-  }
-
 };
+
+// Test whether a Finite Element has an `evaluateHessian(...)` method and exports `HessianType`.
+template<class FE>
+concept hasEvaluateHessian = requires (FE const& fe, typename FE::Traits::LocalBasisType::Traits::DomainType x, std::vector<typename FE::Traits::LocalBasisType::Traits::HessianType> hessians)
+{
+  fe.localBasis().evaluateHessian(x, hessians);
+};
+
+
+template<class FE, class Element> requires hasEvaluateHessian<FE>
+auto derivative(ShapeFunctionDerivativeAsCallable<FE, Element> const &t)
+{
+  using Base =  ShapeFunctionDerivativeAsCallable<FE, Element>;
+    return [t](typename Base::DomainType const& x){
+
+      typename FE::Traits::LocalBasisType::Traits::HessianType hessian;
+      std::vector<typename FE::Traits::LocalBasisType::Traits::HessianType> referenceHessians;
+      t.fe_.localBasis().evaluateHessian(x, referenceHessians);
+      const auto geometryJacobianInverse = t.e_.geometry().jacobianInverse(x);
+      hessian = transpose(geometryJacobianInverse) * referenceHessians[t.shapeFunction_] * geometryJacobianInverse;
+      return hessian;
+    };
+}
+
 // Check whether the degrees of freedom computed by LocalInterpolation
 // are dual to the shape functions.  See Ciarlet, "The Finite Element Method
 // for Elliptic Problems", 1978, for details.

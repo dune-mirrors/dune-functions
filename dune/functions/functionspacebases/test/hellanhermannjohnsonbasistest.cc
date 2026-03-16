@@ -4,6 +4,7 @@
 // SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md
 // SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 
+#include "basistest.hh"
 #include <config.h>
 
 #include <iterator>
@@ -30,38 +31,7 @@ void testHellanHermannJohnsonBasis(TestSuite& test, const GridView& gridView)
   // Check basis created 'manually'
   {
     Functions::HellanHermannJohnsonBasis<GridView,k> basis(gridView);
-    test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck()));
-
-    auto f = [](auto const& x) {
-      // return Dune::FieldMatrix<double,2,2>({
-      //   {x[0], 2.0},
-      //   {2.0, 2.0*x[1]}
-      // });
-      return Dune::FieldMatrix<double,2,2>({
-        {2*x[0]*x[1],      x[0]*x[0] + x[1]},
-        {x[0]*x[0] + x[1], (x[0]+x[1])*(x[0]+x[1])}
-      });
-    };
-
-    auto localView = basis.localView();
-    auto const& indexSet = gridView.indexSet();
-    for (auto const& e : elements(gridView))
-    {
-      std::cout << "Element[" << indexSet.index(e) << "]:" << std::endl;
-      localView.bind(e);
-
-      auto const& node = localView.tree();
-      auto const& localFE = node.finiteElement();
-      auto const& localIp = localFE.localInterpolation();
-
-      auto local_f = [f,g=e.geometry()](auto const& x) { return f(g.global(x)); };
-
-      std::vector<double> coeff;
-      localIp.interpolate(local_f, coeff);
-      for (std::size_t i = 0; i < coeff.size(); ++i)
-        std::cout << "  c[" << localView.index(node.localIndex(i)) << "(" << i << ")] = " << coeff[i] << std::endl;
-    }
-
+    test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck(), CheckLocalFiniteElementFlag<0>()));
   }
 
   // Check basis created using basis builder mechanism
@@ -80,13 +50,31 @@ int main (int argc, char* argv[])
   TestSuite test;
 
   // Test with pure simplex grid
-  // (Unfortunately there is no grid implementation available that only supports simplices.)
   std::cout<<"Testing Hellan-Hermann-Johnson basis in 2D with simplex grid\n";
-  auto triangleGrid = Dune::StructuredGridFactory<UGGrid<2>>::createSimplexGrid({0.0,0.0},{1.0,1.0},{1u,1u});
-  auto triangleGridView = triangleGrid->leafGridView();
-  testHellanHermannJohnsonBasis<0>(test, triangleGridView);
-  testHellanHermannJohnsonBasis<1>(test, triangleGridView);
-  testHellanHermannJohnsonBasis<2>(test, triangleGridView);
+  {
+    auto triangleGrid = Dune::StructuredGridFactory<UGGrid<2>>::createSimplexGrid({0.0,0.0},{1.0,1.0},{1u,1u});
+    auto triangleGridView = triangleGrid->leafGridView();
+    testHellanHermannJohnsonBasis<0>(test, triangleGridView);
+    testHellanHermannJohnsonBasis<1>(test, triangleGridView);
+    testHellanHermannJohnsonBasis<2>(test, triangleGridView);
+  }
 
+  {
+    auto gridFactory = GridFactory<UGGrid<2>>();
+    gridFactory.insertVertex({0., 0.});
+    gridFactory.insertVertex({1., 0.});
+    gridFactory.insertVertex({1., 1.});
+    gridFactory.insertVertex({0., 1.});
+
+    gridFactory.insertElement(GeometryTypes::simplex(2), {0, 1, 2});
+    gridFactory.insertElement(GeometryTypes::simplex(2), {2, 3,0});
+
+    auto grid = gridFactory.createGrid();
+    auto gridView = grid->leafGridView();
+
+    testHellanHermannJohnsonBasis<0>(test, gridView);
+    testHellanHermannJohnsonBasis<1>(test, gridView);
+    testHellanHermannJohnsonBasis<2>(test, gridView);
+  }
   return test.exit();
 }

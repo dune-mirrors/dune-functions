@@ -37,7 +37,7 @@ auto multiDot(FieldMatrix<T1,n1,n2> const& A, FieldMatrix<T0,n0,n1> const& B0, F
     for (int i1 = 0; i1 < n1; ++i1)
       for (int i2 = 0; i2 < n2; ++i2)
         for (int i3 = 0; i3 < n3; ++i3)
-          C[i0][i3] += B0[i0][i1] * A[i1][i2] * B1[i2][i3];
+          C[i0][i3] += B0[i1][i0] * A[i1][i2] * B1[i2][i3];
   return C;
 }
 

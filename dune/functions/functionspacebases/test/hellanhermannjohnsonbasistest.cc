@@ -33,14 +33,14 @@ void testHellanHermannJohnsonBasis(TestSuite& test, const GridView& gridView)
     test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck()));
 
     auto f = [](auto const& x) {
-      return Dune::FieldMatrix<double,2,2>({
-        {x[0], 2.0},
-        {2.0, 2.0*x[1]}
-      });
       // return Dune::FieldMatrix<double,2,2>({
-      //   {2*x[0]*x[1],      x[0]*x[0] + x[1]},
-      //   {x[0]*x[0] + x[1], (x[0]+x[1])*(x[0]+x[1])}
+      //   {x[0], 2.0},
+      //   {2.0, 2.0*x[1]}
       // });
+      return Dune::FieldMatrix<double,2,2>({
+        {2*x[0]*x[1],      x[0]*x[0] + x[1]},
+        {x[0]*x[0] + x[1], (x[0]+x[1])*(x[0]+x[1])}
+      });
     };
 
     auto localView = basis.localView();
@@ -84,9 +84,9 @@ int main (int argc, char* argv[])
   std::cout<<"Testing Hellan-Hermann-Johnson basis in 2D with simplex grid\n";
   auto triangleGrid = Dune::StructuredGridFactory<UGGrid<2>>::createSimplexGrid({0.0,0.0},{1.0,1.0},{1u,1u});
   auto triangleGridView = triangleGrid->leafGridView();
-  // testHellanHermannJohnsonBasis<0>(test, triangleGridView);
+  testHellanHermannJohnsonBasis<0>(test, triangleGridView);
   testHellanHermannJohnsonBasis<1>(test, triangleGridView);
-  // testHellanHermannJohnsonBasis<2>(test, triangleGridView);
+  testHellanHermannJohnsonBasis<2>(test, triangleGridView);
 
   return test.exit();
 }

@@ -646,9 +646,7 @@ namespace Dune::Functions
 
     HellanHermannJohnsonNode()
       : element_(nullptr)
-    {
-      this->setSize(finiteElement_.size());
-    }
+    {}
 
     //! Return current element, throw if unbound
     Element const& element() const
@@ -671,6 +669,7 @@ namespace Dune::Functions
     {
       element_ = &e;
       finiteElement_.bind(*element_);
+      this->setSize(finiteElement_.size());
     }
 
     //! The order of the local basis.

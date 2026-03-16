@@ -454,11 +454,12 @@ namespace Dune::Functions
           for (int i = 0; i < refElem.size(1); ++i) {
             auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
             auto geoInCell = refElem.template geometry<1>(i);
+            auto vol = geoInCell.volume();
 
             out[i] = C(0);
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              out[i] += multiDot(local_f(geoInCell.global(x)),n,n) * dx;
+              out[i] += multiDot(local_f(geoInCell.global(x)),n,n) * vol * dx;
             }
           }
         }
@@ -466,12 +467,13 @@ namespace Dune::Functions
           for (int i = 0; i < refElem.size(1); ++i) {
             auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
             auto geoInCell = refElem.template geometry<1>(i);
+            auto vol = geoInCell.volume();
 
             out[2*i] = C(0);
             out[2*i+1] = C(0);
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * dx;
+              auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * vol * dx;
               out[2*i] += (1-x) * nVn;
               out[2*i+1] += x * nVn;
             }
@@ -496,13 +498,14 @@ namespace Dune::Functions
           for (int i = 0; i < refElem.size(1); ++i) {
             auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
             auto geoInCell = refElem.template geometry<1>(i);
+            auto vol = geoInCell.volume();
 
             out[3*i] = C(0);
             out[3*i+1] = C(0);
             out[3*i+2] = C(0);
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * dx;
+              auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * vol * dx;
               out[3*i] += (2*x*x-3*x+1) * nVn;
               out[3*i+1] += (x*(2*x-1)) * nVn;
               out[3*i+2] += (4*x*(1-x)) * nVn;
@@ -520,15 +523,15 @@ namespace Dune::Functions
             using T = FieldMatrix<D,2,2>;
             out[9]  += innerProduct(V, T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
             out[10] += innerProduct(V, T({{2*x[0]+2*x[1]-2,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
-            out[11] += innerProduct(V, T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,-2*x[0]-2*x[1]+2}}));
+            out[11] += innerProduct(V, T({{0, x[0]+x[1]-1},{ x[0]+x[1]-1,-2*x[0]-2*x[1]+2}}));
 
             out[12] += innerProduct(V, T({{0,x[0]},{x[0],0}}));
             out[13] += innerProduct(V, T({{-2*x[0],x[0]},{x[0],0}}));
-            out[14] += innerProduct(V, T({{0,x[0]},{x[0],2*x[0]}}));
+            out[14] += innerProduct(V, T({{0,-x[0]},{-x[0],2*x[0]}}));
 
             out[15] += innerProduct(V, T({{0,x[1]},{x[1],0}}));
             out[16] += innerProduct(V, T({{-2*x[1],x[1]},{x[1],0}}));
-            out[17] += innerProduct(V, T({{0,x[1]},{x[1],2*x[1]}}));
+            out[17] += innerProduct(V, T({{0,-x[1]},{-x[1],2*x[1]}}));
           }
         }
       }

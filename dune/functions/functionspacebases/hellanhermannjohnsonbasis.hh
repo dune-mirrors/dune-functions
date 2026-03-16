@@ -188,7 +188,7 @@ namespace Dune::Functions
         // ...
         using Range = typename Traits::RangeType;
         if constexpr(k == 0) {
-          R half = -R(1)/2;
+          R half = R(1)/2;
           out[0] = Range({{0,-half},{-half,1}});
           out[1] = Range({{1,-half},{-half,0}});
           out[2] = Range({{0, half},{ half,0}});
@@ -353,7 +353,7 @@ namespace Dune::Functions
           for (std::size_t i = 0; i < inValues.size(); ++i)
           {
             outValues[i] = multiDot(inValues[i],Jt,Jt);
-            outValues[i] /= Dune::power(dx,2);
+            outValues[i] /= dx*dx;
           }
         }
 

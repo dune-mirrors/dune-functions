@@ -12,7 +12,6 @@
 #include <utility>
 #include <vector>
 
-#include <dune/common/densetensor.hh>
 #include <dune/common/exceptions.hh>
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
@@ -25,7 +24,9 @@
 #include <dune/localfunctions/common/localfiniteelementtraits.hh>
 #include <dune/localfunctions/common/localkey.hh>
 
+#include <dune/functions/common/innerproduct.hh>
 #include <dune/functions/common/mapperutilities.hh>
+#include <dune/functions/common/multidot.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/functionaldescriptor.hh>
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
@@ -151,7 +152,7 @@ namespace Dune::Functions
         using DomainFieldType = D;
         using DomainType = FieldVector<D,dim>;
         using RangeFieldType = R;
-        using RangeType = DenseTensor<R,dim,dim>;
+        using RangeType = FieldMatrix<R,dim,dim>;
         using DivDivType = R;
       };
 
@@ -291,7 +292,7 @@ namespace Dune::Functions
           using DomainFieldType = D;
           using DomainType = FieldVector<D,dimDomain>;
           using RangeFieldType = R;
-          using RangeType = DenseTensor<R,dimRange,dimRange>;
+          using RangeType = FieldMatrix<R,dimRange,dimRange>;
           using DivDivType = R;
         };
 
@@ -351,7 +352,7 @@ namespace Dune::Functions
 
           for (std::size_t i = 0; i < inValues.size(); ++i)
           {
-            outValues[i] = inValues[i].multiDot(Jt,Jt);
+            outValues[i] = multiDot(inValues[i],Jt,Jt);
             outValues[i] /= Dune::power(dx,2);
           }
         }
@@ -424,7 +425,7 @@ namespace Dune::Functions
         {
           auto Jit = geometry_.jacobianInverseTransposed(xi);
           auto dx = geometry_.integrationElement(xi);
-          return f_(xi).multiDot(Jit, Jit) * (dx*dx);
+          return multiDot(f_(xi), Jit, Jit) * (dx*dx);
         }
 
         F const& f_;
@@ -457,7 +458,7 @@ namespace Dune::Functions
             out[i] = C(0);
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              out[i] += local_f(geoInCell.global(x)).multiDot(n,n) * dx;
+              out[i] += multiDot(local_f(geoInCell.global(x)),n,n) * dx;
             }
           }
         }
@@ -470,16 +471,16 @@ namespace Dune::Functions
             out[2*i+1] = C(0);
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n) * dx;
+              auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * dx;
               out[2*i] += (1-x) * nVn;
               out[2*i+1] += x * nVn;
             }
           }
 
           std::array B{
-            DenseTensor<D,2,2>({{0,1},{1,0}}),
-            DenseTensor<D,2,2>({{-2,1},{1,0}}),
-            DenseTensor<D,2,2>({{0,-1},{-1,2}})
+            FieldMatrix<D,2,2>({{0,1},{1,0}}),
+            FieldMatrix<D,2,2>({{-2,1},{1,0}}),
+            FieldMatrix<D,2,2>({{0,-1},{-1,2}})
           };
 
           for (std::size_t i = 0; i < B.size(); ++i) {
@@ -487,7 +488,7 @@ namespace Dune::Functions
             out[6+i] = C(0);
             for (auto const& [x,w] : cellQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              out[6+i] += local_f(geoInCell.global(x)).inner(B[i]) * dx;
+              out[6+i] += innerProduct(local_f(geoInCell.global(x)),B[i]) * dx;
             }
           }
         }
@@ -501,7 +502,7 @@ namespace Dune::Functions
             out[3*i+2] = C(0);
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              auto nVn = local_f(geoInCell.global(x)).multiDot(n,n) * dx;
+              auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * dx;
               out[3*i] += (2*x*x-3*x+1) * nVn;
               out[3*i+1] += (x*(2*x-1)) * nVn;
               out[3*i+2] += (4*x*(1-x)) * nVn;
@@ -516,18 +517,18 @@ namespace Dune::Functions
             auto dx = geoInCell.integrationElement(x) * w;
             auto V = local_f(geoInCell.global(x))*dx;
 
-            using T = DenseTensor<D,2,2>;
-            out[9]  += V.inner(T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
-            out[10] += V.inner(T({{2*x[0]+2*x[1]-2,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
-            out[11] += V.inner(T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,-2*x[0]-2*x[1]+2}}));
+            using T = FieldMatrix<D,2,2>;
+            out[9]  += innerProduct(V, T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
+            out[10] += innerProduct(V, T({{2*x[0]+2*x[1]-2,-x[0]-x[1]+1},{-x[0]-x[1]+1,0}}));
+            out[11] += innerProduct(V, T({{0,-x[0]-x[1]+1},{-x[0]-x[1]+1,-2*x[0]-2*x[1]+2}}));
 
-            out[12] += V.inner(T({{0,x[0]},{x[0],0}}));
-            out[13] += V.inner(T({{-2*x[0],x[0]},{x[0],0}}));
-            out[14] += V.inner(T({{0,x[0]},{x[0],2*x[0]}}));
+            out[12] += innerProduct(V, T({{0,x[0]},{x[0],0}}));
+            out[13] += innerProduct(V, T({{-2*x[0],x[0]},{x[0],0}}));
+            out[14] += innerProduct(V, T({{0,x[0]},{x[0],2*x[0]}}));
 
-            out[15] += V.inner(T({{0,x[1]},{x[1],0}}));
-            out[16] += V.inner(T({{-2*x[1],x[1]},{x[1],0}}));
-            out[17] += V.inner(T({{0,x[1]},{x[1],2*x[1]}}));
+            out[15] += innerProduct(V, T({{0,x[1]},{x[1],0}}));
+            out[16] += innerProduct(V, T({{-2*x[1],x[1]},{x[1],0}}));
+            out[17] += innerProduct(V, T({{0,x[1]},{x[1],2*x[1]}}));
           }
         }
       }

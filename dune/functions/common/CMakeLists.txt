@@ -12,10 +12,12 @@ install(FILES
         functionconcepts.hh
         geometryinancestor.hh
         indexaccess.hh
+        innerproduct.hh
         interfaces.hh
         localfunction.hh
         localfunction_imp.hh
         mapperutilities.hh
+        multidot.hh
         multiindex.hh
         overflowarray.hh
         polymorphicsmallobject.hh

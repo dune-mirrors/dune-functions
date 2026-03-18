@@ -36,22 +36,22 @@ def hornerScheme(f, derivative = [x,y], **kwargs):
 
   if derivative == "Divdiv":
     result = horner(diff(f[0,0].diff(x) + f[0,1].diff(y), x) +  diff(f[1,0].diff(x) + f[1,1].diff(y), y))
-  result =  [] # result is at least tensor order 1
-  for i in range(s[0]):
-    if derivative == "Div":
-      result.append(horner(f[0,0].diff(x) + f[0,1].diff(y)))
-      result.append(horner(f[1,0].diff(x) + f[1,1].diff(y)))
-    else:
-      result.append([]) # result is at least tensor order 2
-      for j in range(s[1]):
-        if derivative is None: #values
-          result[i].append(horner(f[i,j]))
-        elif isinstance(derivative, list):  #multiple derivatives, typically jacobian
-          result[i].append([])  ## tensor order 3
-          for k,direction in enumerate(derivative):
-            result[i][j].append(horner(diff(f[i,j], direction), **kwargs))
-        else:   # single derivative, i.e. partial
-          result[i].append(horner(diff(f[i,j], derivative)))
+  else:
+    result =  [] # result is at least tensor order 1
+    for i in range(s[0]):
+      if derivative == "Div":
+        result.append(horner(f[i,0].diff(x) + f[i,1].diff(y)))
+      else:
+        result.append([]) # result is at least tensor order 2
+        for j in range(s[1]):
+          if derivative is None: #values
+            result[i].append(horner(f[i,j]))
+          elif isinstance(derivative, list):  #multiple derivatives, typically jacobian
+            result[i].append([])  ## tensor order 3
+            for k,direction in enumerate(derivative):
+              result[i][j].append(horner(diff(f[i,j], direction), **kwargs))
+          else:   # single derivative, i.e. partial
+            result[i].append(horner(diff(f[i,j], derivative)))
 
   return result
 
@@ -65,6 +65,11 @@ def getCodeForList(f, **kwargs):
     code += "}"
   else:
     code += cxxcode(f, **kwargs)
+  return code
+
+def getCodeForScalarorVector(f, **kwargs):
+  code = ""
+  code += "\n*(iter++) = " + getCodeForList(f , **kwargs) + ";\n"
   return code
 
 def getCodeForMatrix(tensor, **kwargs):
@@ -86,7 +91,7 @@ def getCodeForMatrix(tensor, **kwargs):
 
 ### function body for evaluateFunction
 def getCodeForEvaluation(basis, **kwargs):
-  symmetric = kwargs.get("symmetric")
+  symmetric = kwargs.pop("symmetric")
   derivative = kwargs.pop("derivative", None)
   powsubs={'Pow': [(lambda b,e: e == 2, lambda b, e: ("{0}*{0}".format(b))),
   (lambda b,e: e == 3, lambda b, e: ("{0}*{0}*{0}".format(b))),
@@ -101,14 +106,22 @@ def getCodeForEvaluation(basis, **kwargs):
     code += "\n//{}th basis function".format(i)
 
     mat = hornerScheme(f, derivative)
-    code += getCodeForMatrix(mat,**kwargs)+"\n"
+    if derivative is None:
+      code += getCodeForMatrix(mat,symmetric = symmetric, **kwargs)+"\n"
+    else:
+      code += getCodeForScalarorVector(mat, **kwargs) + "\n"
   return code
 
 ## Generate an include file for evaluation methods
 def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, symmetric = False, **kwargs):
 
   assert(isinstance(name, str))
-  code = "#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n namespace Dune::Functions{\n  namespace Impl{ \n    "
+  code = "// -*- tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-\n \
+// vi: set et ts=4 sw=2 sts=2: \n\n \
+// SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md\n\
+// SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later\n\
+// NOTE: This is an auto generated file from CodeGeneration_HHJ.py\n"
+  code += "#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n namespace Dune::Functions{\n  namespace Impl{ \n    "
   code += "template<class D, class R,int dim, unsigned int k>\n"
   code +='     void ' + name + 'LocalBasis<D,R, dim,k>::evaluateFunction(const typename Traits::DomainType &in,std::vector<typename Traits::RangeType> &out) const\n{\nout.resize(size());\n auto iter = out.begin();'
   code += "\n\n// generated with sympy from symfem library\n"
@@ -150,4 +163,10 @@ if __name__== "__main__":
     #         dim  = 0 if i == 0 or i == order else reference.tdim
     #         subEntityCount = 1 if i == order else 0
     #         dofs.append(PointEvaluation(reference, (sympy.Rational(i,order),), entity=(dim, subEntityCount)))
+  # hhj = createGenericReferenceElement("triangle", "HHJ", 3, variant="Dune")
+  # print(hhj.get_basis_function(0))
+  # print(diff(hhj.get_basis_function(0)[0][1], x))
+  # print(hhj.get_basis_function(0)[0][1].diff(x))
+
+
   printEvaluationCode("HellanHerrmannJohnsonReference", reference = "triangle", feType = "HHJ",minOrder  = 0, maxOrder= 6, symmetric = True, variant = "Dune")

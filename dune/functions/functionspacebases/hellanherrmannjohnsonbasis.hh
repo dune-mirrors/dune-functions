@@ -689,5 +689,5 @@ namespace Dune::Functions
 
   } // end namespace BasisFactory
 } // end namespace Dune::Functions
-#include <dune/functions/functionspacebases/hellanhermannjohnsonbasis_inc.hh>
+#include <dune/functions/functionspacebases/hellanherrmannjohnsonbasis_inc.hh>
 #endif // DUNE_FUNCTIONS_FUNCTIONSPACEBASES_HELLANHerrmannJOHNSONBASIS_HH

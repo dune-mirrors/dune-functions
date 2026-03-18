@@ -17,14 +17,14 @@
 #include <dune/grid/yaspgrid.hh>
 #include <dune/grid/io/file/gmshreader.hh>
 #include <dune/grid/io/file/printgrid.hh>
-#include <dune/functions/functionspacebases/hellanhermannjohnsonbasis.hh>
+#include <dune/functions/functionspacebases/hellanherrmannjohnsonbasis.hh>
 #include <dune/functions/functionspacebases/test/basistest.hh>
 
 
 using namespace Dune;
 
 template<int k, class GridView>
-void testHellanHermannJohnsonBasis(TestSuite& test, const GridView& gridView)
+void testHellanHerrmannJohnsonBasis(TestSuite& test, const GridView& gridView)
 {
   std::cout<<"  Testing order: "<< k <<std::endl;
   Dune::printGrid(gridView.grid(), Dune::MPIHelper::instance(), "grid");
@@ -50,13 +50,13 @@ int main (int argc, char* argv[])
   TestSuite test;
 
   // Test with pure simplex grid
-  std::cout<<"Testing Hellan-Hermann-Johnson basis in 2D with simplex grid\n";
+  std::cout<<"Testing Hellan-Herrmann-Johnson basis in 2D with simplex grid\n";
   {
     auto triangleGrid = Dune::StructuredGridFactory<UGGrid<2>>::createSimplexGrid({0.0,0.0},{1.0,1.0},{1u,1u});
     auto triangleGridView = triangleGrid->leafGridView();
-    testHellanHermannJohnsonBasis<0>(test, triangleGridView);
-    testHellanHermannJohnsonBasis<1>(test, triangleGridView);
-    testHellanHermannJohnsonBasis<2>(test, triangleGridView);
+    testHellanHerrmannJohnsonBasis<0>(test, triangleGridView);
+    testHellanHerrmannJohnsonBasis<1>(test, triangleGridView);
+    testHellanHerrmannJohnsonBasis<2>(test, triangleGridView);
   }
 
   {
@@ -72,13 +72,13 @@ int main (int argc, char* argv[])
     auto grid = gridFactory.createGrid();
     auto gridView = grid->leafGridView();
 
-    testHellanHermannJohnsonBasis<0>(test, gridView);
-    testHellanHermannJohnsonBasis<1>(test, gridView);
-    testHellanHermannJohnsonBasis<2>(test, gridView);
-    testHellanHermannJohnsonBasis<3>(test, gridView);
-    testHellanHermannJohnsonBasis<4>(test, gridView);
-    testHellanHermannJohnsonBasis<5>(test, gridView);
-    testHellanHermannJohnsonBasis<6>(test, gridView);
+    testHellanHerrmannJohnsonBasis<0>(test, gridView);
+    testHellanHerrmannJohnsonBasis<1>(test, gridView);
+    testHellanHerrmannJohnsonBasis<2>(test, gridView);
+    testHellanHerrmannJohnsonBasis<3>(test, gridView);
+    testHellanHerrmannJohnsonBasis<4>(test, gridView);
+    testHellanHerrmannJohnsonBasis<5>(test, gridView);
+    testHellanHerrmannJohnsonBasis<6>(test, gridView);
 
   }
   return test.exit();

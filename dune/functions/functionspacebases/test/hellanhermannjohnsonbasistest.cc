@@ -30,7 +30,7 @@ void testHellanHermannJohnsonBasis(TestSuite& test, const GridView& gridView)
   Dune::printGrid(gridView.grid(), Dune::MPIHelper::instance(), "grid");
   // Check basis created 'manually'
   {
-    Functions::HellanHermannJohnsonBasis<GridView,k> basis(gridView);
+    Functions::HellanHerrmannJohnsonBasis<GridView,k> basis(gridView);
     test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck(), CheckLocalFiniteElementFlag<0>()));
   }
 
@@ -75,6 +75,11 @@ int main (int argc, char* argv[])
     testHellanHermannJohnsonBasis<0>(test, gridView);
     testHellanHermannJohnsonBasis<1>(test, gridView);
     testHellanHermannJohnsonBasis<2>(test, gridView);
+    testHellanHermannJohnsonBasis<3>(test, gridView);
+    testHellanHermannJohnsonBasis<4>(test, gridView);
+    testHellanHermannJohnsonBasis<5>(test, gridView);
+    testHellanHermannJohnsonBasis<6>(test, gridView);
+
   }
   return test.exit();
 }

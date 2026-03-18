@@ -34,20 +34,24 @@ def hornerScheme(f, derivative = [x,y], **kwargs):
   s = shape(f)
   assert(len(s) == 2)
 
-  result =  [] #
+  if derivative == "Divdiv":
+    result = horner(diff(f[0,0].diff(x) + f[0,1].diff(y), x) +  diff(f[1,0].diff(x) + f[1,1].diff(y), y))
+  result =  [] # result is at least tensor order 1
   for i in range(s[0]):
-    result.append([])
-    for j in range(s[1]):
-      if derivative is None: #values
-        result[i].append(horner(f[i,j]))
-      elif derivative == "Divdiv":
-        result[i].append(horner(diff(f[i,j].diff(x), x)+ diff(f[i,j].diff(y), y)))
-      elif isinstance(derivative, list):  #multiple derivatives, typically jacobian
-        result[i].append([])
-        for k,direction in enumerate(derivative):
-          result[i][j].append(horner(diff(f[i,j], direction), **kwargs))
-      else:   # single derivative, i.e. partial
-        result[i].append(horner(diff(f[i,j], derivative)))
+    if derivative == "Div":
+      result.append(horner(f[0,0].diff(x) + f[0,1].diff(y)))
+      result.append(horner(f[1,0].diff(x) + f[1,1].diff(y)))
+    else:
+      result.append([]) # result is at least tensor order 2
+      for j in range(s[1]):
+        if derivative is None: #values
+          result[i].append(horner(f[i,j]))
+        elif isinstance(derivative, list):  #multiple derivatives, typically jacobian
+          result[i].append([])  ## tensor order 3
+          for k,direction in enumerate(derivative):
+            result[i][j].append(horner(diff(f[i,j], direction), **kwargs))
+        else:   # single derivative, i.e. partial
+          result[i].append(horner(diff(f[i,j], derivative)))
 
   return result
 
@@ -121,7 +125,7 @@ def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, sy
   code += 'template<class D, class R, int dim, unsigned int k>\n      void ' + name + 'LocalBasis<D,R,dim,k>::evaluateDivDiv(const typename Traits::DomainType &in,std::vector<typename Traits::DivDivType> &out) const\n{\nout.resize(size());\nauto iter = out.begin();'
   code += "\n\n// generated with sympy from symfem library\n"
   code += "auto const&x = in[0], y = in[1];"
-  for i in range(maxOrder):
+  for i in range(minOrder, maxOrder +1):
     fe = createGenericReferenceElement(reference, feType, i)
     basis = fe.get_basis_functions()
     code += "if constexpr (k =="+str(i)+"){"
@@ -146,4 +150,4 @@ if __name__== "__main__":
     #         dim  = 0 if i == 0 or i == order else reference.tdim
     #         subEntityCount = 1 if i == order else 0
     #         dofs.append(PointEvaluation(reference, (sympy.Rational(i,order),), entity=(dim, subEntityCount)))
-  printEvaluationCode("HellanHerrmannJohnsonReference", reference =  "triangle", feType = "HHJ",minOrder  = 0,maxOrder= 6, symmetric = True, variant = "Dune")
+  printEvaluationCode("HellanHerrmannJohnsonReference", reference = "triangle", feType = "HHJ",minOrder  = 0, maxOrder= 6, symmetric = True, variant = "Dune")

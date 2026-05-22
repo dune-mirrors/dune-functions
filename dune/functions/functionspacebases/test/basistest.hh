@@ -458,6 +458,36 @@ struct EnableNormalContinuityCheck : public EnableContinuityCheck
   }
 };
 
+struct EnableNormal_VectorContinuityCheck : public EnableContinuityCheck
+{
+  auto localContinuityCheck() const {
+    auto normalJump = [this](auto&&jump, auto&& intersection, auto&& x) -> double {
+      auto tmp = intersection.unitOuterNormal(x);
+      jump.mv(intersection.unitOuterNormal(x), tmp);
+      return tmp.infinity_norm();
+    };
+    return localJumpContinuityCheck(normalJump, order_, tol_);
+  }
+};
+
+
+// Flag to enable a local normal-continuity check for checking strong
+// continuity across an intersection within checkBasisContinuity().
+//
+// For each inside basis function this will compute the normal jump against
+// zero or the corresponding inside basis function. The latter is then
+// checked for being (up to a tolerance) zero on a set of quadrature points.
+struct EnableNormalNormalContinuityCheck : public EnableContinuityCheck
+{
+  auto localContinuityCheck() const {
+    auto normalJump = [](auto&& jump, auto&& intersection, auto&& x) -> double {
+      auto n = intersection.unitOuterNormal(x);
+      return Dune::Functions::multiDot(jump,n,n);
+    };
+    return localJumpContinuityCheck(normalJump, order_, tol_);
+  }
+};
+
 // Flag to enable a local tangential-continuity check for checking continuity
 // of tangential parts of a vector-valued basis across an intersection
 // within checkBasisContinuity().

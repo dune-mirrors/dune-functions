@@ -347,6 +347,7 @@ bool testBoundFE(const FE &fe, Element const &element, char disabledTests = Disa
   {
     success = testCanRepresentDifferentiableConstants<FE>(fe) and success;
   }
+  if constexpr (hasEvaluateJacobian<FE> and diffOrder > 0){
 
   if (not(disabledTests & DisableJacobian))
   {

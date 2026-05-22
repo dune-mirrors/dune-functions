@@ -121,6 +121,8 @@ void ArnoldWintherReferenceLocalBasis<D, R, dim, k>::evaluateFunction(
     // 23th basis function
     *(iter++) = sym<Range>(0, 0, -24 * x * y + y * (24 - 24 * y));
   }
+  else
+    DUNE_THROW(NotImplemented, "Higher order not implemented");
 }
 template<class D, class R, int dim, unsigned int k>
 void ArnoldWintherReferenceLocalBasis<D, R, dim, k>::evaluateDivergence(

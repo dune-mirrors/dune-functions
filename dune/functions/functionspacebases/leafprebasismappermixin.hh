@@ -18,7 +18,99 @@
 
 
 namespace Dune::Functions {
+namespace Impl {
 
+struct NoTwist
+{
+  template <class Element>
+  unsigned int operator() (const Element& element, unsigned int s, unsigned int c, unsigned int i) const
+  {
+    return i;
+  }
+};
+
+template <class IndexSet>
+struct EdgeTwist
+{
+  static constexpr int dim = IndexSet::dimension;
+
+  /**
+   * \param indexSet The gridView indexSet containing the elements and vertices
+   * \param n  The number of DOFs per edge.
+   */
+  EdgeTwist (const IndexSet& indexSet, unsigned int n)
+    : indexSet_(&indexSet)
+    , n_(n)
+  {}
+
+  template <class Element>
+  unsigned int operator() (const Element& element, unsigned int s, unsigned int c, unsigned int i) const
+  {
+    if (c == 1) {
+      auto refElem = referenceElement(element);
+      auto v0 = indexSet_->subIndex(element,refElem.subEntity(s,c,0,dim),dim);
+      auto v1 = indexSet_->subIndex(element,refElem.subEntity(s,c,1,dim),dim);
+      bool flip = (v0 > v1);
+      return flip ? n_-1 - i : i;
+    } else {
+      return i;
+    }
+  }
+
+private:
+  const IndexSet* indexSet_;
+  unsigned int n_;
+};
+
+/** An edge twist for multiple sets of of separately twisted degrees of freedom, numbered alternating, on an edge.*/
+template <class IndexSet>
+struct ModuloEdgeTwist
+{
+  static constexpr int dim = IndexSet::dimension;
+
+  /**
+   * \param indexSet The gridView indexSet containing the elements and vertices
+   * \param n  The number of DOFs per edge.
+   * \param mod The number of sets of DOFs to be twisted separately
+   */
+  ModuloEdgeTwist (const IndexSet& indexSet, unsigned int n, unsigned int mod)
+    : indexSet_(&indexSet)
+    , n_(n)
+    , mod_(mod)
+  {
+    assert(n%mod==0 && "ModuloEdgeTwist only works in mod is a divisor of total dofs n");
+  }
+
+  template <class Element>
+  unsigned int operator() (const Element& element, unsigned int s, unsigned int c, unsigned int i) const
+  {
+    if (c == 1) {
+      auto refElem = referenceElement(element);
+      auto v0 = indexSet_->subIndex(element,refElem.subEntity(s,c,0,dim),dim);
+      auto v1 = indexSet_->subIndex(element,refElem.subEntity(s,c,1,dim),dim);
+      bool flip = (v0 > v1);
+      if (flip)
+      {
+        unsigned int setSize = n_/mod_;
+        unsigned int setIndex = i%mod_;
+        unsigned int indexInSet = i/mod_;
+        return n_  - setSize * (indexInSet + 1) + setIndex;
+
+      }
+      else
+        return i;
+    } else {
+      return i;
+    }
+  }
+
+private:
+  const IndexSet* indexSet_;
+  unsigned int n_;
+  unsigned int mod_;
+};
+
+} // end namespace Impl
 
 
 // Helper function returning a random access range

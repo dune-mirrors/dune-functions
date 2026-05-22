@@ -19,8 +19,11 @@
 #include <dune/localfunctions/common/localfiniteelementtraits.hh>
 #include <dune/localfunctions/common/localinterpolation.hh>
 #include <dune/localfunctions/common/localkey.hh>
+#include <dune/localfunctions/lagrange/lagrangesimplex.hh>
 
 #include <dune/functions/common/densevectorview.hh>
+#include <dune/functions/common/multidot.hh>
+#include <dune/functions/common/mapperutilities.hh>
 
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
@@ -65,15 +68,13 @@ struct ArnoldWintherTensorTypes {
  * \tparam D Type to represent the field in the domain
  * \tparam R Type to represent the field in the range
  */
-template <class D, class R> class ArnoldWintherReferenceLocalBasis {
+template <class D, class R, int dim = 2, unsigned int k = 2>
+ class ArnoldWintherReferenceLocalBasis {
   // only implemented for triangles
   // only lowest order implemented
-
+  using Range = ArnoldWintherTensorTypes<R, dim>::Matrix;
 public:
-  static constexpr unsigned int dim = 2;
-  // TODO generalize this to surface maps
-  static constexpr unsigned int dimAmbient = 2;
-
+  static_assert(dim == 2, "AW Element only implemented in 2d");
   static constexpr unsigned int coeffSize = 24;
   // using Traits = LocalBasisTraits<D, dim, typename ArnoldWinterTensorTypes<D,
   // dim>::Vector, R, dim* dim, typename ArnoldWinterTensorTypes<R,
@@ -87,7 +88,7 @@ public:
     constexpr static int dimDomain = dim;
 
     //! \brief domain type
-    using DomainType = Dune::FieldVector<D, dimDomain>;
+    using DomainType = Dune::FieldVector<D, dim>;
 
     //! \brief Export type for range field
     using RangeFieldType = R;
@@ -95,15 +96,15 @@ public:
     //! \brief dimension of the range
     // TODO discuss what this should be. For now we take it as the entries in
     // the range matrix
-    constexpr static int dimRange = dimAmbient * dimAmbient;
+    constexpr static int dimRange = dim * dim;
 
     //! \brief range type
-    using RangeType = ArnoldWintherTensorTypes<R, dimAmbient>::Matrix;
+    using RangeType = ArnoldWintherTensorTypes<R, dim>::Matrix;
 
     /** \brief Type to represent derivative
      */
     using JacobianType =
-        ArnoldWintherTensorTypes<R, dimAmbient, dim>::ThreeTensor;
+        ArnoldWintherTensorTypes<R, dim, dim>::ThreeTensor;
 
     /** \brief Type to represent the rowwise divergence
      */
@@ -192,216 +193,6 @@ private:
   std::vector<LocalKey> localKeys_;
 };
 
-template <unsigned int momentOrder, class F, class Geometry>
-static auto integralMoment(F const &f, Geometry const &geo, int quadOrder) {
-  using ctype = typename Geometry::ctype;
-  using LocalCoordinate = typename Geometry::LocalCoordinate;
-  using GlobalCoordinate = typename Geometry::GlobalCoordinate;
-
-  auto quad = QuadratureRules<ctype, Geometry::mydimension>::rule(
-      geo.type(), quadOrder);
-
-  typename std::decay_t<std::remove_cv_t<decltype(std::declval<F>()(
-        std::declval<GlobalCoordinate>()))>> sum = 0.;
-
-  for (auto const &qp : quad) {
-    auto QP = geo.global(qp.position());
-    if constexpr (momentOrder == 0u)
-      sum += qp.weight() * f(QP) * geo.integrationElement(qp.position());
-    else
-    {
-      static_assert(
-          Geometry::mydimension == 1,
-          "Higher order moment only implememted for 1 dimensional facets");
-      sum += qp.weight() * Dune::power(ctype(qp.position()), momentOrder) * f(QP) *
-              geo.integrationElement(qp.position());
-    }
-  }
-  return sum;
-}
-
-/**\brief The Arnold-Winther degrees of freedom on the reference Trianlge
- * \TODO add functionalDescriptors
- * \TODO Actually, all we need now is the global interpolation, see
- * cubichermitebasis.hh
- */
-template <class D, class R>
-class ArnoldWintherReferenceLocalInterpolation {
-  using LocalBasis = ArnoldWintherReferenceLocalBasis<D, R>;
-  using size_type = std::size_t;
-  using LocalCoordinate = typename LocalBasis::Traits::DomainType;
-  using c_type = typename LocalBasis::Traits::DomainFieldType;
-  static constexpr size_type dim = LocalBasis::Traits::dimDomain;
-
-public:
-  ArnoldWintherReferenceLocalInterpolation(int quadOrder = 6)
-  : quadratureOrder(quadOrder){}
-
-  /** \brief Evaluate a given function at the Lagrange nodes
-   *
-   * \tparam F Type of function to evaluate
-   * \tparam C Type used for the values of the function
-   * \param[in] ff Function to evaluate
-   * \param[out] out Array of function values
-   */
-  template <typename F, typename C>
-  void interpolate(const F &f, std::vector<C> &out) const {
-
-    out.resize(LocalBasis::size());
-    auto refElement = Dune::ReferenceElements<double, dim>::simplex();
-    auto it = out.begin();
-
-    // point evaluations
-    // 9 DOFs in total
-    for (auto i = 0; i < refElement.size(dim); ++i) {
-      auto value = f(refElement.position(i, dim));
-      it[0] = value[0][0];
-      it[1] = value[0][1];
-      it[2] = value[1][1];
-      it += 3;
-    }
-
-    // integral moment over edges
-    // 12 DOFs in total
-    for (auto i = 0; i < refElement.size(1); ++i) {
-      auto average = integralMoment<0>(f, refElement.template geometry<1>(i), quadratureOrder);
-      auto firstMoment =
-          integralMoment<1>(f, refElement.template geometry<1>(i), quadratureOrder+1);
-
-      std::size_t lower = (i == 2) ? 1 : 0;
-      std::size_t upper = (i == 0) ? 1 : 2;
-      auto tangent =
-          refElement.position(upper, 2) - refElement.position(lower, 2);
-      tangent /= tangent.two_norm();
-      std::decay_t<decltype(tangent)> normal = {
-          tangent[1], -tangent[0]}; // rotation by -90 degree
-
-      using fRange = std::decay_t<std::remove_cv_t<decltype(f(refElement.position(i, dim)))>>;
-      using protomotedType =
-          typename PromotionTraits<typename FieldTraits<fRange>::field_type,
-                                   c_type>::PromotedType;
-
-      FieldVector<protomotedType, 2> normalTimesAverage, normalTimesFirstMoment;
-      average.mtv(normal, normalTimesAverage);
-      firstMoment.mv(normal, normalTimesFirstMoment);
-      it[0] = dot(normalTimesAverage, normal);
-      it[1] = dot(normalTimesAverage, tangent);
-      it[2] = dot(normalTimesFirstMoment, normal);
-      it[3] = dot(normalTimesFirstMoment, tangent);
-      it += 4;
-    }
-
-    // integral moment on element
-    // three DOFs in total
-    auto average = integralMoment<0>(f, refElement.template geometry<0>(0), quadratureOrder);
-    it[0] = average[0][0];
-    it[1] = average[0][1];
-    it[2] = average[1][1];
-  }
-
-  int quadratureOrder ;
-};
-
-
- /** \brief The Arnold-Winther degrees of freedom on the reference Trianlge
- * \TODO add functionalDescriptors
- */
-template <class Element, class R>
-class ArnoldWintherLocalInterpolation {
-  using size_type = std::size_t;
-  using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
-  using GlobalCoordinate = typename Element::Geometry::GlobalCoordinate;
-
-  using ctype = typename Element::Geometry::ctype;
-  static constexpr size_type dim = Element::Geometry::mydimension;
-  static constexpr size_type dimWorld = Element::Geometry::coordimension;
-  static constexpr int size = 24; // number of dofs. TODO generalize this!
-public:
-  ArnoldWintherLocalInterpolation(int quadOrder = 10)
-  : quadratureOrder(quadOrder)
-  {}
-
-  void bind(std::bitset<3> data, Element const& e){
-    edgeOrientation_ = data;
-    element = &e;
-  }
-
-  /** \brief Evaluate a given function at the Lagrange nodes
-   * \TODO this implemenation assumes constant normals/tangents. Generalize to curved grids
-   * \tparam F Type of function to evaluate
-   * \tparam C Type used for the values of the function
-   * \param[in] ff Function to evaluate
-   * \param[out] out Array of function values
-   */
-  template <typename F, typename C>
-  void interpolate(const F &f, std::vector<C> &out) const {
-
-    out.resize(size);
-    auto it = out.begin();
-    auto refElement = referenceElement(*element);
-
-    // point evaluations
-    // 9 DOFs in total
-    for (auto i = 0u; i < element->subEntities(dim); ++i) {
-      // auto value = f((*element).template subEntity<dim>(i).geometry().center());
-      auto value = f(element->geometry().global(refElement.position(i,2)));
-
-      it[0] = value[0][0];
-      it[1] = value[0][1];
-      it[2] = value[1][1];
-      it += 3;
-    }
-
-    // integral moment over edges
-    // 12 DOFs in total
-    for (auto i = 0u; i < element->subEntities(1); ++i) {
-      auto average = integralMoment<0>(f, (*element).template subEntity<1>(i).geometry(), quadratureOrder);
-      auto firstMoment =
-          integralMoment<1>(f, (*element).template subEntity<1>(i).geometry(), quadratureOrder + 1);
-
-      std::size_t lower = (i == 2) ? 1 : 0;
-      std::size_t upper = (i == 0) ? 1 : 2;
-      auto tangent = (*element).template subEntity<dim>(upper).geometry().center() - (*element).template subEntity<dim>(lower).geometry().center();
-      tangent /= tangent.two_norm();
-      std::decay_t<decltype(tangent)> normal = {
-          tangent[1], -tangent[0]}; // rotation by -90 degree
-
-      using fRange = typename std::decay_t<std::remove_cv_t<decltype(f(std::declval<GlobalCoordinate>()))>>;
-      using protomotedType =
-          typename PromotionTraits<typename FieldTraits<fRange>::field_type,
-                                   ctype>::PromotedType;
-
-      FieldVector<protomotedType, 2> normalTimesAverage, normalTimesFirstMoment;
-      average.mtv(normal, normalTimesAverage);
-      firstMoment.mv(normal, normalTimesFirstMoment);
-      it[0] = dot(normalTimesAverage, normal);
-      it[1] = dot(normalTimesAverage, tangent);
-      it[2] = dot(normalTimesFirstMoment, normal);
-      it[3] = dot(normalTimesFirstMoment, tangent);
-      // if edgeOrientation is wrong, then x -> 1-x therefore first moment -> zero moment - first moment
-      // Note that because both normals and the tangent switches sign, these cancel
-      // if (edgeOrientation_[i]){
-      //   it[2] = it[0] - it[2];
-      //   it[3] = it[1] - it[3];
-      // }
-      it += 4;
-    }
-
-    // integral moment on element
-    // three DOFs in total
-    auto average = integralMoment<0>(f, (*element).geometry(), quadratureOrder);
-    it[0] = average[0][0];
-    it[1] = average[0][1];
-    it[2] = average[1][1];
-  }
-
-private:
-  int quadratureOrder;
-  std::bitset<3> edgeOrientation_;
-  Element const* element = nullptr;
-
-};
-
 /** \brief Transforms shape function values and derivatives from reference
  * element coordinates to world coordinates using the double contravariant Piola
  * transform
@@ -424,15 +215,19 @@ struct DoubleContravariantPiolaTransformator {
             &values,
         const LocalCoordinate &xi, const Geometry &geometry) {
     auto jacobian = geometry.jacobian(xi);
+    auto JT = geometry.jacobianTransposed(xi);
+
     auto integrationElement = geometry.integrationElement(xi);
     assert(values[0].N() == values[0].M());
     assert(values[0].N() == jacobian.N());
     assert(jacobian.M() == jacobian.N());
 
     for (auto &value : values) {
-      value = jacobian * value * transpose(jacobian);
+      // value = jacobian * value * transpose(jacobian);
+      value = multiDot(value, JT, JT);
       value /= (integrationElement * integrationElement);
     }
+
     return;
   }
 
@@ -503,6 +298,251 @@ struct DoubleContravariantPiolaTransformator {
       return globalValue;
     }
   };
+};
+
+
+template <unsigned int momentOrder, class F, class Geometry>
+static auto integralMoment(F const &f, Geometry const &geo, int quadOrder) {
+  using ctype = typename Geometry::ctype;
+  using LocalCoordinate = typename Geometry::LocalCoordinate;
+  using GlobalCoordinate = typename Geometry::GlobalCoordinate;
+
+  auto quad = QuadratureRules<ctype, Geometry::mydimension>::rule(
+      geo.type(), quadOrder);
+
+  typename std::decay_t<std::remove_cv_t<decltype(std::declval<F>()(
+        std::declval<GlobalCoordinate>()))>> sum = 0.;
+
+  for (auto const &qp : quad) {
+    auto QP = geo.global(qp.position());
+    if constexpr (momentOrder == 0u)
+      sum += qp.weight() * f(QP) * geo.integrationElement(qp.position());
+    else
+    {
+      static_assert(
+          Geometry::mydimension == 1,
+          "Higher order moment only implememted for 1 dimensional facets");
+      sum += qp.weight() * Dune::power(ctype(qp.position()), momentOrder) * f(QP) *
+              geo.integrationElement(qp.position());
+    }
+  }
+  return sum;
+}
+
+template <class C, unsigned int lagrangeOrder, class F, class Geometry>
+static auto LagrangeMoment(F const &f, Geometry const &geo, int quadOrder) {
+  using ctype = typename Geometry::ctype;
+  using LocalCoordinate = typename Geometry::LocalCoordinate;
+  using GlobalCoordinate = typename Geometry::GlobalCoordinate;
+  using D = LocalCoordinate::field_type;
+  static constexpr int dim = Geometry::mydimension;
+
+  Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim, lagrangeOrder> edgeLagrangebasis;
+  thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim, lagrangeOrder>::Traits::RangeType> edgeValues;
+  static constexpr std::size_t edgeSize = edgeLagrangebasis.size();
+
+  auto quad = QuadratureRules<ctype, Geometry::mydimension>::rule(
+      geo.type(), quadOrder);
+
+
+  using ReturnType = std::remove_cvref_t<decltype(std::declval<F>()(
+        std::declval<GlobalCoordinate>()))>;
+
+  std::array<ReturnType, edgeSize> result;
+
+  for (std::size_t i = 0; i < edgeSize; ++i)
+    result[i] = 0.;
+
+  for (auto const &qp : quad) {
+    auto QP = geo.global(qp.position());
+    edgeLagrangebasis.evaluateFunction(qp.position(), edgeValues);
+    auto value = f(QP)*qp.weight()*geo.integrationElement(qp.position());
+    for (std::size_t i = 0; i < edgeSize; ++i){
+      result[i] += value*edgeValues[i][0];
+    }
+  }
+  return result;
+}
+
+/**\brief The Arnold-Winther degrees of freedom on the reference Trianlge
+ * \TODO add functionalDescriptors
+ * \TODO Actually, all we need now is the global interpolation, see
+ * cubichermitebasis.hh
+ */
+template <class D, class R>
+class ArnoldWintherReferenceLocalInterpolation {
+  using LocalBasis = ArnoldWintherReferenceLocalBasis<D, R>;
+  using size_type = std::size_t;
+  using LocalCoordinate = typename LocalBasis::Traits::DomainType;
+  using c_type = typename LocalBasis::Traits::DomainFieldType;
+  static constexpr size_type dim = LocalBasis::Traits::dimDomain;
+
+public:
+  ArnoldWintherReferenceLocalInterpolation(int quadOrder = 10)
+  : quadratureOrder(quadOrder){}
+
+  /** \brief Evaluate a given function at the Lagrange nodes
+   *
+   * \tparam F Type of function to evaluate
+   * \tparam C Type used for the values of the function
+   * \param[in] ff Function to evaluate
+   * \param[out] out Array of function values
+   */
+  template <typename F, typename C>
+  void interpolate(const F &f, std::vector<C> &out) const {
+
+    out.resize(LocalBasis::size());
+    auto refElement = Dune::ReferenceElements<double, dim>::simplex();
+    auto it = out.begin();
+
+    // point evaluations
+    // 9 DOFs in total
+    for (auto i = 0; i < refElement.size(dim); ++i) {
+      auto value = f(refElement.position(i, dim));
+      it[0] = value[0][0];
+      it[1] = value[0][1];
+      it[2] = value[1][1];
+      it += 3;
+    }
+
+    // integral moment over edges
+    // 12 DOFs in total
+    for (auto i = 0; i < refElement.size(1); ++i) {
+      auto moments = LagrangeMoment<C,1>(f, refElement.template geometry<1>(i), quadratureOrder);
+
+      std::size_t lower = (i == 2) ? 1 : 0;
+      std::size_t upper = (i == 0) ? 1 : 2;
+      auto tangent =
+          refElement.position(upper, 2) - refElement.position(lower, 2);
+      tangent /= tangent.two_norm();
+      std::decay_t<decltype(tangent)> normal = {
+          -tangent[1], tangent[0]};
+
+      using fRange = std::decay_t<std::remove_cv_t<decltype(f(refElement.position(i, dim)))>>;
+      using protomotedType =
+          typename PromotionTraits<typename FieldTraits<fRange>::field_type,
+                                   c_type>::PromotedType;
+
+      FieldVector<protomotedType, 2> tmp;
+      for (auto&& val : moments){
+        val.mtv(normal, tmp);
+
+        it[0] = dot(tmp, normal)*refElement.template geometry<1>(i).volume();
+        it[1] = dot(tmp, tangent)*refElement.template geometry<1>(i).volume();
+        it += 2;
+      }
+
+    }
+
+    // integral moment on element
+    // three DOFs in total
+    auto average = integralMoment<0>(f, refElement.template geometry<0>(0), quadratureOrder);
+    it[0] = average[0][0];
+    it[1] = average[0][1];
+    it[2] = average[1][1];
+  }
+
+  int quadratureOrder ;
+};
+
+
+ /** \brief The Arnold-Winther degrees of freedom on the reference Trianlge
+ * \TODO add functionalDescriptors
+ */
+template <class Element, class R>
+class ArnoldWintherLocalInterpolation {
+  using size_type = std::size_t;
+  using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
+  using GlobalCoordinate = typename Element::Geometry::GlobalCoordinate;
+
+  using ctype = typename Element::Geometry::ctype;
+  static constexpr size_type dim = Element::Geometry::mydimension;
+  static constexpr size_type dimWorld = Element::Geometry::coordimension;
+  static constexpr int size = 24; // number of dofs. TODO generalize this!
+public:
+  ArnoldWintherLocalInterpolation(int quadOrder = 10)
+  : quadratureOrder(quadOrder)
+  {}
+
+  void bind(std::bitset<3> data, Element const& e){
+    edgeOrientation_ = data;
+    element = &e;
+  }
+
+  /** \brief Evaluate a given function at the Lagrange nodes
+   * \TODO this implemenation assumes constant normals/tangents. Generalize to curved grids
+   * \tparam F Type of function to evaluate
+   * \tparam C Type used for the values of the function
+   * \param[in] ff Function to evaluate
+   * \param[out] out Array of function values
+   */
+  template <typename F, typename C>
+  void interpolate(const F &f, std::vector<C> &out) const {
+
+    out.resize(size);
+    auto it = out.begin();
+    auto refElement = referenceElement(*element);
+    auto lf = DoubleContravariantPiolaTransformator::LocalValuedFunction<F, typename Element::Geometry::LocalCoordinate, Element>(f, *element);
+    // point evaluations
+    // 9 DOFs in total
+    for (auto i = 0u; i < element->subEntities(dim); ++i) {
+      auto geoInCell = refElement.template geometry<dim>(i);
+
+      auto value = f(geoInCell.center());
+
+      it[0] = value[0][0];
+      it[1] = value[0][1];
+      it[2] = value[1][1];
+      it += 3;
+    }
+
+    // integral moment over edges
+    // 12 DOFs in total
+    static constexpr int momentOrder =1;
+    for (auto i = 0u; i < element->subEntities(1); ++i) {
+      auto edgeGeo = (*element).template subEntity<1>(i).geometry();
+      auto refEdgeGeo = refElement.template geometry<1>(i);
+
+      auto moments = LagrangeMoment<C, momentOrder>(f, refEdgeGeo, quadratureOrder);
+
+      std::size_t lower = (i == 2) ? 1 : 0;
+      std::size_t upper = (i == 0) ? 1 : 2;
+      auto tangent = (*element).template subEntity<dim>(upper).geometry().center() - (*element).template subEntity<dim>(lower).geometry().center();
+      tangent /= tangent.two_norm();
+      std::decay_t<decltype(tangent)> normal = {
+          -tangent[1], tangent[0]};
+
+      using fRange = typename std::decay_t<std::remove_cv_t<decltype(f(std::declval<GlobalCoordinate>()))>>;
+      using protomotedType =
+          typename PromotionTraits<typename FieldTraits<fRange>::field_type,
+                                   ctype>::PromotedType;
+
+      FieldVector<protomotedType, 2> normalTimesMoment;
+      for (std::size_t m = 0; m < momentOrder + 1; ++m){
+        if (edgeOrientation_[i])
+          moments[momentOrder -m].mtv(normal, normalTimesMoment);
+        else
+          moments[m].mtv(normal, normalTimesMoment);
+        it[0] = dot(normalTimesMoment, normal)*edgeGeo.volume();
+        it[1] = dot(normalTimesMoment, tangent)*edgeGeo.volume();
+        it += 2;
+      }
+
+    }
+
+    // integral moment on element
+    // three DOFs in total
+    auto average = integralMoment<0>(f, refElement.template geometry<0>(0), quadratureOrder)*(*element).geometry().volume()/refElement.template geometry<0>(0).volume();
+    it[0] = average[0][0];
+    it[1] = average[0][1];
+    it[2] = average[1][1];
+  }
+
+private:
+  int quadratureOrder;
+  std::bitset<3> edgeOrientation_;
+  Element const* element = nullptr;
+
 };
 
 // Class offering reading and writing access to a Vector starting from an index
@@ -780,7 +820,7 @@ private:
 
       globalEdgeLength[i] = globalEdge.two_norm();
 
-      referenceG[i] = {{tangent[1], tangent[0]}, {-tangent[0], tangent[1]}};
+      referenceG[i] = {{-tangent[1], tangent[0]}, {tangent[0], tangent[1]}};
       auto tmp = tangent, tmp2 = tangent;
       jacobianTransposed.mtv(tangent, tmp);
       jacobianTransposed.mv(tmp, tmp2);
@@ -789,27 +829,31 @@ private:
       alpha[i] = tmp[0] / jacobianDeterminant;
       beta[i] = tmp[1] / jacobianDeterminant;
 
+
+
       // already inverted W_k
+      // By using Lagrange moments these matrices are orientation invariant.
       W_k[i] = 0;
-      W_k[i][0][0] = 1.;
-      W_k[i][1][0] = -alpha[i] / beta[i];
-      W_k[i][1][1] = 1. / beta[i];
-      // These entries transform the moments of order 1. They are orientation
-      // dependent (due to the direction change in parametrization)
-      if (!edgeOrientation_[i]) {
+      if (edgeOrientation_[i]){
+
+        W_k[i][2][0] = 1.;
+        W_k[i][3][0] = -alpha[i] / beta[i];
+        W_k[i][3][1] = 1. / beta[i];
+        W_k[i][0][2] = 1.;
+        W_k[i][1][2] = -alpha[i] / beta[i];
+        W_k[i][1][3] = 1. / beta[i];
+
+      }
+      else{
+        W_k[i][0][0] = 1.;
+        W_k[i][1][0] = -alpha[i] / beta[i];
+        W_k[i][1][1] = 1. / beta[i];
         W_k[i][2][2] = 1.;
         W_k[i][3][2] = -alpha[i] / beta[i];
         W_k[i][3][3] = 1. / beta[i];
-      } else {
-        // First order moment over a wronly oriented edge equals the zero order
-        // moment minus the first order moment
-        W_k[i][2][0] = 1.;
-        W_k[i][2][2] = -1.;
-        W_k[i][3][0] = -alpha[i] / beta[i];
-        W_k[i][3][1] = 1. / beta[i];
-        W_k[i][3][2] = alpha[i] / beta[i];
-        W_k[i][3][3] = -1. / beta[i];
       }
+
+
       W_k[i] *= globalEdgeLength[i] / referenceEdgeLength[i];
     }
     // Fill W  (not yet inverted)
@@ -834,29 +878,6 @@ private:
         std::array<Dune::FieldMatrix<R, 3, 3>, 3>{W, W, W}, W_k,
         W / jacobianDeterminant};
   }
-  /**
-   * \brief Apply the transformation to some Vector of Shapevalues, Jacobians or
-   * Hessians
-   *
-   * \tparam Values Vector
-   * \param values
-   */
-  template <class Values> void apply(Values &values) const {
-    Values tmp = values;
-    mat_.mv(tmp, values);
-  }
-
-  /**
-   * \brief Apply the Inverse transformation to some Vector of Shapevalues,
-   * Jacobians or Hessians
-   *
-   * \tparam Values Vector
-   * \param values
-   */
-  template <class Values> void applyInverse(Values &values) const {
-    Values tmp = values;
-    mat_.getInverse().mv(tmp, values);
-  }
 
 private:
   Impl::ArnoldWintherReferenceLocalBasis<D, R> basis_;
@@ -873,11 +894,13 @@ private:
 template <class GV, class R> class ArnoldWintherNode;
 
 template <class GV, typename R>
-class ArnoldWintherPreBasis : public LeafPreBasisMapperMixin<GV> {
+class ArnoldWintherPreBasis
+: public LeafPreBasisMapperMixin<GV>//, Impl::ModuloEdgeTwist<typename GV::IndexSet>>
+{
   static const int dim = GV::dimension;
   static_assert(dim == 2,
                 "ArnoldWinther PreBasis only implemented for 2d simplices");
-  using Base = LeafPreBasisMapperMixin<GV>;
+  using Base = LeafPreBasisMapperMixin<GV>;//, Impl::ModuloEdgeTwist<typename GV::IndexSet>>;
 
   // helper methods to assign each subentity the number of dofs. Used by the
   // LeafPreBasisMapperMixin.
@@ -908,15 +931,17 @@ public:
 
   //! Constructor for a given grid view object
   ArnoldWintherPreBasis(const GV &gv)
-      : Base(gv, arnoldWintherMapperLayout),
-        mapper_({gv, mcmgElementLayout()}) {
-    updateState(gv);
+      : Base(gv, arnoldWintherMapperLayout),//, Impl::ModuloEdgeTwist{gv.indexSet(), arnoldWintherMapperLayout(GeometryTypes::line, dim), 2}),
+        mapper_({gv, mcmgElementLayout()})
+  {
+    data_ = Impl::computeEdgeOrientations(mapper_);
   }
 
   //! Update the stored grid view, to be called if the grid has changed
   void update(GridView const &gv) {
     Base::update(gv);
-    updateState(gv);
+    mapper_.update(this->gridView());
+    data_ = Impl::computeEdgeOrientations(mapper_);
   }
 
   /**
@@ -924,42 +949,7 @@ public:
    */
   Node makeNode() const { return Node{mapper_, data_}; }
 
-protected:
-  // \TODO replace with external functionality once argyris is merged
-  void updateState(GridView const &gridView)
-  {
-    data_.resize(gridView.size(0));
-    // compute orientation for all elements
-    std::bitset<3> orientation = 0;
-    auto const &idSet = gridView.grid().globalIdSet();
-    auto const& indexSet = gridView.indexSet();
-
-    for (const auto &element : elements(gridView)) {
-      const auto &refElement = referenceElement(element);
-      auto elementIndex = mapper_.index(element);
-
-      orientation = 0;
-
-      for (std::size_t i = 0; i < element.subEntities(dim - 1); i++) {
-        // Local vertex indices within the element
-        auto localV0 = refElement.subEntity(i, dim - 1, 0, dim);
-        auto localV1 = refElement.subEntity(i, dim - 1, 1, dim);
-
-        // Global vertex indices within the grid
-        auto globalV0 = idSet.subId(element, localV0, dim);
-        auto globalV1 = idSet.subId(element, localV1, dim);
-        // The edge is flipped if the local ordering disagrees with global
-        // ordering
-        if(indexSet.subIndex(element.template subEntity<1>(i),0,2)>indexSet.subIndex(element.template subEntity<1>(i),1,2)){
-        // if ((localV0 < localV1 && globalV0 > globalV1) ||
-            // (localV0 > localV1 && globalV0 < globalV1)) {
-          orientation[i] = 1;
-        }
-      }
-      data_[elementIndex] = orientation;
-    }
-  }
-
+private:
   SubEntityMapper mapper_;
 public:
   std::vector<std::bitset<3>> data_;
@@ -978,7 +968,7 @@ public:
 
   ArnoldWintherNode(Mapper const &m, std::vector<std::bitset<3>> const &data)
       : mapper_(&m), data_(&data) {
-    this->setSize(finiteElement_.size());
+    // this->setSize(finiteElement_.size());
   }
 
   ~ArnoldWintherNode() {}
@@ -1037,4 +1027,7 @@ struct FieldTraits<typename Functions::Impl::VectorSlice<T>> {
   typedef typename FieldTraits<T>::real_type real_type;
 };
 } // namespace Dune
+
+#include <dune/functions/functionspacebases/arnoldwintherbasis_inc.hh>
+
 #endif

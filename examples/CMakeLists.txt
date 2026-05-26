@@ -28,3 +28,9 @@ add_executable("poisson-mfem" poisson-mfem.cc)
 target_link_libraries(poisson-mfem PRIVATE Dune::Functions)
 set_property(TARGET poisson-mfem PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples poisson-mfem)
+
+
+add_executable("indexing" indexing.cc)
+target_link_libraries(indexing PRIVATE Dune::Functions)
+set_property(TARGET indexing PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples indexing)

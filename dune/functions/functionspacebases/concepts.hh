@@ -273,6 +273,63 @@ struct GlobalBasis
 };
 
 
+struct DifferentiableBasisTree;
+
+struct DifferentiableLeafBasisNode
+{
+  template<class N>
+  auto require(const N& node) -> decltype(
+    requireType<typename N::FiniteElement::Traits::LocalBasisType::Traits::JacobianType>()
+  );
+};
+
+struct DifferentiablePowerBasisNode
+{
+  template<class N>
+  auto require(const N& node) -> decltype(
+    requireConcept<DifferentiableBasisTree, Dune::TypeTree::Child<N, 0>>()
+  );
+};
+
+struct DifferentiableDynamicPowerBasisNode
+{
+  template<class N>
+  auto require(const N& node) -> decltype(
+    requireConcept<DifferentiableBasisTree, Dune::TypeTree::Child<N, 0>>()
+  );
+};
+
+struct DifferentiableCompositeBasisNode
+{
+  template<class N>
+  auto require(const N& node) -> decltype(
+    requireConceptForTupleEntries<DifferentiableBasisTree, Dune::TypeTree::Impl::Children<N>>()
+  );
+};
+
+struct DifferentiableBasisTree
+{
+  template<class N>
+  static constexpr bool hasStaticDegree() {
+    return requires() { N::degree(); };
+  }
+
+  template<class N>
+  auto require(const N& node) -> decltype(
+    requireConcept<std::conditional_t<Dune::TypeTree::Concept::LeafTreeNode<N>, DifferentiableLeafBasisNode, BasisNode>, N>(),
+    requireConcept<std::conditional_t<Dune::TypeTree::Concept::UniformInnerTreeNode<N> and hasStaticDegree<N>(), DifferentiablePowerBasisNode, BasisNode>, N>(),
+    requireConcept<std::conditional_t<Dune::TypeTree::Concept::UniformInnerTreeNode<N> and not hasStaticDegree<N>(), DifferentiableDynamicPowerBasisNode, BasisNode>, N>(),
+    requireConcept<std::conditional_t<Dune::TypeTree::Concept::StaticDegreeInnerTreeNode<N> and (not Dune::TypeTree::Concept::UniformInnerTreeNode<N>), DifferentiableCompositeBasisNode, BasisNode>, N>()
+  );
+};
+
+
+template <class LV>
+concept DifferentiableLocalView = models<DifferentiableBasisTree,typename LV::Tree>();
+
+template <class GB>
+concept DifferentiableBasis = DifferentiableLocalView<typename GB::LocalView>;
+
 
 } // namespace Dune::Functions::Concept
 } // namespace Dune::Functions

@@ -371,11 +371,12 @@ public:
     }
 
     //! Local function of the derivative
-    friend typename DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>::LocalFunction derivative(const LocalFunction& lf)
+    template <class = void>
+    auto makeDerivative() const
     {
-      auto dlf = localFunction(DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>(lf.data_));
-      if (lf.bound())
-        dlf.bind(lf.localContext());
+      auto dlf = localFunction(DiscreteGlobalBasisFunctionDerivative<DiscreteGlobalBasisFunction>(this->data_));
+      if (this->bound())
+        dlf.bind(this->localContext());
       return dlf;
     }
 
@@ -429,6 +430,14 @@ public:
   }
 };
 
+
+//! Local function of the derivative
+template<typename B_, typename V_, typename NTRE_, typename R_>
+  requires Concept::DifferentiableBasis<B_>
+auto derivative(const typename DiscreteGlobalBasisFunction<B_,V_,NTRE_,R_>::LocalFunction& lf)
+{
+  return lf.makeDerivative();
+}
 
 /**
  * \brief Generate a DiscreteGlobalBasisFunction.

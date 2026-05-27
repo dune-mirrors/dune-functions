@@ -21,6 +21,7 @@ install(FILES
         multiindex.hh
         overflowarray.hh
         polymorphicsmallobject.hh
+        pullback.hh
         reserveddeque.hh
         signature.hh
         squeezetensor.hh

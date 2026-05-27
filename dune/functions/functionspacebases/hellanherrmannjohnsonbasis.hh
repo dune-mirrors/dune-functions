@@ -272,7 +272,7 @@ namespace Dune::Functions
 
           for (std::size_t i = 0; i < inValues.size(); ++i)
           {
-            outValues[i] = multiDot(inValues[i],Jt,Jt);
+            outValues[i] = pullback(inValues[i],Jt);
             outValues[i] /= dx*dx;
           }
         }
@@ -347,7 +347,7 @@ namespace Dune::Functions
         {
           auto Jit = geometry_.jacobianInverseTransposed(xi);
           auto dx = geometry_.integrationElement(xi);
-          return multiDot(f_(xi), Jit, Jit) * (dx*dx);
+          return pullback(f_(xi), Jit) * (dx*dx);
         }
 
         F const& f_;
@@ -388,7 +388,7 @@ namespace Dune::Functions
 
             for (auto const& [x,w] : edgeQuadRule) {
               auto dx = geoInCell.integrationElement(x) * w;
-              out[i] += multiDot(local_f(geoInCell.global(x)),n,n) * vol * dx;
+              out[i] += pullback(local_f(geoInCell.global(x)),n) * vol * dx;
             }
           }
         }
@@ -410,7 +410,7 @@ namespace Dune::Functions
 
               edgeLagrangebasis.evaluateFunction(x, edgeValues);
               auto dx = geoInCell.integrationElement(x) * w;
-              auto nVn = multiDot(local_f(geoInCell.global(x)),n,n) * vol * dx;
+              auto nVn = pullback(local_f(geoInCell.global(x)),n) * vol * dx;
               for (std::size_t j = 0; j < edgeSize; j++)
                 out[edgeSize*i + j] +=  edgeValues[j] * nVn;
             }
@@ -437,7 +437,7 @@ namespace Dune::Functions
 
 
     /** \brief Hellan-Herrmann-Johnson finite element for simplices, as defined on the reference Element.
-     * For more Details, see <dune/functions/functionspacebases/hellanHerrmannjohnsonbasis.hh>.
+     * For more Details, see <dune/functions/functionspacebases/hellanherrmannjohnsonbasis.hh>.
      *
      * \tparam D Type used for domain coordinates
      * \tparam R Type used for function values
@@ -598,6 +598,10 @@ namespace Dune::Functions
     using D = typename GV::ctype;
     static const std::size_t dim = GV::dimension;
 
+  private:
+    static constexpr int edgeSize = (k+1);
+    static constexpr int cellSize = ((k+1)*k)/2*3;
+
     // helper methods to assign each subentity the number of dofs. Used by the LeafPreBasisMapperMixin.
     static constexpr std::size_t hellanHerrmannJohnsonLayout(Dune::GeometryType type, int gridDim)
     {
@@ -612,10 +616,9 @@ namespace Dune::Functions
         return type.isLine() ? edgeSize : int(type.dim()) == gridDim ? cellSize : 0;
       }
     }
-  private:
-    static constexpr int edgeSize = (k+1);
-    static constexpr int cellSize = ((k+1)*k)/2*3;
+
   public:
+
     //! The grid view that the FE basis is defined on
     using GridView = GV;
 

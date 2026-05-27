@@ -14,6 +14,7 @@ template<class D, class R, int dim, unsigned int k>
 void HellanHerrmannJohnsonReferenceLocalBasis<D, R, dim, k>::evaluateFunction(
     typename Traits::DomainType const &in, std::vector<typename Traits::RangeType> &out) const
 {
+  using Range = typename Traits::RangeType;
   out.resize(size());
   auto iter = out.begin();
 

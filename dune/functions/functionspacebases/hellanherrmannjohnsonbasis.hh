@@ -590,10 +590,9 @@ namespace Dune::Functions
    */
   template<class GV, unsigned int k, class R>
   class HellanHerrmannJohnsonPreBasis
-    : public LeafPreBasisMapperMixin<GV, Impl::EdgeTwist<typename GV::IndexSet>>
+    : public LeafPreBasisMapperMixin<GV>
   {
-    using Twist = Impl::EdgeTwist<typename GV::IndexSet>;
-    using Base = LeafPreBasisMapperMixin<GV, Twist>;
+    using Base = LeafPreBasisMapperMixin<GV>;
     using Element = typename GV::template Codim<0>::Entity;
     using D = typename GV::ctype;
     static const std::size_t dim = GV::dimension;
@@ -632,7 +631,7 @@ namespace Dune::Functions
 
     //! Constructor for a given grid view object
     HellanHerrmannJohnsonPreBasis(const GV &gv)
-      : Base(gv, hellanHerrmannJohnsonLayout, Twist{gv.indexSet(), hellanHerrmannJohnsonLayout(GeometryTypes::line,dim)})
+      : Base(gv, hellanHerrmannJohnsonLayout)
     {
       static_assert(dim==2, "HellanHerrmannJohnsonPreBasis only implemented for dim=2");
     }

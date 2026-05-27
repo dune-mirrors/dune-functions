@@ -141,8 +141,6 @@ namespace Dune::Functions
         using RangeType = FieldMatrix<R,dim,dim>;
         using DivDivType = R;
       };
-    private:
-      using Range = typename Traits::RangeType;
 
     public:
       HellanHerrmannJohnsonReferenceLocalBasis()

@@ -166,13 +166,6 @@ class PullbackTransformedLocalBasis
         out[i] = T(in[i]);
     }
 
-    // auto const& finalize(Derivatives::Value d,
-    //                      Domain const& x,
-    //                      PrecomputeBuffer<Derivatives::Value> const& in) const
-    // {
-    //   return in;
-    // }
-
     void finalize (Derivatives::Jacobian d,
                    Domain const& x,
                    PrecomputeBuffer<Derivatives::Jacobian> const& in,
@@ -192,15 +185,6 @@ class PullbackTransformedLocalBasis
           JinvT.mv(in[i][0], out[i]);
       }
     }
-
-    // auto finalize(Derivatives::Jacobian d,
-    //               Domain const& x,
-    //               PrecomputeBuffer<Derivatives::Jacobian> const& in) const
-    // {
-    //   assert(!!geometry_);
-    //   return transformedRangeView(in,
-    //     [Jinv=geometry_->jacobianInverse(x)](auto const& jac) { return jac * Jinv; });
-    // }
 
     void evaluate (Derivatives::Value d,
                    Domain const& x,

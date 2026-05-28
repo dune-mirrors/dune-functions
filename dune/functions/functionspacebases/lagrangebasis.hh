@@ -34,6 +34,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
+#include <dune/functions/functionspacebases/pullbacktransformedlocalfiniteelement.hh>
 
 #include <dune/grid/common/capabilities.hh>
 
@@ -948,6 +949,7 @@ public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
   using FiniteElement = typename FiniteElementCache::FiniteElementType;
+  using GlobalizedFiniteElement = PullbackTransformedLocalFiniteElement<FiniteElement, typename Element::Geometry, ScalarDerivativeTraits<typename FiniteElement::Traits::LocalBasisType,typename Element::Geometry>>;
 
   //! Constructor without order (uses the compile-time value)
   LagrangeNode() :
@@ -976,12 +978,21 @@ public:
     return *finiteElement_;
   }
 
+  const GlobalizedFiniteElement& globalizedFiniteElement() const
+  {
+    return *globalizedFiniteElement_;
+  }
+
   //! Bind to element.
   void bind(const Element& e)
   {
     element_ = &e;
+    geometry_.emplace(e.geometry());
     finiteElement_ = &(cache_.get(element_->type()));
     this->setSize(finiteElement_->size());
+
+    globalizedFiniteElement_.bind(*finiteElement_);
+    globalizedFiniteElement_.bind(*geometry_);
   }
 
 protected:
@@ -989,6 +1000,8 @@ protected:
   FiniteElementCache cache_;
   const FiniteElement* finiteElement_;
   const Element* element_;
+  std::optional<typename Element::Geometry> geometry_;
+  GlobalizedFiniteElement globalizedFiniteElement_;
 };
 
 

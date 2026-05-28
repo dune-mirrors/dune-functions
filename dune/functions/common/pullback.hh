@@ -19,9 +19,9 @@ namespace Dune::Functions::Impl {
 template <class S, int n, class T>
 auto pullback(FieldMatrix<S,n,n> const& A, FieldVector<T,n> const& b)
 {
-  using T = typename Dune::PromotionTraits<S,T>::PromotedType;
+  using U = typename Dune::PromotionTraits<S,T>::PromotedType;
 
-  T c = 0;
+  U c = 0;
   for (int i1 = 0; i1 < n; ++i1)
     for (int i2 = 0; i2 < n; ++i2)
       c += b[i1] * A[i1][i2] * b[i2];
@@ -32,9 +32,9 @@ auto pullback(FieldMatrix<S,n,n> const& A, FieldVector<T,n> const& b)
 template <class S, int n, class T, int m>
 auto pullback(FieldMatrix<S,n,n> const& A, FieldMatrix<T,n,m> const& B)
 {
-  using T = typename Dune::PromotionTraits<S,T>::PromotedType;
+  using U = typename Dune::PromotionTraits<S,T>::PromotedType;
 
-  FieldMatrix<T,m,m> C{};
+  FieldMatrix<U,m,m> C{};
   for (int i0 = 0; i0 < m; ++i0)
     for (int i1 = 0; i1 < n; ++i1)
       for (int i2 = 0; i2 < n; ++i2)
@@ -47,10 +47,10 @@ auto pullback(FieldMatrix<S,n,n> const& A, FieldMatrix<T,n,m> const& B)
 template <class MatrixA, class MatrixB>
 auto pullback(MatrixA const& A, MatrixB const& B)
 {
-  using T = typename Dune::PromotionTraits<typename MatrixA::value_type, typename MatrixB::value_type>::PromotedType;
+  using U = typename Dune::PromotionTraits<typename MatrixA::value_type, typename MatrixB::value_type>::PromotedType;
 
   constexpr int m = MatrixB::M();
-  FieldMatrix<T,m,m> C{};
+  FieldMatrix<U,m,m> C{};
   for (auto i1 : Dune::range(A.N()))
     for (auto [a12,i2] : Dune::sparseRange(A[i1]))
       for (auto [b23,i3] : Dune::sparseRange(B[i2]))

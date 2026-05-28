@@ -154,6 +154,14 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Partial>
 };
 
 template <class LocalBasis>
+  requires requires { typename LocalBasis::Traits::HessianType; }
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Hessian>
+{
+  using type = std::vector<typename LocalBasis::Traits::HessianType>;
+};
+
+template <class LocalBasis>
+  requires (!requires { typename LocalBasis::Traits::HessianType; })
 struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Hessian>
 {
   using type = std::vector<HessianTensor<LocalBasis,LocalBasis::Traits::dimDomain>>;
@@ -162,7 +170,7 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Hessian>
 template <class LocalBasis>
 struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Laplacian>
 {
-  using type = std::vector<HessianTensor<LocalBasis,LocalBasis::Traits::dimDomain>>;
+  using type = typename PullbackPrecomputeBuffer<LocalBasis,Derivatives::Hessian>::type;
 };
 
 } // end namespace Impl
@@ -353,8 +361,10 @@ class PullbackTransformedLocalBasis
     /**
      * \brief Precompute reference-element shape-function Hessians.
      *
-     * This implementation only requires the local basis partial() interface.
-     * It evaluates all second-order partial derivatives and assembles symmetric
+     * If the bound local basis provides evaluateHessian() and
+     * Traits::HessianType, this method is used directly.  Otherwise this
+     * implementation falls back to the local basis partial() interface,
+     * evaluates all second-order partial derivatives, and assembles symmetric
      * Hessian matrices for all range components.
      */
     void precompute (Derivatives::Hessian,
@@ -362,22 +372,28 @@ class PullbackTransformedLocalBasis
                      PrecomputeBuffer<Derivatives::Hessian>& out) const
     {
       assert(!!localBasis_);
-      out.resize(localBasis_->size());
 
-      std::vector<typename LocalBasis::Traits::RangeType> partialValues;
-      std::array<unsigned int,LocalBasis::Traits::dimDomain> order;
+      if constexpr (requires { localBasis_->evaluateHessian(x,out); }) {
+        localBasis_->evaluateHessian(x,out);
+      }
+      else {
+        out.resize(localBasis_->size());
 
-      for (auto i : Dune::range(LocalBasis::Traits::dimDomain)) {
-        for (auto j : Dune::range(i,LocalBasis::Traits::dimDomain)) {
-          order.fill(0);
-          ++order[i];
-          ++order[j];
-          localBasis_->partial(order,x,partialValues);
+        std::vector<typename LocalBasis::Traits::RangeType> partialValues;
+        std::array<unsigned int,LocalBasis::Traits::dimDomain> order;
 
-          for (auto k : Dune::range(out.size())) {
-            for (auto r : Dune::range(LocalBasis::Traits::dimRange)) {
-              out[k][r][i][j] = partialValues[k][r];
-              out[k][r][j][i] = partialValues[k][r];
+        for (auto i : Dune::range(LocalBasis::Traits::dimDomain)) {
+          for (auto j : Dune::range(i,LocalBasis::Traits::dimDomain)) {
+            order.fill(0);
+            ++order[i];
+            ++order[j];
+            localBasis_->partial(order,x,partialValues);
+
+            for (auto k : Dune::range(out.size())) {
+              for (auto r : Dune::range(LocalBasis::Traits::dimRange)) {
+                out[k][r][i][j] = partialValues[k][r];
+                out[k][r][j][i] = partialValues[k][r];
+              }
             }
           }
         }
@@ -500,16 +516,30 @@ class PullbackTransformedLocalBasis
       out.resize(in.size());
 
       auto&& Jinv = geometry_->jacobianInverse(x);
-      auto&& JinvT = transposed(Jinv);
+      auto&& JinvT = Jinv.transposed();
 
       if constexpr (requires{out[0][0][0][0];}) {
-        for (auto i : Dune::range(in.size()))
-          for (auto r : Dune::range(LocalBasis::Traits::dimRange))
-            out[i][r] = JinvT * in[i][r] * Jinv;
+        if constexpr (requires{in[0][0][0][0];}) {
+          for (auto i : Dune::range(in.size()))
+            for (auto r : Dune::range(LocalBasis::Traits::dimRange))
+              out[i][r] = JinvT * in[i][r] * Jinv;
+        }
+        else {
+          static_assert(LocalBasis::Traits::dimRange == 1,
+            "A scalar HessianType can only be used with scalar local basis ranges.");
+          for (auto i : Dune::range(in.size()))
+            out[i][0] = JinvT * in[i] * Jinv;
+        }
       }
       else {
-        for (auto i : Dune::range(in.size()))
-          out[i] = JinvT * in[i][0] * Jinv;
+        if constexpr (requires{in[0][0][0][0];}) {
+          for (auto i : Dune::range(in.size()))
+            out[i] = JinvT * in[i][0] * Jinv;
+        }
+        else {
+          for (auto i : Dune::range(in.size()))
+            out[i] = JinvT * in[i] * Jinv;
+        }
       }
     }
 
@@ -537,16 +567,30 @@ class PullbackTransformedLocalBasis
       if constexpr (requires{out[0][0];}) {
         for (auto i : Dune::range(in.size())) {
           out[i] = DerivativeRange<Derivatives::Laplacian>{};
-          for (auto r : Dune::range(LocalBasis::Traits::dimRange)) {
-            auto hessian = JinvT * in[i][r] * Jinv;
+          if constexpr (requires{in[0][0][0][0];}) {
+            for (auto r : Dune::range(LocalBasis::Traits::dimRange)) {
+              auto hessian = JinvT * in[i][r] * Jinv;
+              for (auto j : Dune::range(Geometry::coorddimension))
+                out[i][r] += hessian[j][j];
+            }
+          }
+          else {
+            static_assert(LocalBasis::Traits::dimRange == 1,
+              "A scalar HessianType can only be used with scalar local basis ranges.");
+            auto hessian = JinvT * in[i] * Jinv;
             for (auto j : Dune::range(Geometry::coorddimension))
-              out[i][r] += hessian[j][j];
+              out[i][0] += hessian[j][j];
           }
         }
       }
       else {
         for (auto i : Dune::range(in.size())) {
-          auto hessian = JinvT * in[i][0] * Jinv;
+          auto hessian = [&] {
+            if constexpr (requires{in[0][0][0][0];})
+              return JinvT * in[i][0] * Jinv;
+            else
+              return JinvT * in[i] * Jinv;
+          }();
           out[i] = 0;
           for (auto j : Dune::range(Geometry::coorddimension))
             out[i] += hessian[j][j];

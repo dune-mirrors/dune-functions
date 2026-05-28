@@ -58,6 +58,7 @@ void getLocalMatrix(
   const Element element = localView.element();
 
   const int dim = Element::dimension;
+  const int dimworld = Element::Geometry::coorddimension;
   auto geometry = element.geometry();
   // { local_assembler_get_element_information_end }
 
@@ -70,15 +71,15 @@ void getLocalMatrix(
   // Get set of shape functions for this element
   // { get_local_fe_begin }
   using namespace Indices;
-  const auto& velocityLocalFiniteElement                   /*@\label{li:stokes_taylorhood_get_velocity_lfe}@*/
-          = localView.tree().child(_0,0).finiteElement();
-  const auto& pressureLocalFiniteElement
-          = localView.tree().child(_1).finiteElement();    /*@\label{li:stokes_taylorhood_get_pressure_lfe}@*/
+  const auto& velocityFiniteElement                   /*@\label{li:stokes_taylorhood_get_velocity_lfe}@*/
+          = localView.tree().child(_0,0).globalizedFiniteElement();
+  const auto& pressureFiniteElement
+          = localView.tree().child(_1).globalizedFiniteElement();    /*@\label{li:stokes_taylorhood_get_pressure_lfe}@*/
   // { get_local_fe_end }
 
   // Get a quadrature rule
   // { begin_quad_loop_begin }
-  int order = 2*(dim*velocityLocalFiniteElement.localBasis().order()-1);
+  int order = 2*(dim*velocityFiniteElement.basis().order()-1);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
 
   // Loop over all quadrature points
@@ -86,10 +87,6 @@ void getLocalMatrix(
   {
     // { begin_quad_loop_end }
     // { quad_loop_preamble_begin }
-    // The inverse Jacobian of the map from the
-    // reference element to the element
-    const auto jacobianInverse = geometry.jacobianInverse(quadPoint.position());
-
     // The multiplicative factor in the integral transformation formula
     const auto integrationElement
             = geometry.integrationElement(quadPoint.position());
@@ -101,26 +98,21 @@ void getLocalMatrix(
 
     // The gradients of the shape functions on the reference element
     // { velocity_gradients_begin }
-    std::vector<FieldMatrix<double,1,dim> > referenceJacobians;
-    velocityLocalFiniteElement.localBasis().evaluateJacobian(
+    std::vector<FieldVector<double,dimworld> > jacobians;
+    velocityFiniteElement.basis().evaluate(Functions::Derivatives::Jacobian{},
             quadPoint.position(),
-            referenceJacobians);
-
-    // Compute the shape function gradients on the grid element
-    std::vector<FieldMatrix<double,1,dim> > jacobians(referenceJacobians.size());
-    for (size_t i=0; i<jacobians.size(); i++)
-      jacobians[i] = referenceJacobians[i] * jacobianInverse;
+            jacobians);
     // { velocity_gradients_end }
 
     // Compute the actual matrix entries
     // { velocity_velocity_coupling_begin }
-    for (size_t i=0; i<velocityLocalFiniteElement.size(); i++)
-      for (size_t j=0; j<velocityLocalFiniteElement.size(); j++ )
-        for (size_t k=0; k<dim; k++)
+    for (size_t i=0; i<velocityFiniteElement.size(); i++)
+      for (size_t j=0; j<velocityFiniteElement.size(); j++ )
+        for (size_t k=0; k<dimworld; k++)
         {
           size_t row = localView.tree().child(_0,k).localIndex(i);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_row}@*/
           size_t col = localView.tree().child(_0,k).localIndex(j);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_column}@*/
-          elementMatrix[row][col] += (jacobians[i] * transpose(jacobians[j]))[0][0]
+          elementMatrix[row][col] += jacobians[i].dot(jacobians[j])
                                      * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vv_element_matrix}@*/
         }
     // { velocity_velocity_coupling_end }
@@ -131,26 +123,26 @@ void getLocalMatrix(
 
     // The values of the pressure shape functions
     // { pressure_values_begin }
-    std::vector<FieldVector<double,1> > pressureValues;
-    pressureLocalFiniteElement.localBasis().evaluateFunction(
+    std::vector<double> pressureValues;
+    pressureFiniteElement.basis().evaluate(Functions::Derivatives::Value{},
             quadPoint.position(),
             pressureValues);
     // { pressure_values_end }
 
     // Compute the actual matrix entries
     // { velocity_pressure_coupling_begin }
-    for (size_t i=0; i<velocityLocalFiniteElement.size(); i++)
-      for (size_t j=0; j<pressureLocalFiniteElement.size(); j++ )
-        for (size_t k=0; k<dim; k++)
+    for (size_t i=0; i<velocityFiniteElement.size(); i++)
+      for (size_t j=0; j<pressureFiniteElement.size(); j++ )
+        for (size_t k=0; k<dimworld; k++)
         {
           size_t vIndex = localView.tree().child(_0,k).localIndex(i); /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_row}@*/
           size_t pIndex = localView.tree().child(_1).localIndex(j);   /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_column}@*/
 
           elementMatrix[vIndex][pIndex] -=                    /*@\label{li:stokes_taylorhood_update_vp_element_matrix_a}@*/
-                  jacobians[i][0][k] * pressureValues[j]
+                  jacobians[i][k] * pressureValues[j]
                   * quadPoint.weight() * integrationElement;
           elementMatrix[pIndex][vIndex] -=
-                  jacobians[i][0][k] * pressureValues[j]
+                  jacobians[i][k] * pressureValues[j]
                   * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vp_element_matrix_b}@*/
         }
     // { velocity_pressure_coupling_end }

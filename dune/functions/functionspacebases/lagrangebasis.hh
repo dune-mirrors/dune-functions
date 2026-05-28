@@ -749,7 +749,7 @@ class LagrangePreBasis :
   {
     return [order](Dune::GeometryType type, int dim) -> std::size_t {
       if (order==0)
-        return type.dim() == dim;
+        return type.dim() == (unsigned int)(dim);
       if (type.isSimplex())
         return Dune::binomial(order-1, type.dim());
       if (type.isCube())
@@ -980,7 +980,7 @@ public:
 
   const GlobalizedFiniteElement& globalizedFiniteElement() const
   {
-    return *globalizedFiniteElement_;
+    return globalizedFiniteElement_;
   }
 
   //! Bind to element.

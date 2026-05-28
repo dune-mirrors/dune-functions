@@ -8,20 +8,19 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_PULLBACKTRANSFORMEDLOCALFINITEELEMENT_HH
 
 #include <array>
+#include <cassert>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
+#include <dune/geometry/type.hh>
 
 namespace Dune::Functions {
 
 namespace Derivatives
 {
-  template <class D>
-  D local (D const& d) { return d; }
-
   struct Value {};
   struct Jacobian {};
   struct Gradient {};
@@ -32,51 +31,69 @@ namespace Derivatives
 
 } // end namespace Derivatives
 
+namespace Impl {
+
+template <class LocalBasis, class Geometry, class Derivative>
+struct StandardDerivativeRange;
+
+template <class LocalBasis, class Geometry>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Value>
+{
+  using type = typename LocalBasis::Traits::RangeType;
+};
+
+template <class LocalBasis, class Geometry>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
+{
+  using K = typename LocalBasis::Traits::RangeFieldType;
+  using type = FieldMatrix<K,LocalBasis::Traits::dimRange,Geometry::coorddimension>;
+};
+
+template <class LocalBasis, class Geometry, class Derivative>
+struct ScalarDerivativeRange;
+
+template <class LocalBasis, class Geometry>
+struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Value>
+{
+  using type = typename LocalBasis::Traits::RangeType::value_type;
+};
+
+template <class LocalBasis, class Geometry>
+struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
+{
+  using K = typename LocalBasis::Traits::RangeFieldType;
+  using type = FieldVector<K,Geometry::coorddimension>;
+};
+
+template <class LocalBasis, class Derivative>
+struct PullbackPrecomputeBuffer;
+
+template <class LocalBasis>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Value>
+{
+  using type = std::vector<typename LocalBasis::Traits::RangeType>;
+};
+
+template <class LocalBasis>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Jacobian>
+{
+  using type = std::vector<typename LocalBasis::Traits::JacobianType>;
+};
+
+} // end namespace Impl
+
 template <class LocalBasis, class Geometry>
 struct StandardDerivativeTraits
 {
   template <class Derivative>
-  struct Traits;
-
-  template <>
-  struct Traits<Derivatives::Value> {
-    using type = typename LocalBasis::Traits::RangeType;
-  };
-
-  template <>
-  struct Traits<Derivatives::Jacobian> {
-    using K = typename LocalBasis::Traits::RangeFieldType;
-    static constexpr int dimRange = typename LocalBasis::Traits::dimRange;
-    using type = FieldMatrix<K,dimRange,Geometry::coordinatedimension>;
-  };
-
-  // template <>
-  // struct Traits<Derivatives::Hessian> {
-  //   using type = typename LocalBasis::Traits::HessianType;
-  // };
+  using Range = Impl::StandardDerivativeRange<LocalBasis,Geometry,Derivative>;
 };
 
 template <class LocalBasis, class Geometry>
 struct ScalarDerivativeTraits
 {
   template <class Derivative>
-  struct Traits;
-
-  template <>
-  struct Traits<Derivatives::Value> {
-    using type = typename LocalBasis::Traits::RangeType::value_type;
-  };
-
-  template <>
-  struct Traits<Derivatives::Jacobian> {
-    using K = typename LocalBasis::Traits::RangeFieldType;
-    using type = FieldVector<K,Geometry::coordinatedimension>;
-  };
-
-  // template <>
-  // struct Traits<Derivatives::Hessian> {
-  //   using type = typename LocalBasis::Traits::HessianType;
-  // };
+  using Range = Impl::ScalarDerivativeRange<LocalBasis,Geometry,Derivative>;
 };
 
 /**
@@ -91,28 +108,13 @@ template <class LocalBasis, class Geometry,
           class DerivativeTraits = StandardDerivativeTraits<LocalBasis,Geometry>>
 class PullbackTransformedLocalBasis
 {
-  private:
-
-    template <class D>
-    struct PrecomputeBufferTraits;
-
-    template <>
-    struct PrecomputeBufferTraits<Derivatives::Value> {
-      using type = std::vector<typename LocalBasis::Traits::RangeType>;
-    };
-
-    template <>
-    struct PrecomputeBufferTraits<Derivatives::Jacobian> {
-      using type = std::vector<typename LocalBasis::Traits::JacobianType>;
-    };
-
   public:
 
     template <class D>
-    using PrecomputeBuffer = typename PrecomputeBufferTraits<D>::type;
+    using PrecomputeBuffer = typename Impl::PullbackPrecomputeBuffer<LocalBasis,D>::type;
 
     template <class D>
-    using DerivativeRange = typename DerivativeTraits::template Traits<D>::type;
+    using DerivativeRange = typename DerivativeTraits::template Range<D>::type;
 
     using Domain = typename LocalBasis::Traits::DomainType;
     using Range = DerivativeRange<Derivatives::Value>;
@@ -122,7 +124,7 @@ class PullbackTransformedLocalBasis
      * \brief Number of shape functions
      * This need not to be equal to the size of the reference local basis
      */
-    auto size() const
+    std::size_t size () const
     {
       return localBasis_->size();
     }
@@ -137,26 +139,26 @@ class PullbackTransformedLocalBasis
       geometry_ = &geometry;
     }
 
-    void precompute(Derivatives::Value,
-                    Domain const& x,
-                    PrecomputeBuffer<Derivatives::Value>& out) const
+    void precompute (Derivatives::Value,
+                     Domain const& x,
+                     PrecomputeBuffer<Derivatives::Value>& out) const
     {
       assert(!!localBasis_);
       localBasis_->evaluateFunction(x,out);
     }
 
-    void precompute(Derivatives::Jacobian,
-                    Domain const& x,
-                    PrecomputeBuffer<Derivatives::Jacobian>& out) const
+    void precompute (Derivatives::Jacobian,
+                     Domain const& x,
+                     PrecomputeBuffer<Derivatives::Jacobian>& out) const
     {
       assert(!!localBasis_);
       localBasis_->evaluateJacobian(x,out);
     }
 
-    void finalize(Derivatives::Value d,
-                  Domain const& x,
-                  PrecomputeBuffer<Derivatives::Value> const& in,
-                  std::vector<DerivativeRange<Derivatives::Value>>& out) const
+    void finalize (Derivatives::Value d,
+                   Domain const& x,
+                   PrecomputeBuffer<Derivatives::Value> const& in,
+                   std::vector<DerivativeRange<Derivatives::Value>>& out) const
     {
       out.resize(in.size());
       using T = DerivativeRange<Derivatives::Value>;
@@ -171,10 +173,10 @@ class PullbackTransformedLocalBasis
     //   return in;
     // }
 
-    void finalize(Derivatives::Jacobian d,
-                  Domain const& x,
-                  PrecomputeBuffer<Derivatives::Jacobian> const& in,
-                  std::vector<DerivativeRange<Derivatives::Jacobian>>& out) const
+    void finalize (Derivatives::Jacobian d,
+                   Domain const& x,
+                   PrecomputeBuffer<Derivatives::Jacobian> const& in,
+                   std::vector<DerivativeRange<Derivatives::Jacobian>>& out) const
     {
       assert(!!geometry_);
       out.resize(in.size());
@@ -200,25 +202,36 @@ class PullbackTransformedLocalBasis
     //     [Jinv=geometry_->jacobianInverse(x)](auto const& jac) { return jac * Jinv; });
     // }
 
-    void evaluate(Derivatives::Value d,
-                  Domain const& x,
-                  std::vector<Range>& out) const
+    void evaluate (Derivatives::Value d,
+                   Domain const& x,
+                   std::vector<Range>& out) const
     {
-      precompute(d,x,out);
+      if constexpr(std::is_same_v<Range,typename LocalBasis::Traits::RangeType>)
+        precompute(d,x,out);
+      else {
+        precompute(d,x,valueBuffer_);
+        finalize(d,x,valueBuffer_,out);
+      }
     }
 
-    void evaluate(Derivatives::Jacobian d,
-                  Domain const& x,
-                  std::vector<DerivativeRange<Derivatives::Jacobian>>& out) const
+    void evaluate (Derivatives::Jacobian d,
+                   Domain const& x,
+                   std::vector<DerivativeRange<Derivatives::Jacobian>>& out) const
     {
       precompute(d,x,jacobianBuffer_);
       finalize(d,x,jacobianBuffer_,out);
+    }
+
+    int order () const
+    {
+      return localBasis_->order();
     }
 
   private:
     LocalBasis const* localBasis_ = nullptr;
     Geometry const* geometry_ = nullptr;
 
+    mutable PrecomputeBuffer<Derivatives::Value> valueBuffer_ = {};
     mutable PrecomputeBuffer<Derivatives::Jacobian> jacobianBuffer_ = {};
 };
 
@@ -227,26 +240,40 @@ template <class LocalFiniteElement, class Geometry,
           class DerivativeTraits = StandardDerivativeTraits<typename LocalFiniteElement::Traits::LocalBasisType,Geometry>>
 class PullbackTransformedLocalFiniteElement
 {
-  using LocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
+    using LocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
 
   public:
+    using Basis = PullbackTransformedLocalBasis<LocalBasis, Geometry, DerivativeTraits>;
+
     void bind (LocalFiniteElement const& lfe)
     {
-      globalizedBasis_.bind(lfe.localBasis());
+      basis_.bind(lfe.localBasis());
     }
 
     void bind (Geometry const& geometry)
     {
-      globalizedBasis_.bind(geometry);
+      basis_.bind(geometry);
+      type_ = geometry.type();
     }
 
-    auto const& globalizedBasis() const
+    Basis const& basis () const
     {
-      return globalizedBasis_;
+      return basis_;
+    }
+
+    std::size_t size () const
+    {
+      return basis_.size();
+    }
+
+    GeometryType type () const
+    {
+      return type_;
     }
 
   protected:
-    PullbackTransformedLocalBasis<LocalBasis, Geometry, DerivativeTraits> globalizedBasis_;
+    Basis basis_;
+    GeometryType type_;
 };
 
 } // end namespace Dune::Functions

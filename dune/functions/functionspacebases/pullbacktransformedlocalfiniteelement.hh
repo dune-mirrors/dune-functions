@@ -74,6 +74,12 @@ struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
   using type = FieldMatrix<K,LocalBasis::Traits::dimRange,Geometry::coorddimension>;
 };
 
+template <class LocalBasis, class Geometry>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Partial>
+{
+  using type = typename LocalBasis::Traits::RangeType;
+};
+
 template <class LocalBasis, class Geometry, class Derivative>
 struct ScalarDerivativeRange;
 
@@ -88,6 +94,12 @@ struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
 {
   using K = typename LocalBasis::Traits::RangeFieldType;
   using type = FieldVector<K,Geometry::coorddimension>;
+};
+
+template <class LocalBasis, class Geometry>
+struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Partial>
+{
+  using type = typename LocalBasis::Traits::RangeType::value_type;
 };
 
 template <class LocalBasis, class Derivative>
@@ -105,6 +117,12 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Jacobian>
   using type = std::vector<typename LocalBasis::Traits::JacobianType>;
 };
 
+template <class LocalBasis>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Partial>
+{
+  using type = std::vector<typename LocalBasis::Traits::JacobianType>;
+};
+
 } // end namespace Impl
 
 /**
@@ -115,10 +133,11 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Jacobian>
  * The nested alias template Range<Derivative>::type is the customization point
  * used by PullbackTransformedLocalBasis.
  *
- * The default implementation supports Derivatives::Value and
- * Derivatives::Jacobian.  Values keep the range type of the reference local
- * basis.  Jacobians are mapped to matrices with one row per range component and
- * one column per physical coordinate direction.
+ * The default implementation supports Derivatives::Value,
+ * Derivatives::Jacobian, and Derivatives::Partial.  Values and partial
+ * derivatives use the range type of the reference local basis.  Jacobians are
+ * mapped to matrices with one row per range component and one column per
+ * physical coordinate direction.
  *
  * \tparam LocalBasis Reference local basis type.
  * \tparam Geometry Bound element geometry type.
@@ -135,9 +154,9 @@ struct StandardDerivativeTraits
  * \brief Derivative range traits for scalar components of pullback transformed bases.
  *
  * This traits class is useful when a vector-valued reference basis is used as a
- * source for scalar-valued component shape functions.  Values are represented
- * by the scalar value_type of the reference range, and Jacobians are represented
- * by physical-coordinate gradients.
+ * source for scalar-valued component shape functions.  Values and partial
+ * derivatives are represented by the scalar value_type of the reference range,
+ * and Jacobians are represented by physical-coordinate gradients.
  *
  * The nested alias template Range<Derivative>::type is the customization point
  * used by PullbackTransformedLocalBasis.
@@ -158,9 +177,10 @@ struct ScalarDerivativeTraits
  *
  * PullbackTransformedLocalBasis adapts a reference-element local basis to an
  * element geometry.  Values and derivatives are requested with tags from the
- * Derivatives namespace.  For Derivatives::Jacobian, the wrapper evaluates the
- * reference-element Jacobian and transforms it with the inverse element
- * Jacobian, producing derivatives with respect to physical coordinates.
+ * Derivatives namespace.  For Derivatives::Jacobian and Derivatives::Partial,
+ * the wrapper evaluates the reference-element Jacobian and transforms it with
+ * the inverse element Jacobian, producing derivatives with respect to physical
+ * coordinates.
  *
  * The class also exposes a two-stage evaluation protocol:
  *
@@ -256,11 +276,27 @@ class PullbackTransformedLocalBasis
      *
      * This stage only requires the bound local basis.  The output stores
      * derivatives with respect to reference coordinates and can be reused with
-     * finalize(Derivatives::Jacobian, ...) for a bound geometry.
+     * finalize(Derivatives::Jacobian, ...) or
+     * finalize(Derivatives::Partial, ...) for a bound geometry.
      */
     void precompute (Derivatives::Jacobian,
                      Domain const& x,
                      PrecomputeBuffer<Derivatives::Jacobian>& out) const
+    {
+      assert(!!localBasis_);
+      localBasis_->evaluateJacobian(x,out);
+    }
+
+    /**
+     * \brief Precompute reference-element shape-function Jacobians for a partial derivative.
+     *
+     * Global partial derivatives are selected after the geometry pullback.
+     * Hence this precompute stage is identical to the Jacobian precomputation
+     * and stores derivatives with respect to reference coordinates.
+     */
+    void precompute (Derivatives::Partial,
+                     Domain const& x,
+                     PrecomputeBuffer<Derivatives::Partial>& out) const
     {
       assert(!!localBasis_);
       localBasis_->evaluateJacobian(x,out);
@@ -313,6 +349,41 @@ class PullbackTransformedLocalBasis
     }
 
     /**
+     * \brief Transform reference Jacobians and select one physical partial derivative.
+     *
+     * This stage requires a bound geometry.  The reference Jacobians are first
+     * transformed to physical-coordinate derivatives.  Only the column selected
+     * by d.i is written to the output.
+     */
+    void finalize (Derivatives::Partial d,
+                   Domain const& x,
+                   PrecomputeBuffer<Derivatives::Partial> const& in,
+                   std::vector<DerivativeRange<Derivatives::Partial>>& out) const
+    {
+      assert(!!geometry_);
+      assert(0 <= d.i && d.i < Geometry::coorddimension);
+
+      out.resize(in.size());
+
+      if constexpr (requires{out[0][0];}) {
+        auto&& Jinv = geometry_->jacobianInverse(x);
+        for (auto i : Dune::range(in.size())) {
+          DerivativeRange<Derivatives::Jacobian> jac = in[i] * Jinv;
+          for (auto j : Dune::range(LocalBasis::Traits::dimRange))
+            out[i][j] = jac[j][d.i];
+        }
+      }
+      else {
+        auto&& JinvT = geometry_->jacobianInverseTransposed(x);
+        FieldVector<typename LocalBasis::Traits::RangeFieldType,Geometry::coorddimension> gradient;
+        for (auto i : Dune::range(in.size())) {
+          JinvT.mv(in[i][0], gradient);
+          out[i] = gradient[d.i];
+        }
+      }
+    }
+
+    /**
      * \brief Evaluate shape-function values in one step.
      *
      * This is equivalent to precompute(Derivatives::Value, ...) followed by
@@ -340,6 +411,20 @@ class PullbackTransformedLocalBasis
     void evaluate (Derivatives::Jacobian d,
                    Domain const& x,
                    std::vector<DerivativeRange<Derivatives::Jacobian>>& out) const
+    {
+      precompute(d,x,jacobianBuffer_);
+      finalize(d,x,jacobianBuffer_,out);
+    }
+
+    /**
+     * \brief Evaluate one physical-coordinate partial derivative in one step.
+     *
+     * This combines reference Jacobian precomputation with the geometry
+     * pullback transformation and writes only the component selected by d.i.
+     */
+    void evaluate (Derivatives::Partial d,
+                   Domain const& x,
+                   std::vector<DerivativeRange<Derivatives::Partial>>& out) const
     {
       precompute(d,x,jacobianBuffer_);
       finalize(d,x,jacobianBuffer_,out);

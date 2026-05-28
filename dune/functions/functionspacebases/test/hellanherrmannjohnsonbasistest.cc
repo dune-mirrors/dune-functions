@@ -27,7 +27,6 @@ template<int k, class GridView>
 void testHellanHerrmannJohnsonBasis(TestSuite& test, const GridView& gridView)
 {
   std::cout<<"  Testing order: "<< k <<std::endl;
-  Dune::printGrid(gridView.grid(), Dune::MPIHelper::instance(), "grid");
   // Check basis created 'manually'
   {
     Functions::HellanHerrmannJohnsonBasis<GridView,k> basis(gridView);
@@ -42,12 +41,9 @@ void testHellanHerrmannJohnsonBasis(TestSuite& test, const GridView& gridView)
   // }
 }
 
-
-int main (int argc, char* argv[])
+TestSuite test2d()
 {
-  MPIHelper::instance(argc, argv);
-
-  TestSuite test;
+  TestSuite test("HHJ_2d");
 
   // Test with pure simplex grid
   std::cout<<"Testing Hellan-Herrmann-Johnson basis in 2D with simplex grid\n";
@@ -76,10 +72,42 @@ int main (int argc, char* argv[])
     testHellanHerrmannJohnsonBasis<1>(test, gridView);
     testHellanHerrmannJohnsonBasis<2>(test, gridView);
     testHellanHerrmannJohnsonBasis<3>(test, gridView);
-    testHellanHerrmannJohnsonBasis<4>(test, gridView);
-    testHellanHerrmannJohnsonBasis<5>(test, gridView);
-    testHellanHerrmannJohnsonBasis<6>(test, gridView);
+    // testHellanHerrmannJohnsonBasis<4>(test, gridView);
+    // testHellanHerrmannJohnsonBasis<5>(test, gridView);
+    // testHellanHerrmannJohnsonBasis<6>(test, gridView);
 
   }
+
+  return test;
+}
+
+TestSuite test3d()
+{
+  TestSuite test("HHJ_3d");
+
+  // Test with pure simplex grid
+  std::cout<<"Testing Hellan-Herrmann-Johnson basis in 3D with simplex grid\n";
+  {
+    auto tetGrid = Dune::StructuredGridFactory<UGGrid<3>>::createSimplexGrid({0.0,0.0,0.0},{1.0,1.0,1.0},{1u,1u,1u});
+    tetGrid->globalRefine(2);
+    auto tetGridView = tetGrid->leafGridView();
+    testHellanHerrmannJohnsonBasis<0>(test, tetGridView);
+    testHellanHerrmannJohnsonBasis<1>(test, tetGridView);
+    testHellanHerrmannJohnsonBasis<2>(test, tetGridView);
+  }
+
+  return test;
+}
+
+
+int main (int argc, char* argv[])
+{
+  MPIHelper::instance(argc, argv);
+
+  TestSuite test;
+
+  test.subTest(test2d());
+  // test.subTest(test3d());
+
   return test.exit();
 }

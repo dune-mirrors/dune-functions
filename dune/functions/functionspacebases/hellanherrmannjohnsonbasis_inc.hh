@@ -18,6 +18,8 @@ void HellanHerrmannJohnsonReferenceLocalBasis<D, R, dim, k>::evaluateFunction(
   out.resize(size());
   auto iter = out.begin();
 
+  static_assert(dim == 2);
+
   // generated with sympy from symfem library
   auto const &x = in[0], y = in[1];
   if constexpr (k == 0) {

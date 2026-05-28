@@ -24,7 +24,7 @@
 
 #include <dune/geometry/quadraturerules.hh>
 
-#include <dune/functions/common/multidot.hh>
+#include <dune/functions/common/pullback.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
 #include <dune/functions/functionspacebases/test/testboundlocalfe.hh>
@@ -471,7 +471,7 @@ struct EnableNormalNormalContinuityCheck : public EnableContinuityCheck
   auto localContinuityCheck() const {
     auto normalJump = [](auto&& jump, auto&& intersection, auto&& x) -> double {
       auto n = intersection.unitOuterNormal(x);
-      return Dune::Functions::multiDot(jump,n,n);
+      return Dune::Functions::Impl::pullback(jump,n);
     };
     return localJumpContinuityCheck(normalJump, order_, tol_);
   }

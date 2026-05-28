@@ -92,6 +92,12 @@ struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Hessian>
   using type = HessianTensor<LocalBasis,Geometry::coorddimension>;
 };
 
+template <class LocalBasis, class Geometry>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Laplacian>
+{
+  using type = typename LocalBasis::Traits::RangeType;
+};
+
 template <class LocalBasis, class Geometry, class Derivative>
 struct ScalarDerivativeRange;
 
@@ -118,6 +124,12 @@ template <class LocalBasis, class Geometry>
 struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Hessian>
 {
   using type = HessianMatrix<LocalBasis,Geometry::coorddimension>;
+};
+
+template <class LocalBasis, class Geometry>
+struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Laplacian>
+{
+  using type = typename LocalBasis::Traits::RangeType::value_type;
 };
 
 template <class LocalBasis, class Derivative>
@@ -147,6 +159,12 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Hessian>
   using type = std::vector<HessianTensor<LocalBasis,LocalBasis::Traits::dimDomain>>;
 };
 
+template <class LocalBasis>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Laplacian>
+{
+  using type = std::vector<HessianTensor<LocalBasis,LocalBasis::Traits::dimDomain>>;
+};
+
 } // end namespace Impl
 
 /**
@@ -158,11 +176,12 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Hessian>
  * used by PullbackTransformedLocalBasis.
  *
  * The default implementation supports Derivatives::Value,
- * Derivatives::Jacobian, Derivatives::Partial, and Derivatives::Hessian.
- * Values and partial derivatives use the range type of the reference local
- * basis.  Jacobians are mapped to matrices with one row per range component and
- * one column per physical coordinate direction.  Hessians are represented by an
- * array of matrices, one for each range component.
+ * Derivatives::Jacobian, Derivatives::Partial, Derivatives::Hessian, and
+ * Derivatives::Laplacian.  Values, partial derivatives, and Laplacians use the
+ * range type of the reference local basis.  Jacobians are mapped to matrices
+ * with one row per range component and one column per physical coordinate
+ * direction.  Hessians are represented by an array of matrices, one for each
+ * range component.
  *
  * \tparam LocalBasis Reference local basis type.
  * \tparam Geometry Bound element geometry type.
@@ -181,8 +200,9 @@ struct StandardDerivativeTraits
  * This traits class is useful when a vector-valued reference basis is used as a
  * source for scalar-valued component shape functions.  Values and partial
  * derivatives are represented by the scalar value_type of the reference range,
- * Jacobians are represented by physical-coordinate gradients, and Hessians are
- * represented by matrices in physical coordinates.
+ * Jacobians are represented by physical-coordinate gradients, Hessians are
+ * represented by matrices in physical coordinates, and Laplacians are
+ * represented by scalar values.
  *
  * The nested alias template Range<Derivative>::type is the customization point
  * used by PullbackTransformedLocalBasis.
@@ -206,9 +226,9 @@ struct ScalarDerivativeTraits
  * Derivatives namespace.  For Derivatives::Jacobian and Derivatives::Partial,
  * the wrapper evaluates the reference-element Jacobian and transforms it with
  * the inverse element Jacobian, producing derivatives with respect to physical
- * coordinates.  For Derivatives::Hessian, second reference partial derivatives
- * are assembled into Hessian matrices and transformed with the inverse element
- * Jacobian from both sides.
+ * coordinates.  For Derivatives::Hessian and Derivatives::Laplacian, second
+ * reference partial derivatives are assembled into Hessian matrices and
+ * transformed with the inverse element Jacobian from both sides.
  *
  * The class also exposes a two-stage evaluation protocol:
  *
@@ -365,6 +385,19 @@ class PullbackTransformedLocalBasis
     }
 
     /**
+     * \brief Precompute reference-element Hessians for Laplacians.
+     *
+     * The Laplacian is the trace of the physical-coordinate Hessian, so the
+     * precompute stage is identical to Hessian precomputation.
+     */
+    void precompute (Derivatives::Laplacian,
+                     Domain const& x,
+                     PrecomputeBuffer<Derivatives::Laplacian>& out) const
+    {
+      precompute(Derivatives::Hessian{}, x, out);
+    }
+
+    /**
      * \brief Convert precomputed reference values to the public value range.
      *
      * For StandardDerivativeTraits this is typically a copy.  For
@@ -481,6 +514,47 @@ class PullbackTransformedLocalBasis
     }
 
     /**
+     * \brief Transform reference Hessians and take their traces.
+     *
+     * This stage requires a bound geometry.  It first computes the
+     * physical-coordinate Hessian and then writes the sum of its diagonal
+     * entries to the output.
+     *
+     * \note This uses the same affine-geometry Hessian transformation as
+     * finalize(Derivatives::Hessian, ...).
+     */
+    void finalize (Derivatives::Laplacian d,
+                   Domain const& x,
+                   PrecomputeBuffer<Derivatives::Laplacian> const& in,
+                   std::vector<DerivativeRange<Derivatives::Laplacian>>& out) const
+    {
+      assert(!!geometry_);
+      out.resize(in.size());
+
+      auto&& Jinv = geometry_->jacobianInverse(x);
+      auto&& JinvT = Jinv.transposed();
+
+      if constexpr (requires{out[0][0];}) {
+        for (auto i : Dune::range(in.size())) {
+          out[i] = DerivativeRange<Derivatives::Laplacian>{};
+          for (auto r : Dune::range(LocalBasis::Traits::dimRange)) {
+            auto hessian = JinvT * in[i][r] * Jinv;
+            for (auto j : Dune::range(Geometry::coorddimension))
+              out[i][r] += hessian[j][j];
+          }
+        }
+      }
+      else {
+        for (auto i : Dune::range(in.size())) {
+          auto hessian = JinvT * in[i][0] * Jinv;
+          out[i] = 0;
+          for (auto j : Dune::range(Geometry::coorddimension))
+            out[i] += hessian[j][j];
+        }
+      }
+    }
+
+    /**
      * \brief Evaluate shape-function values in one step.
      *
      * This is equivalent to precompute(Derivatives::Value, ...) followed by
@@ -536,6 +610,20 @@ class PullbackTransformedLocalBasis
     void evaluate (Derivatives::Hessian d,
                    Domain const& x,
                    std::vector<DerivativeRange<Derivatives::Hessian>>& out) const
+    {
+      precompute(d,x,hessianBuffer_);
+      finalize(d,x,hessianBuffer_,out);
+    }
+
+    /**
+     * \brief Evaluate physical-coordinate Laplacians in one step.
+     *
+     * This combines reference Hessian precomputation from second-order partial
+     * derivatives with the geometry pullback transformation and trace.
+     */
+    void evaluate (Derivatives::Laplacian d,
+                   Domain const& x,
+                   std::vector<DerivativeRange<Derivatives::Laplacian>>& out) const
     {
       precompute(d,x,hessianBuffer_);
       finalize(d,x,hessianBuffer_,out);

@@ -34,25 +34,25 @@ namespace Dune::Functions {
 namespace Derivatives
 {
   //! Select evaluation of shape-function values.
-  struct Value {};
+  struct Value { bool operator==(Value const&) const = default; };
 
   //! Select evaluation of the Jacobian/first derivative of shape functions.
-  struct Jacobian {};
+  struct Jacobian { bool operator==(Jacobian const&) const = default; };
 
   //! Select evaluation of gradients.
-  struct Gradient {};
+  struct Gradient { bool operator==(Gradient const&) const = default; };
 
   //! Select evaluation of divergences.
-  struct Divergence {};
+  struct Divergence { bool operator==(Divergence const&) const = default; };
 
   //! Select evaluation of Hessians.
-  struct Hessian {};
+  struct Hessian { bool operator==(Hessian const&) const = default; };
 
   //! Select evaluation of Laplacians.
-  struct Laplacian {};
+  struct Laplacian { bool operator==(Laplacian const&) const = default; };
 
   //! Select evaluation of a partial derivative in coordinate direction i.
-  struct Partial { int i; };
+  struct Partial { int i;  bool operator==(Partial const&) const = default;  };
 
 } // end namespace Derivatives
 

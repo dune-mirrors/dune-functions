@@ -72,17 +72,18 @@ void getLocalMatrix(
   // { initialize_element_matrix_end }
 
   using namespace Indices;
+  auto& velocityFECache = cache.get(_0,0);
+  auto& pressureFECache = cache.get(_1);
 
   // Get a quadrature rule
   // { begin_quad_loop_begin }
-  int order = 2*(dim*localView.tree().child(_0,0).globalizedFiniteElement().basis().order()-1);
+  int order = 2*(dim*velocityFECache.basis().order()-1);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
-  cache.bind(localView, quad);
 
   // Get set of shape functions for this element
   // { get_local_fe_begin }
-  const auto& velocityFiniteElementCache = cache.evaluated(TypeTree::treePath(_0,0));
-  const auto& pressureFiniteElementCache = cache.evaluated(TypeTree::treePath(_1));
+  const auto& velocityJacobians = velocityFECache.evaluate(Dune::Functions::Derivatives::Jacobian{}, quad);
+  const auto& pressureValues = pressureFECache.evaluate(Dune::Functions::Derivatives::Value{}, quad);
   // { get_local_fe_end }
 
   // Loop over all quadrature points
@@ -101,7 +102,7 @@ void getLocalMatrix(
 
     // The gradients of the shape functions on the reference element
     // { velocity_gradients_begin }
-    auto const& jacobians = velocityFiniteElementCache[iq].get(Functions::Derivatives::Jacobian{});
+    auto const& jacobians = velocityJacobians[iq];
     // { velocity_gradients_end }
 
     // Compute the actual matrix entries
@@ -123,23 +124,23 @@ void getLocalMatrix(
 
     // The values of the pressure shape functions
     // { pressure_values_begin }
-    auto const& pressureValues = pressureFiniteElementCache[iq].get(Functions::Derivatives::Value{});
+    auto const& values = pressureValues[iq];
     // { pressure_values_end }
 
     // Compute the actual matrix entries
     // { velocity_pressure_coupling_begin }
     for (size_t i=0; i<jacobians.size(); i++)
-      for (size_t j=0; j<pressureValues.size(); j++ )
+      for (size_t j=0; j<values.size(); j++ )
         for (size_t k=0; k<dimworld; k++)
         {
           size_t vIndex = localView.tree().child(_0,k).localIndex(i); /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_row}@*/
           size_t pIndex = localView.tree().child(_1).localIndex(j);   /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_column}@*/
 
           elementMatrix[vIndex][pIndex] -=                    /*@\label{li:stokes_taylorhood_update_vp_element_matrix_a}@*/
-                  jacobians[i][k] * pressureValues[j]
+                  jacobians[i][k] * values[j]
                   * quad[iq].weight() * integrationElement;
           elementMatrix[pIndex][vIndex] -=
-                  jacobians[i][k] * pressureValues[j]
+                  jacobians[i][k] * values[j]
                   * quad[iq].weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vp_element_matrix_b}@*/
         }
     // { velocity_pressure_coupling_end }
@@ -255,6 +256,7 @@ void assembleStokesMatrix(const Basis& basis, MatrixType& matrix)
   {
     // Bind the local FE basis view to the current element
     localView.bind(element);
+    cache.bind(localView);
     // { element_loop_and_bind_end }
 
     // Now let's get the element stiffness matrix

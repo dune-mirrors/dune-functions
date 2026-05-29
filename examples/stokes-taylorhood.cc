@@ -7,6 +7,7 @@
 #include <config.h>
 
 #include <array>
+#include <dune/common/typetree/treepath.hh>
 #include <vector>
 
 #include <dune/common/bitsetvector.hh>
@@ -34,6 +35,7 @@
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/subspacebasis.hh>
 #include <dune/functions/functionspacebases/boundarydofs.hh>
+#include <dune/functions/functionspacebases/quadraturebasisfunctioncache.hh>
 
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
 #include <dune/functions/gridfunctions/gridviewfunction.hh>
@@ -46,9 +48,10 @@ using namespace Dune;
 
 // Compute the stiffness matrix for a single element
 // { local_assembler_signature_begin }
-template <class LocalView>
+template <class LocalView, class Cache>
 void getLocalMatrix(
         const LocalView& localView,
+        Cache& cache,
         Matrix<double>& elementMatrix)
 // { local_assembler_signature_end }
 {
@@ -68,28 +71,28 @@ void getLocalMatrix(
   elementMatrix = 0;      // fills the entire matrix with zeros
   // { initialize_element_matrix_end }
 
-  // Get set of shape functions for this element
-  // { get_local_fe_begin }
   using namespace Indices;
-  const auto& velocityFiniteElement                   /*@\label{li:stokes_taylorhood_get_velocity_lfe}@*/
-          = localView.tree().child(_0,0).globalizedFiniteElement();
-  const auto& pressureFiniteElement
-          = localView.tree().child(_1).globalizedFiniteElement();    /*@\label{li:stokes_taylorhood_get_pressure_lfe}@*/
-  // { get_local_fe_end }
 
   // Get a quadrature rule
   // { begin_quad_loop_begin }
-  int order = 2*(dim*velocityFiniteElement.basis().order()-1);
+  int order = 2*(dim*localView.tree().child(_0,0).globalizedFiniteElement().basis().order()-1);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
+  cache.bind(localView, quad);
+
+  // Get set of shape functions for this element
+  // { get_local_fe_begin }
+  const auto& velocityFiniteElementCache = cache.evaluated(TypeTree::treePath(_0,0));
+  const auto& pressureFiniteElementCache = cache.evaluated(TypeTree::treePath(_1));
+  // { get_local_fe_end }
 
   // Loop over all quadrature points
-  for (const auto& quadPoint : quad)
+  for (std::size_t iq : Dune::range(quad.size()))
   {
     // { begin_quad_loop_end }
     // { quad_loop_preamble_begin }
     // The multiplicative factor in the integral transformation formula
     const auto integrationElement
-            = geometry.integrationElement(quadPoint.position());
+            = geometry.integrationElement(quad[iq].position());
     // { quad_loop_preamble_end }
 
     ///////////////////////////////////////////////////////////////////////
@@ -98,22 +101,19 @@ void getLocalMatrix(
 
     // The gradients of the shape functions on the reference element
     // { velocity_gradients_begin }
-    std::vector<FieldVector<double,dimworld> > jacobians;
-    velocityFiniteElement.basis().evaluate(Functions::Derivatives::Jacobian{},
-            quadPoint.position(),
-            jacobians);
+    auto const& jacobians = velocityFiniteElementCache[iq].get(Functions::Derivatives::Jacobian{});
     // { velocity_gradients_end }
 
     // Compute the actual matrix entries
     // { velocity_velocity_coupling_begin }
-    for (size_t i=0; i<velocityFiniteElement.size(); i++)
-      for (size_t j=0; j<velocityFiniteElement.size(); j++ )
+    for (size_t i=0; i<jacobians.size(); i++)
+      for (size_t j=0; j<jacobians.size(); j++ )
         for (size_t k=0; k<dimworld; k++)
         {
           size_t row = localView.tree().child(_0,k).localIndex(i);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_row}@*/
           size_t col = localView.tree().child(_0,k).localIndex(j);                    /*@\label{li:stokes_taylorhood_compute_vv_element_matrix_column}@*/
           elementMatrix[row][col] += jacobians[i].dot(jacobians[j])
-                                     * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vv_element_matrix}@*/
+                                     * quad[iq].weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vv_element_matrix}@*/
         }
     // { velocity_velocity_coupling_end }
 
@@ -123,16 +123,13 @@ void getLocalMatrix(
 
     // The values of the pressure shape functions
     // { pressure_values_begin }
-    std::vector<double> pressureValues;
-    pressureFiniteElement.basis().evaluate(Functions::Derivatives::Value{},
-            quadPoint.position(),
-            pressureValues);
+    auto const& pressureValues = pressureFiniteElementCache[iq].get(Functions::Derivatives::Value{});
     // { pressure_values_end }
 
     // Compute the actual matrix entries
     // { velocity_pressure_coupling_begin }
-    for (size_t i=0; i<velocityFiniteElement.size(); i++)
-      for (size_t j=0; j<pressureFiniteElement.size(); j++ )
+    for (size_t i=0; i<jacobians.size(); i++)
+      for (size_t j=0; j<pressureValues.size(); j++ )
         for (size_t k=0; k<dimworld; k++)
         {
           size_t vIndex = localView.tree().child(_0,k).localIndex(i); /*@\label{li:stokes_taylorhood_compute_vp_element_matrix_row}@*/
@@ -140,10 +137,10 @@ void getLocalMatrix(
 
           elementMatrix[vIndex][pIndex] -=                    /*@\label{li:stokes_taylorhood_update_vp_element_matrix_a}@*/
                   jacobians[i][k] * pressureValues[j]
-                  * quadPoint.weight() * integrationElement;
+                  * quad[iq].weight() * integrationElement;
           elementMatrix[pIndex][vIndex] -=
                   jacobians[i][k] * pressureValues[j]
-                  * quadPoint.weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vp_element_matrix_b}@*/
+                  * quad[iq].weight() * integrationElement;  /*@\label{li:stokes_taylorhood_update_vp_element_matrix_b}@*/
         }
     // { velocity_pressure_coupling_end }
 
@@ -249,6 +246,7 @@ void assembleStokesMatrix(const Basis& basis, MatrixType& matrix)
   // A view on the FE basis on a single element
   // { get_localview_begin }
   auto localView     = basis.localView();
+  auto cache = Dune::Functions::QuadratureBasisFunctionCache<typename Basis::LocalView::Tree, Dune::Functions::Derivatives::Value, Dune::Functions::Derivatives::Jacobian>{};
   // { get_localview_end }
 
   // A loop over all elements of the grid
@@ -263,7 +261,7 @@ void assembleStokesMatrix(const Basis& basis, MatrixType& matrix)
     // A dense matrix is used for the element stiffness matrix
     // { setup_element_stiffness_begin }
     Matrix<double> elementMatrix;
-    getLocalMatrix(localView, elementMatrix);
+    getLocalMatrix(localView, cache, elementMatrix);
     // { setup_element_stiffness_end }
 
     // Add element stiffness matrix onto the global stiffness matrix

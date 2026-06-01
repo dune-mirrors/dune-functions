@@ -72,7 +72,7 @@ Additionally the pre-build doxygen documentation for the _master_ and
 release branches is also hosted on the [documentation section][dune docs]
 of the dune-website.
 For a structured overview of the components of the module
-you can have a look at the [Topics](topics.html) page.
+you can have a look at the \reftopics page.
 
 
 ### Manual

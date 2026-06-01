@@ -32,6 +32,7 @@ install(FILES
         nedelecbasis.hh
         periodicbasis.hh
         powerbasis.hh
+        pullbacktransformedlocalfiniteelement.hh
         rannacherturekbasis.hh
         raviartthomasbasis.hh
         refinedlagrangebasis.hh
@@ -44,3 +45,13 @@ install(FILES
         transformedfiniteelementmixin.hh
         transformedindexbasis.hh
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases)
+
+install(FILES
+        transformed/bindcontext.hh
+        transformed/concepts.hh
+        transformed/derivative.hh
+        transformed/derivativetraits.hh
+        transformed/localfiniteelement.hh
+        transformed/piola.hh
+        transformed/pullback.hh
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/transformed)

@@ -9,6 +9,7 @@
 
 #include <concepts>
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include <dune/geometry/type.hh>
@@ -46,13 +47,11 @@ template<class Transformation, class LocalBasis, class Context, class Derivative
 concept LocalBasisTransformation =
   LocalFiniteElementBindContext<Context> &&
   requires(Transformation transformation,
-           Transformation const& constTransformation,
            LocalBasis const& localBasis,
            Context const& context,
            typename LocalBasis::Traits::DomainType const& x,
            Derivative derivative,
            typename Transformation::template Traits<LocalBasis,Context>::template PrecomputeBuffer<Derivative>& precomputed,
-           typename Transformation::template Traits<LocalBasis,Context>::template PrecomputeBuffer<Derivative> const& constPrecomputed,
            std::vector<typename Transformation::template Traits<LocalBasis,Context>::template DerivativeRange<Derivative>>& out)
   {
     typename Transformation::template Traits<LocalBasis,Context>;
@@ -60,8 +59,8 @@ concept LocalBasisTransformation =
     typename Transformation::template Traits<LocalBasis,Context>::template DerivativeRange<Derivative>;
 
     transformation.bind(context);
-    constTransformation.precompute(derivative, localBasis, x, precomputed);
-    constTransformation.finalize(derivative, localBasis, x, constPrecomputed, out);
+    std::as_const(transformation).precompute(derivative, localBasis, x, precomputed);
+    std::as_const(transformation).finalize(derivative, localBasis, x, std::as_const(precomputed), out);
   };
 
 /**
@@ -75,28 +74,25 @@ template<class Transformation, class Context, class Function>
 concept LocalInterpolationTransformation =
   LocalFiniteElementBindContext<Context> &&
   requires(Transformation transformation,
-           Transformation const& constTransformation,
            Context const& context,
            Function const& f)
   {
     transformation.bind(context);
-    constTransformation.localFunctionPullback(f);
+    std::as_const(transformation).localFunctionPullback(f);
   };
 
 /**
  * \brief Transformed local basis with split precompute/finalize evaluation.
  *
- * The concept describes the experimental local-basis interface used by
- * transformed finite elements.  As for transformations, it is checked for one
- * derivative tag at a time.
+ * The concept describes the local-basis interface used by transformed finite elements.
+ * As for transformations, it is checked for one derivative tag at a time.
  */
 template<class Basis, class Derivative>
-concept StagedTransformedLocalBasis =
+concept TransformedLocalBasis =
   requires(Basis const& basis,
            typename Basis::Domain const& x,
            Derivative derivative,
            typename Basis::template PrecomputeBuffer<Derivative>& precomputed,
-           typename Basis::template PrecomputeBuffer<Derivative> const& constPrecomputed,
            std::vector<typename Basis::template DerivativeRange<Derivative>>& out)
   {
     typename Basis::Domain;
@@ -108,7 +104,7 @@ concept StagedTransformedLocalBasis =
     { basis.order() } -> std::convertible_to<int>;
 
     basis.precompute(derivative, x, precomputed);
-    basis.finalize(derivative, x, constPrecomputed, out);
+    basis.finalize(derivative, x, std::as_const(precomputed), out);
     basis.evaluate(derivative, x, out);
   };
 

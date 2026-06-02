@@ -34,14 +34,19 @@ namespace TransformedLocalFiniteElementLocalBasis {
  * into a precompute/finalize protocol, allowing element-dependent data to be reused
  * across multiple evaluation points.
  *
- * \tparam LocalBasis Type of the reference local basis to transform (e.g., Lagrange basis on the reference element).
- * \tparam Context Type of the element context providing geometry information (must satisfy LocalFiniteElementBindContext).
- * \tparam Transformation Type of the transformation policy implementing the precompute/finalize protocol
- *                            (must satisfy LocalBasisTransformation for the desired derivatives).
+ * \tparam LocalBasis Type of the reference local basis to transform (e.g., Lagrange
+ *   basis on the reference element).
+ * \tparam Context Type of the element context providing geometry information
+ *   (must satisfy LocalFiniteElementBindContext).
+ * \tparam Transformation Type of the transformation policy implementing the
+ *   precompute/finalize protocol (must satisfy LocalBasisTransformation for the
+ *   desired derivatives).
  *
  * The class is designed to work with different transformation policies, such as
- * covariant Piola transforms for H(curl) spaces or contravariant Piola transforms for H(div) spaces.
- * The transformation policy owns the element-dependent logic (e.g., Jacobian computations).
+ * covariant Piola transforms for H(curl) spaces or contravariant Piola transforms
+ * for H(div) spaces.
+ * The transformation policy owns the element-dependent logic (e.g., Jacobian
+ * computations).
  */
 template<class LocalBasis, class Context, class Transformation>
 class TransformedLocalBasis
@@ -224,8 +229,10 @@ class TransformedLocalBasis
  * the local-valued functions expected by the reference interpolation.
  *
  * \tparam LocalInterpolation Type of the reference local interpolation to use.
- * \tparam Context Type of the element context providing geometry information (must satisfy LocalFiniteElementBindContext).
- * \tparam Transformation Type of the transformation policy providing the pullback (must satisfy LocalInterpolationTransformation).
+ * \tparam Context Type of the element context providing geometry information
+ *   (must satisfy LocalFiniteElementBindContext).
+ * \tparam Transformation Type of the transformation policy providing the pullback
+ *   (must satisfy LocalInterpolationTransformation).
  *
  * For example, a Piola transformation would pull back a physical vector field to
  * the reference element before passing it to the reference interpolation.
@@ -318,11 +325,14 @@ class TransformedLocalInterpolation
  *   returns the reference interpolation.
  *
  * \tparam LocalFiniteElement Type of the reference local finite element to wrap.
- * \tparam Context Type of the element context providing geometry information (must satisfy LocalFiniteElementBindContext).
- * \tparam Transformation Type of the transformation policy for basis and interpolation (must satisfy
- *                          LocalBasisTransformation and LocalInterpolationTransformation as needed).
- * \tparam LocalBasisTag Tag to select whether localBasis() returns the reference or physical basis.
- *                          Use TransformedLocalFiniteElementLocalBasis::Reference or ::Physical.
+ * \tparam Context Type of the element context providing geometry information
+ *   (must satisfy LocalFiniteElementBindContext).
+ * \tparam Transformation Type of the transformation policy for basis and interpolation
+ *   (must satisfy LocalBasisTransformation and LocalInterpolationTransformation
+ *   as needed).
+ * \tparam LocalBasisTag Tag to select whether localBasis() returns the reference or
+ *   physical basis. Use TransformedLocalFiniteElementLocalBasis::Reference or
+ *   ::Physical.
  *
  * Example usage:
  * \code
@@ -353,17 +363,19 @@ class TransformedLocalFiniteElement
     using PhysicalBasis = TransformedLocalBasis<ReferenceLocalBasis,Context,Transformation>;
 
     //! Type exposed by localBasis() for compatibility with existing bases.
-    using LocalBasis = std::conditional_t<std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>,
-                                          ReferenceBasis,
-                                          PhysicalBasis>;
+    using LocalBasis = std::conditional_t<
+      std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>,
+      ReferenceBasis,
+      PhysicalBasis>;
 
     //! Type of the transformed physical local interpolation.
     using PhysicalLocalInterpolation = TransformedLocalInterpolation<ReferenceLocalInterpolation,Context,Transformation>;
 
     //! Type exposed by localInterpolation() for compatibility with existing bases.
-    using LocalInterpolation = std::conditional_t<std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>,
-                                                  ReferenceLocalInterpolation,
-                                                  PhysicalLocalInterpolation>;
+    using LocalInterpolation = std::conditional_t<
+      std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>,
+      ReferenceLocalInterpolation,
+      PhysicalLocalInterpolation>;
 
     //! Export number types, dimensions, etc.
     using Traits = LocalFiniteElementTraits<LocalBasis,ReferenceLocalCoefficients,LocalInterpolation>;
@@ -469,7 +481,7 @@ class TransformedLocalFiniteElement
      *
      * \return Const reference to the local coefficients.
      */
-    auto const& localCoefficients() const
+    ReferenceLocalCoefficients const& localCoefficients() const
     {
       assert(!!lfe_);
       return lfe_->localCoefficients();

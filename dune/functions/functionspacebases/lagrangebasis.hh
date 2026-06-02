@@ -34,7 +34,9 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
-#include <dune/functions/functionspacebases/pullbacktransformedlocalfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/bindcontext.hh>
+#include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/pullback.hh>
 
 #include <dune/grid/common/capabilities.hh>
 
@@ -948,8 +950,12 @@ public:
 
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
-  using FiniteElement = typename FiniteElementCache::FiniteElementType;
-  using GlobalizedFiniteElement = PullbackTransformedLocalFiniteElement<FiniteElement, typename Element::Geometry, ScalarDerivativeTraits<typename FiniteElement::Traits::LocalBasisType,typename Element::Geometry>>;
+  using ReferenceFiniteElement = typename FiniteElementCache::FiniteElementType;
+  using Context = ElementBindContext<Element>;
+  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
+                                                      Context,
+                                                      ScalarDerivativePullback<typename Element::Geometry>,
+                                                      TransformedLocalFiniteElementLocalBasis::Reference>;
 
   //! Constructor without order (uses the compile-time value)
   LagrangeNode() :
@@ -958,15 +964,13 @@ public:
 
   //! Constructor with a run-time order
   LagrangeNode(unsigned int order) :
-    cache_(order),
-    finiteElement_(nullptr),
-    element_(nullptr)
+    cache_(order)
   {}
 
   //! Return current element, throw if unbound
   const Element& element() const
   {
-    return *element_;
+    return context_.element();
   }
 
   /** \brief Return the LocalFiniteElement for the element we are bound to
@@ -975,33 +979,22 @@ public:
    */
   const FiniteElement& finiteElement() const
   {
-    return *finiteElement_;
-  }
-
-  const GlobalizedFiniteElement& globalizedFiniteElement() const
-  {
-    return globalizedFiniteElement_;
+    return finiteElement_;
   }
 
   //! Bind to element.
   void bind(const Element& e)
   {
-    element_ = &e;
-    geometry_.emplace(e.geometry());
-    finiteElement_ = &(cache_.get(element_->type()));
-    this->setSize(finiteElement_->size());
-
-    globalizedFiniteElement_.bind(*finiteElement_);
-    globalizedFiniteElement_.bind(*geometry_);
+    context_.bind(e);
+    finiteElement_.bind(cache_.get(context_.type()), context_);
+    this->setSize(finiteElement_.size());
   }
 
 protected:
 
   FiniteElementCache cache_;
-  const FiniteElement* finiteElement_;
-  const Element* element_;
-  std::optional<typename Element::Geometry> geometry_;
-  GlobalizedFiniteElement globalizedFiniteElement_;
+  Context context_;
+  FiniteElement finiteElement_;
 };
 
 

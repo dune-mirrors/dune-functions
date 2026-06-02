@@ -65,6 +65,25 @@ concept LocalBasisTransformation =
   };
 
 /**
+ * \brief Transformation with an inverse value map for local interpolation.
+ *
+ * A transformed local interpolation receives global-valued functions.  The
+ * transformation policy has to pull those functions back to the local-valued
+ * callable expected by the reference local interpolation.
+ */
+template<class Transformation, class Context, class Function>
+concept LocalInterpolationTransformation =
+  LocalFiniteElementBindContext<Context> &&
+  requires(Transformation transformation,
+           Transformation const& constTransformation,
+           Context const& context,
+           Function const& f)
+  {
+    transformation.bind(context);
+    constTransformation.localFunctionPullback(f);
+  };
+
+/**
  * \brief Transformed local basis with split precompute/finalize evaluation.
  *
  * The concept describes the experimental local-basis interface used by

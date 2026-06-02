@@ -20,10 +20,12 @@
 #include <dune/localfunctions/brezzidouglasmarini/brezzidouglasmarini2cube2d.hh>
 #include <dune/localfunctions/brezzidouglasmarini/brezzidouglasmarini2simplex2d.hh>
 
-#include <dune/functions/functionspacebases/globalvaluedlocalfiniteelement.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
+#include <dune/functions/functionspacebases/transformed/bindcontext.hh>
+#include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/piola.hh>
 
 namespace Dune {
 namespace Functions {
@@ -231,19 +233,19 @@ public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
   using FiniteElementMap = typename Impl::BDMLocalFiniteElementMap<GV, double, k>;
-  using FiniteElement = Impl::GlobalValuedLocalFiniteElement<Impl::ContravariantPiolaTransformator,
-                                                             typename FiniteElementMap::FiniteElement,
-                                                             Element>;
+  using Context = ElementBindContext<Element>;
+  using FiniteElement = TransformedLocalFiniteElement<typename FiniteElementMap::FiniteElement,
+                                                      Context,
+                                                      ContravariantPiolaTransformation<typename Element::Geometry>>;
 
   BrezziDouglasMariniNode(const FiniteElementMap* finiteElementMap) :
-    element_(nullptr),
     finiteElementMap_(finiteElementMap)
   {}
 
   //! Return current element, throw if unbound
   const Element& element() const
   {
-    return *element_;
+    return context_.element();
   }
 
   /** \brief Return the LocalFiniteElement for the element we are bound to
@@ -258,15 +260,15 @@ public:
   //! Bind to element.
   void bind(const Element& e)
   {
-    element_ = &e;
-    finiteElement_.bind((finiteElementMap_->find(*element_)), e);
+    context_.bind(e);
+    finiteElement_.bind(finiteElementMap_->find(context_.element()), context_);
     this->setSize(finiteElement_.size());
   }
 
 protected:
 
+  Context context_;
   FiniteElement finiteElement_;
-  const Element* element_;
   const FiniteElementMap* finiteElementMap_;
 };
 

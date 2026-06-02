@@ -23,6 +23,21 @@ using HessianMatrix = FieldMatrix<typename LocalBasis::Traits::RangeFieldType,do
 template <class LocalBasis, int domainDimension>
 using HessianTensor = std::array<HessianMatrix<LocalBasis,domainDimension>,LocalBasis::Traits::dimRange>;
 
+template <class LocalBasis, class Geometry, int dimension>
+struct CurlDerivativeRange;
+
+template <class LocalBasis, class Geometry>
+struct CurlDerivativeRange<LocalBasis,Geometry,2>
+{
+  using type = typename LocalBasis::Traits::RangeFieldType;
+};
+
+template <class LocalBasis, class Geometry>
+struct CurlDerivativeRange<LocalBasis,Geometry,3>
+{
+  using type = FieldVector<typename LocalBasis::Traits::RangeFieldType,Geometry::coorddimension>;
+};
+
 template <class LocalBasis, class Geometry, class Derivative>
 struct StandardDerivativeRange;
 
@@ -43,6 +58,18 @@ template <class LocalBasis, class Geometry>
 struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Partial>
 {
   using type = typename LocalBasis::Traits::RangeType;
+};
+
+template <class LocalBasis, class Geometry>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Divergence>
+{
+  using type = typename LocalBasis::Traits::RangeFieldType;
+};
+
+template <class LocalBasis, class Geometry>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Curl>
+{
+  using type = typename CurlDerivativeRange<LocalBasis,Geometry,Geometry::coorddimension>::type;
 };
 
 template <class LocalBasis, class Geometry>
@@ -108,6 +135,18 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Jacobian>
 
 template <class LocalBasis>
 struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Partial>
+{
+  using type = std::vector<typename LocalBasis::Traits::JacobianType>;
+};
+
+template <class LocalBasis>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Divergence>
+{
+  using type = std::vector<typename LocalBasis::Traits::JacobianType>;
+};
+
+template <class LocalBasis>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Curl>
 {
   using type = std::vector<typename LocalBasis::Traits::JacobianType>;
 };

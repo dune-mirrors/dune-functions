@@ -53,7 +53,7 @@ namespace Dune::Functions
     template <class Node>
     class QuadratureNodeCache
     {
-      using Basis = typename Node::GlobalizedFiniteElement::Basis;
+      using Basis = typename Node::FiniteElement::PhysicalBasis;
 
       //! Buffer type stored in the cache for the quantity selected by D.
       template <class D>
@@ -83,7 +83,7 @@ namespace Dune::Functions
       Basis const& basis () const
       {
         assert(!!node_);
-        return node_->globalizedFiniteElement().basis();
+        return node_->finiteElement().physicalBasis();
       }
 
       template <class Derivative, class ct, int dim>

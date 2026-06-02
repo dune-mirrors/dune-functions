@@ -17,6 +17,9 @@
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
+#include <dune/functions/functionspacebases/transformed/bindcontext.hh>
+#include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/pullback.hh>
 
 #include <dune/geometry/type.hh>
 
@@ -128,9 +131,14 @@ public:
   using Element = typename GV::template Codim<0>::Entity;
 
   //! Type of the local finite-element
-  using FiniteElement = std::conditional_t<(k==0),
+  using ReferenceFiniteElement = std::conditional_t<(k==0),
     Dune::RefinedP0LocalFiniteElement<typename GV::ctype,R,dim>,
     Dune::RefinedP1LocalFiniteElement<typename GV::ctype,R,dim>>;
+  using Context = ElementBindContext<Element>;
+  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
+                                                      Context,
+                                                      ScalarDerivativePullback<typename Element::Geometry>,
+                                                      TransformedLocalFiniteElementLocalBasis::Reference>;
 
   /**
    * \brief The default constructor initializes all members to their default.
@@ -142,8 +150,7 @@ public:
    * \note Before the node can be used it needs to be bound to an element.
    **/
   RefinedLagrangeNode ()
-    : finiteElement_{}
-    , element_(nullptr)
+    : referenceFiniteElement_{}
   {}
 
   /**
@@ -152,7 +159,7 @@ public:
    */
   const Element& element () const
   {
-    return *element_;
+    return context_.element();
   }
 
   /**
@@ -169,7 +176,8 @@ public:
   //! Bind the node to the element `e`.
   void bind (const Element& e)
   {
-    element_ = &e;
+    context_.bind(e);
+    finiteElement_.bind(referenceFiniteElement_, context_);
     this->setSize(finiteElement_.size());
   }
 
@@ -183,8 +191,9 @@ public:
   }
 
 protected:
-  const FiniteElement finiteElement_;
-  const Element* element_;
+  const ReferenceFiniteElement referenceFiniteElement_;
+  Context context_;
+  FiniteElement finiteElement_;
 };
 
 

@@ -9,15 +9,22 @@
 
 #include <cassert>
 #include <cstddef>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <dune/geometry/type.hh>
+#include <dune/localfunctions/common/localfiniteelementtraits.hh>
 
 #include <dune/functions/functionspacebases/transformed/concepts.hh>
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
 
 namespace Dune::Functions {
+
+namespace TransformedLocalFiniteElementLocalBasis {
+  struct Reference {};
+  struct Physical {};
+}
 
 /**
  * \brief Draft local-basis adapter driven by a transformation policy.
@@ -50,6 +57,9 @@ class TransformedLocalBasis
 
     //! Output range type for Derivatives::Value.
     using Range = DerivativeRange<Derivatives::Value>;
+
+    //! LocalBasis traits for compatibility with the dune-localfunctions interface.
+    using Traits = typename LocalBasis::Traits;
 
     TransformedLocalBasis() = default;
 
@@ -111,6 +121,13 @@ class TransformedLocalBasis
       finalize(derivative, x, precomputed, out);
     }
 
+    //! Evaluate all shape functions using the classic LocalBasis interface.
+    void evaluateFunction(Domain const& x, std::vector<typename Traits::RangeType>& out) const
+      requires Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,Derivatives::Value>
+    {
+      evaluate(Derivatives::Value{}, x, out);
+    }
+
     Transformation const& transformation() const
     {
       return transformation_;
@@ -122,38 +139,109 @@ class TransformedLocalBasis
 };
 
 /**
+ * \brief Local interpolation adapter driven by the same transformation policy.
+ *
+ * The transformation policy provides the pullback used to convert a
+ * global-valued function into the local-valued function expected by the
+ * reference local interpolation.
+ */
+template<class LocalInterpolation, class Context, class Transformation>
+class TransformedLocalInterpolation
+{
+  public:
+    TransformedLocalInterpolation() = default;
+
+    explicit TransformedLocalInterpolation(Transformation transformation)
+      : transformation_(std::move(transformation))
+    {}
+
+    void bind(LocalInterpolation const& localInterpolation)
+    {
+      localInterpolation_ = &localInterpolation;
+    }
+
+    void bind(Context const& context)
+    {
+      transformation_.bind(context);
+    }
+
+    template<class F, class C>
+      requires Concept::LocalInterpolationTransformation<Transformation,Context,F>
+    void interpolate(F const& f, std::vector<C>& out) const
+    {
+      assert(!!localInterpolation_);
+      auto localValuedFunction = transformation_.localFunctionPullback(f);
+      localInterpolation_->interpolate(localValuedFunction, out);
+    }
+
+    Transformation const& transformation() const
+    {
+      return transformation_;
+    }
+
+  private:
+    LocalInterpolation const* localInterpolation_ = nullptr;
+    Transformation transformation_;
+};
+
+/**
  * \brief Draft transformed local finite-element adapter.
  *
  * The class wraps a reference local finite element and exposes a transformed
- * local basis.  Coefficients are forwarded to the reference finite element.
- * Interpolation is deliberately not modeled yet, because inverse value
- * transformations and transformed dual functionals need a separate policy
- * hook.
+ * local basis.  Coefficients are forwarded to the reference finite element,
+ * and interpolation is adapted through the same transformation policy.
  */
-template<class LocalFiniteElement, class Context, class Transformation>
+template<class LocalFiniteElement,
+         class Context,
+         class Transformation,
+         class LocalBasisTag = TransformedLocalFiniteElementLocalBasis::Physical>
 class TransformedLocalFiniteElement
 {
     using ReferenceLocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
+    using ReferenceLocalInterpolation = typename LocalFiniteElement::Traits::LocalInterpolationType;
+    using ReferenceLocalCoefficients = typename LocalFiniteElement::Traits::LocalCoefficientsType;
 
   public:
-    //! Type of the transformed local basis exposed by localBasis() and basis().
-    using Basis = TransformedLocalBasis<ReferenceLocalBasis,Context,Transformation>;
+    //! Type of the reference local basis.
+    using ReferenceBasis = ReferenceLocalBasis;
+
+    //! Type of the transformed physical local basis.
+    using PhysicalBasis = TransformedLocalBasis<ReferenceLocalBasis,Context,Transformation>;
+
+    //! Type exposed by localBasis() for compatibility with existing bases.
+    using LocalBasis = std::conditional_t<std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>,
+                                          ReferenceBasis,
+                                          PhysicalBasis>;
+
+    //! Type of the transformed physical local interpolation.
+    using PhysicalLocalInterpolation = TransformedLocalInterpolation<ReferenceLocalInterpolation,Context,Transformation>;
+
+    //! Type exposed by localInterpolation() for compatibility with existing bases.
+    using LocalInterpolation = std::conditional_t<std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>,
+                                                  ReferenceLocalInterpolation,
+                                                  PhysicalLocalInterpolation>;
+
+    //! Export number types, dimensions, etc.
+    using Traits = LocalFiniteElementTraits<LocalBasis,ReferenceLocalCoefficients,LocalInterpolation>;
 
     TransformedLocalFiniteElement() = default;
 
     explicit TransformedLocalFiniteElement(Transformation transformation)
       : basis_(std::move(transformation))
+      , physicalInterpolation_(basis_.transformation())
     {}
 
     void bind(LocalFiniteElement const& lfe)
     {
       lfe_ = &lfe;
       basis_.bind(lfe.localBasis());
+      physicalInterpolation_.bind(lfe.localInterpolation());
     }
 
     void bind(Context const& context)
     {
       basis_.bind(context);
+      physicalInterpolation_.bind(context);
       type_ = context.type();
     }
 
@@ -163,20 +251,44 @@ class TransformedLocalFiniteElement
       bind(context);
     }
 
-    Basis const& localBasis() const
+    LocalBasis const& localBasis() const
+    {
+      if constexpr (std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>)
+        return referenceBasis();
+      else
+        return physicalBasis();
+    }
+
+    PhysicalBasis const& physicalBasis() const
     {
       return basis_;
     }
 
-    Basis const& basis() const
+    ReferenceBasis const& referenceBasis() const
     {
-      return basis_;
+      assert(!!lfe_);
+      return lfe_->localBasis();
+    }
+
+    ReferenceBasis const& referenceLocalBasis() const
+    {
+      return referenceBasis();
     }
 
     auto const& localCoefficients() const
     {
       assert(!!lfe_);
       return lfe_->localCoefficients();
+    }
+
+    LocalInterpolation const& localInterpolation() const
+    {
+      if constexpr (std::is_same_v<LocalBasisTag,TransformedLocalFiniteElementLocalBasis::Reference>) {
+        assert(!!lfe_);
+        return lfe_->localInterpolation();
+      }
+      else
+        return physicalInterpolation_;
     }
 
     std::size_t size() const
@@ -191,7 +303,8 @@ class TransformedLocalFiniteElement
 
   private:
     LocalFiniteElement const* lfe_ = nullptr;
-    Basis basis_;
+    PhysicalBasis basis_;
+    PhysicalLocalInterpolation physicalInterpolation_;
     GeometryType type_ = {};
 };
 

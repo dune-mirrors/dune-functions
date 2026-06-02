@@ -22,9 +22,8 @@ namespace Dune::Functions {
  * \brief Transformation policy for the contravariant Piola map.
  *
  * This policy preserves normal traces and is the canonical value
- * transformation for H(div)-conforming finite elements.  The Jacobian
- * transformation is the affine-geometry variant used by the existing
- * GlobalValuedLocalFiniteElement implementation.
+ * transformation for H(div)-conforming finite elements.  Its natural
+ * derivative is Derivatives::Divergence.
  */
 template<class Geometry>
 class ContravariantPiolaTransformation
@@ -39,6 +38,42 @@ class ContravariantPiolaTransformation
       geometry_ = &context.geometry();
     }
 
+    template<class Function>
+    class LocalValuedFunction
+    {
+      public:
+        LocalValuedFunction(Function const& f, Geometry const& geometry)
+          : f_(&f)
+          , geometry_(&geometry)
+        {}
+
+        template<class LocalCoordinate>
+        auto operator()(LocalCoordinate const& x) const
+        {
+          auto globalValue = (*f_)(x);
+          auto localValue = globalValue;
+
+          auto jacobianInverse = geometry_->jacobianInverse(x);
+          auto globalValueDenseVector = Impl::DenseVectorView(globalValue);
+          auto localValueDenseVector = Impl::DenseVectorView(localValue);
+          jacobianInverse.mv(globalValueDenseVector, localValueDenseVector);
+          localValue *= geometry_->integrationElement(x);
+
+          return localValue;
+        }
+
+      private:
+        Function const* f_;
+        Geometry const* geometry_;
+    };
+
+    template<class Function>
+    auto localFunctionPullback(Function const& f) const
+    {
+      assert(!!geometry_);
+      return LocalValuedFunction<Function>(f, *geometry_);
+    }
+
     template<class LocalBasis, class Out>
     void precompute(Derivatives::Value,
                     LocalBasis const& localBasis,
@@ -49,16 +84,7 @@ class ContravariantPiolaTransformation
     }
 
     template<class LocalBasis, class Out>
-    void precompute(Derivatives::Jacobian,
-                    LocalBasis const& localBasis,
-                    typename LocalBasis::Traits::DomainType const& x,
-                    Out& out) const
-    {
-      localBasis.evaluateJacobian(x,out);
-    }
-
-    template<class LocalBasis, class Out>
-    void precompute(Derivatives::Partial,
+    void precompute(Derivatives::Divergence,
                     LocalBasis const& localBasis,
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
@@ -76,20 +102,20 @@ class ContravariantPiolaTransformation
       assert(!!geometry_);
       out.resize(in.size());
 
-      auto jacobianTransposed = geometry_->jacobianTransposed(x);
+      auto jacobian = geometry_->jacobian(x);
       auto integrationElement = geometry_->integrationElement(x);
 
       for (auto i : Dune::range(in.size())) {
         auto tmp = in[i];
         auto tmpDenseVector = Impl::DenseVectorView(tmp);
         auto outDenseVector = Impl::DenseVectorView(out[i]);
-        jacobianTransposed.mtv(tmpDenseVector, outDenseVector);
+        jacobian.mv(tmpDenseVector, outDenseVector);
         out[i] /= integrationElement;
       }
     }
 
     template<class LocalBasis, class In, class Out>
-    void finalize(Derivatives::Jacobian,
+    void finalize(Derivatives::Divergence,
                   LocalBasis const&,
                   typename LocalBasis::Traits::DomainType const& x,
                   In const& in,
@@ -98,35 +124,14 @@ class ContravariantPiolaTransformation
       assert(!!geometry_);
       out.resize(in.size());
 
-      auto jacobianTransposed = geometry_->jacobianTransposed(x);
       auto integrationElement = geometry_->integrationElement(x);
 
       for (auto i : Dune::range(in.size())) {
-        out[i] = 0;
-        for (std::size_t k=0; k<out[i].M(); ++k)
-          for (std::size_t l=0; l<in[i].N(); ++l)
-            for (auto&& [jacobianTransposed_l_j, j] : sparseRange(jacobianTransposed[l]))
-              out[i][j][k] += jacobianTransposed_l_j * in[i][l][k];
+        out[i] = {};
+        for (auto j : Dune::range(Geometry::coorddimension))
+          out[i] += in[i][j][j];
         out[i] /= integrationElement;
       }
-    }
-
-    template<class LocalBasis, class In, class Out>
-    void finalize(Derivatives::Partial d,
-                  LocalBasis const& localBasis,
-                  typename LocalBasis::Traits::DomainType const& x,
-                  In const& in,
-                  Out& out) const
-    {
-      assert(0 <= d.i && d.i < Geometry::coorddimension);
-
-      std::vector<typename Traits<LocalBasis,void>::template DerivativeRange<Derivatives::Jacobian>> jacobian;
-      finalize(Derivatives::Jacobian{}, localBasis, x, in, jacobian);
-
-      out.resize(jacobian.size());
-      for (auto i : Dune::range(out.size()))
-        for (auto j : Dune::range(out[i].size()))
-          out[i][j] = jacobian[i][j][d.i];
     }
 
   private:
@@ -137,9 +142,8 @@ class ContravariantPiolaTransformation
  * \brief Transformation policy for the covariant Piola map.
  *
  * This policy preserves tangential traces and is the canonical value
- * transformation for H(curl)-conforming finite elements.  The Jacobian
- * transformation is the affine-geometry variant used by the existing
- * GlobalValuedLocalFiniteElement implementation.
+ * transformation for H(curl)-conforming finite elements.  Its natural
+ * derivative is Derivatives::Curl.
  */
 template<class Geometry>
 class CovariantPiolaTransformation
@@ -154,6 +158,41 @@ class CovariantPiolaTransformation
       geometry_ = &context.geometry();
     }
 
+    template<class Function>
+    class LocalValuedFunction
+    {
+      public:
+        LocalValuedFunction(Function const& f, Geometry const& geometry)
+          : f_(&f)
+          , geometry_(&geometry)
+        {}
+
+        template<class LocalCoordinate>
+        auto operator()(LocalCoordinate const& x) const
+        {
+          auto globalValue = (*f_)(x);
+          auto localValue = globalValue;
+
+          auto jacobianTransposed = geometry_->jacobianTransposed(x);
+          auto globalValueDenseVector = Impl::DenseVectorView(globalValue);
+          auto localValueDenseVector = Impl::DenseVectorView(localValue);
+          jacobianTransposed.mv(globalValueDenseVector, localValueDenseVector);
+
+          return localValue;
+        }
+
+      private:
+        Function const* f_;
+        Geometry const* geometry_;
+    };
+
+    template<class Function>
+    auto localFunctionPullback(Function const& f) const
+    {
+      assert(!!geometry_);
+      return LocalValuedFunction<Function>(f, *geometry_);
+    }
+
     template<class LocalBasis, class Out>
     void precompute(Derivatives::Value,
                     LocalBasis const& localBasis,
@@ -164,16 +203,7 @@ class CovariantPiolaTransformation
     }
 
     template<class LocalBasis, class Out>
-    void precompute(Derivatives::Jacobian,
-                    LocalBasis const& localBasis,
-                    typename LocalBasis::Traits::DomainType const& x,
-                    Out& out) const
-    {
-      localBasis.evaluateJacobian(x,out);
-    }
-
-    template<class LocalBasis, class Out>
-    void precompute(Derivatives::Partial,
+    void precompute(Derivatives::Curl,
                     LocalBasis const& localBasis,
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
@@ -202,7 +232,7 @@ class CovariantPiolaTransformation
     }
 
     template<class LocalBasis, class In, class Out>
-    void finalize(Derivatives::Jacobian,
+    void finalize(Derivatives::Curl,
                   LocalBasis const&,
                   typename LocalBasis::Traits::DomainType const& x,
                   In const& in,
@@ -211,33 +241,33 @@ class CovariantPiolaTransformation
       assert(!!geometry_);
       out.resize(in.size());
 
-      auto jacobianInverseTransposed = geometry_->jacobianInverseTransposed(x);
+      auto integrationElement = geometry_->integrationElement(x);
 
-      for (auto i : Dune::range(in.size())) {
-        out[i] = 0;
-        for (std::size_t j=0; j<out[i].N(); ++j)
-          for (std::size_t k=0; k<out[i].M(); ++k)
-            for (auto&& [jacobianInverseTransposed_j_l, l] : sparseRange(jacobianInverseTransposed[j]))
-              out[i][j][k] += jacobianInverseTransposed_j_l * in[i][l][k];
+      if constexpr (Geometry::coorddimension == 2) {
+        for (auto i : Dune::range(in.size())) {
+          out[i] = in[i][1][0] - in[i][0][1];
+          out[i] /= integrationElement;
+        }
       }
-    }
+      else {
+        static_assert(Geometry::coorddimension == 3,
+          "CovariantPiolaTransformation::finalize(Curl) supports only dimension 2 or 3.");
 
-    template<class LocalBasis, class In, class Out>
-    void finalize(Derivatives::Partial d,
-                  LocalBasis const& localBasis,
-                  typename LocalBasis::Traits::DomainType const& x,
-                  In const& in,
-                  Out& out) const
-    {
-      assert(0 <= d.i && d.i < Geometry::coorddimension);
+        auto jacobian = geometry_->jacobian(x);
+        using CurlRange = typename Traits<LocalBasis,void>::template DerivativeRange<Derivatives::Curl>;
 
-      std::vector<typename Traits<LocalBasis,void>::template DerivativeRange<Derivatives::Jacobian>> jacobian;
-      finalize(Derivatives::Jacobian{}, localBasis, x, in, jacobian);
+        for (auto i : Dune::range(in.size())) {
+          CurlRange referenceCurl;
+          referenceCurl[0] = in[i][2][1] - in[i][1][2];
+          referenceCurl[1] = in[i][0][2] - in[i][2][0];
+          referenceCurl[2] = in[i][1][0] - in[i][0][1];
 
-      out.resize(jacobian.size());
-      for (auto i : Dune::range(out.size()))
-        for (auto j : Dune::range(out[i].size()))
-          out[i][j] = jacobian[i][j][d.i];
+          auto referenceCurlDenseVector = Impl::DenseVectorView(referenceCurl);
+          auto outDenseVector = Impl::DenseVectorView(out[i]);
+          jacobian.mv(referenceCurlDenseVector, outDenseVector);
+          out[i] /= integrationElement;
+        }
+      }
     }
 
   private:

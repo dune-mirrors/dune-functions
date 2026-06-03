@@ -61,4 +61,5 @@ install(
   interpolatetest.hh
   enabledifferentiabilitycheck.hh
   testboundlocalfe.hh
+  testtransformedlocalbasis.hh
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/test)

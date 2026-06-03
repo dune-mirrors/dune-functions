@@ -15,10 +15,9 @@
 #include <dune/grid/uggrid.hh>
 #include <dune/grid/io/file/gmshreader.hh>
 
-#include <dune/localfunctions/test/test-localfe.hh>
-
 #include <dune/functions/functionspacebases/nedelecbasis.hh>
 #include <dune/functions/functionspacebases/raviartthomasbasis.hh>
+#include <dune/functions/functionspacebases/test/testtransformedlocalbasis.hh>
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
 
 
@@ -26,21 +25,26 @@ using namespace Dune;
 
 
 template<class Basis, class Derivative>
-void checkBasisFEs(const Basis& basis, Derivative d) {
+TestSuite checkBasisFEs(const Basis& basis, Derivative d) {
+  TestSuite test("basis finite elements");
   auto localView = basis.localView();
   for (const auto& element : elements(basis.gridView()))
   {
     localView.bind(element);
-    testFE(localView.tree().finiteElement(), DisableJacobian | DisableEvaluate, 0 /* diffOrder */);
-
-    // TODO: test divergence and curl explicitly
+    test.subTest(Functions::Test::testTransformedLocalFiniteElement(
+      localView.tree().finiteElement(),
+      localView.element(),
+      Functions::Derivatives::Value{},
+      d));
   }
+  return test;
 }
 
 
 int main (int argc, char* argv[]) try
 {
   Dune::MPIHelper::instance(argc, argv);
+  TestSuite test;
 
   using namespace Functions::BasisFactory;
 
@@ -62,15 +66,15 @@ int main (int argc, char* argv[]) try
     //  We use the Raviart-Thomas basis.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, raviartThomas<0>()), Dune::Functions::Derivatives::Divergence{});
-    checkBasisFEs(makeBasis(gridView, raviartThomas<1>()), Dune::Functions::Derivatives::Divergence{});
+    test.subTest(checkBasisFEs(makeBasis(gridView, raviartThomas<0>()), Dune::Functions::Derivatives::Divergence{}));
+    test.subTest(checkBasisFEs(makeBasis(gridView, raviartThomas<1>()), Dune::Functions::Derivatives::Divergence{}));
 
     ///////////////////////////////////////////////////////////////////////
     //  Test GlobalValuedLocalFiniteElement for a H(curl)-conforming space
     //  We use the Nedelec basis of the first kind.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()), Dune::Functions::Derivatives::Curl{});
+    test.subTest(checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()), Dune::Functions::Derivatives::Curl{}));
   }
 
   // Check with YaspGrid
@@ -84,17 +88,19 @@ int main (int argc, char* argv[]) try
     //  We use the Raviart-Thomas basis.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, raviartThomas<0>()), Dune::Functions::Derivatives::Divergence{});
-    checkBasisFEs(makeBasis(gridView, raviartThomas<1>()), Dune::Functions::Derivatives::Divergence{});
-    checkBasisFEs(makeBasis(gridView, raviartThomas<2>()), Dune::Functions::Derivatives::Divergence{});
+    test.subTest(checkBasisFEs(makeBasis(gridView, raviartThomas<0>()), Dune::Functions::Derivatives::Divergence{}));
+    test.subTest(checkBasisFEs(makeBasis(gridView, raviartThomas<1>()), Dune::Functions::Derivatives::Divergence{}));
+    test.subTest(checkBasisFEs(makeBasis(gridView, raviartThomas<2>()), Dune::Functions::Derivatives::Divergence{}));
 
     ///////////////////////////////////////////////////////////////////////
     //  Test GlobalValuedLocalFiniteElement for a H(curl)-conforming space
     //  We use the Nedelec basis of the first kind.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()), Dune::Functions::Derivatives::Curl{});
+    test.subTest(checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()), Dune::Functions::Derivatives::Curl{}));
   }
+
+  return test.exit();
 
 } catch (Exception &e)
 {

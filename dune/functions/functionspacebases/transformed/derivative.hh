@@ -19,9 +19,8 @@ namespace Dune::Functions::Derivatives {
  * or finalize() to select the quantity to compute without overloading on the
  * output container type.
  *
- * The tags are intentionally lightweight value types.  Tags without data denote
- * a whole derivative quantity, while Partial stores the selected coordinate
- * direction.
+ * The tags are intentionally lightweight value types.  Currently, no tag stores
+ * any value and the type is actually enough for the distinction.
  */
 
 //! Select evaluation of shape-function values.
@@ -44,13 +43,6 @@ struct Hessian { bool operator==(Hessian const&) const = default; };
 
 //! Select evaluation of Laplacians.
 struct Laplacian { bool operator==(Laplacian const&) const = default; };
-
-//! Select evaluation of a partial derivative in coordinate direction i.
-template <std::size_t dim>
-struct Partial {
-  std::array<unsigned int,dim> orders;
-  bool operator==(Partial const&) const = default;
-};
 
 } // end namespace Dune::Functions::Derivatives
 

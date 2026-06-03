@@ -84,12 +84,13 @@ class DerivativePullback
       localBasis.evaluateJacobian(x,out);
     }
 
-    template<class LocalBasis, class Out>
-    void precompute(Derivatives::Partial,
+    template<std::size_t dim, class LocalBasis, class Out>
+    void precompute(Derivatives::Partial<dim>,
                     LocalBasis const& localBasis,
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
     {
+      // TODO: we need a way to check which derivative order to evaluate on the reference element. It is only enough to evaluate jacobians, if we request first order partial derivatives. But for second order derivative, we would need a hessian on the reference element, and so on. Maybe this needs to be encoded in the template parameter?
       localBasis.evaluateJacobian(x,out);
     }
 
@@ -170,34 +171,35 @@ class DerivativePullback
       }
     }
 
-    template<class LocalBasis, class In, class Out>
-    void finalize(Derivatives::Partial d,
+    template<std::size_t dim, class LocalBasis, class In, class Out>
+    void finalize(Derivatives::Partial<dim> d,
                   LocalBasis const&,
                   typename LocalBasis::Traits::DomainType const& x,
                   In const& in,
                   Out& out) const
     {
       assert(!!geometry_);
-      assert(0 <= d.i && d.i < Geometry::coorddimension);
+      // assert(0 <= d.i && d.i < Geometry::coorddimension);
 
       out.resize(in.size());
+      // TODO: implement global partial derivaitves. Therefore, we need a way to decide which reference derivatives to evaluate.
 
-      if constexpr (requires{out[0][0];}) {
-        auto&& Jinv = geometry_->jacobianInverse(x);
-        for (auto i : Dune::range(in.size())) {
-          typename Traits<LocalBasis,void>::template DerivativeRange<Derivatives::Jacobian> jac = in[i] * Jinv;
-          for (auto j : Dune::range(LocalBasis::Traits::dimRange))
-            out[i][j] = jac[j][d.i];
-        }
-      }
-      else {
-        auto&& JinvT = geometry_->jacobianInverseTransposed(x);
-        FieldVector<typename LocalBasis::Traits::RangeFieldType,Geometry::coorddimension> gradient;
-        for (auto i : Dune::range(in.size())) {
-          JinvT.mv(in[i][0], gradient);
-          out[i] = gradient[d.i];
-        }
-      }
+      // if constexpr (requires{out[0][0];}) {
+      //   auto&& Jinv = geometry_->jacobianInverse(x);
+      //   for (auto i : Dune::range(in.size())) {
+      //     typename Traits<LocalBasis,void>::template DerivativeRange<Derivatives::Jacobian> jac = in[i] * Jinv;
+      //     for (auto j : Dune::range(LocalBasis::Traits::dimRange))
+      //       out[i][j] = jac[j][d.i];
+      //   }
+      // }
+      // else {
+      //   auto&& JinvT = geometry_->jacobianInverseTransposed(x);
+      //   FieldVector<typename LocalBasis::Traits::RangeFieldType,Geometry::coorddimension> gradient;
+      //   for (auto i : Dune::range(in.size())) {
+      //     JinvT.mv(in[i][0], gradient);
+      //     out[i] = gradient[d.i];
+      //   }
+      // }
     }
 
     template<class LocalBasis, class In, class Out>

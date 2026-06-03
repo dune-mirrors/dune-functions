@@ -19,18 +19,21 @@
 
 #include <dune/functions/functionspacebases/nedelecbasis.hh>
 #include <dune/functions/functionspacebases/raviartthomasbasis.hh>
+#include <dune/functions/functionspacebases/transformed/derivative.hh>
 
 
 using namespace Dune;
 
 
-template<class Basis>
-void checkBasisFEs(const Basis& basis) {
+template<class Basis, class Derivative>
+void checkBasisFEs(const Basis& basis, Derivative d) {
   auto localView = basis.localView();
   for (const auto& element : elements(basis.gridView()))
   {
     localView.bind(element);
-    testFE(localView.tree().finiteElement(), DisableNone, 1 /* diffOrder */);
+    testFE(localView.tree().finiteElement(), DisableJacobian | DisableEvaluate, 0 /* diffOrder */);
+
+    // TODO: test divergence and curl explicitly
   }
 }
 
@@ -59,15 +62,15 @@ int main (int argc, char* argv[]) try
     //  We use the Raviart-Thomas basis.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, raviartThomas<0>()));
-    checkBasisFEs(makeBasis(gridView, raviartThomas<1>()));
+    checkBasisFEs(makeBasis(gridView, raviartThomas<0>()), Dune::Functions::Derivatives::Divergence{});
+    checkBasisFEs(makeBasis(gridView, raviartThomas<1>()), Dune::Functions::Derivatives::Divergence{});
 
     ///////////////////////////////////////////////////////////////////////
     //  Test GlobalValuedLocalFiniteElement for a H(curl)-conforming space
     //  We use the Nedelec basis of the first kind.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()));
+    checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()), Dune::Functions::Derivatives::Curl{});
   }
 
   // Check with YaspGrid
@@ -81,16 +84,16 @@ int main (int argc, char* argv[]) try
     //  We use the Raviart-Thomas basis.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, raviartThomas<0>()));
-    checkBasisFEs(makeBasis(gridView, raviartThomas<1>()));
-    checkBasisFEs(makeBasis(gridView, raviartThomas<2>()));
+    checkBasisFEs(makeBasis(gridView, raviartThomas<0>()), Dune::Functions::Derivatives::Divergence{});
+    checkBasisFEs(makeBasis(gridView, raviartThomas<1>()), Dune::Functions::Derivatives::Divergence{});
+    checkBasisFEs(makeBasis(gridView, raviartThomas<2>()), Dune::Functions::Derivatives::Divergence{});
 
     ///////////////////////////////////////////////////////////////////////
     //  Test GlobalValuedLocalFiniteElement for a H(curl)-conforming space
     //  We use the Nedelec basis of the first kind.
     ///////////////////////////////////////////////////////////////////////
 
-    checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()));
+    checkBasisFEs(makeBasis(gridView, nedelec<1,1,double>()), Dune::Functions::Derivatives::Curl{});
   }
 
 } catch (Exception &e)

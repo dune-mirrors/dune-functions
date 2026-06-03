@@ -74,9 +74,6 @@ void getLocalMatrix(const LocalView& localView,
     // Position of the current quadrature point in the reference element
     const auto quadPos = quadPoint.position();
 
-    // The inverse Jacobian of the map from the reference element to the element
-    const auto jacobianInverse = geometry.jacobianInverse(quadPos);
-
     // The multiplicative factor in the integral transformation formula
     const auto integrationElement = geometry.integrationElement(quadPos);
 
@@ -88,22 +85,9 @@ void getLocalMatrix(const LocalView& localView,
     std::vector<FieldVector<double,dim> > fluxValues(fluxLocalFiniteElement.size());
     fluxLocalFiniteElement.localBasis().evaluateFunction(quadPos, fluxValues);
 
-    // Gradients of the flux shape function gradients on the reference element
-    std::vector<FieldMatrix<double,dim,dim> > fluxReferenceJacobians(fluxLocalFiniteElement.size());
-    fluxLocalFiniteElement.localBasis().evaluateJacobian(quadPos, fluxReferenceJacobians);
-
-    // Helper function to compute the trace of a matrix
-    auto trace = [](const auto& matrix) {
-      double r=0;
-      for (size_t j=0; j<matrix.N(); j++)
-        r += matrix[j][j];
-      return r;
-    };
-
-    // Domain transformation of Jacobians and computation of div = trace(Jacobian)
-    std::vector<double> fluxDivergence(fluxValues.size(), 0.0);
-    for (size_t i=0; i<fluxReferenceJacobians.size(); i++)
-      fluxDivergence[i] = trace(fluxReferenceJacobians[i] * jacobianInverse);
+    // Divergence of the transformed shape functions on the physical element
+    std::vector<double> fluxDivergence(fluxLocalFiniteElement.size());
+    fluxLocalFiniteElement.localBasis().evaluate(Functions::Derivatives::Divergence{}, quadPos, fluxDivergence);
 
     ///////////////////////////////////////////////////////////////////////////
     // Shape functions - pressure

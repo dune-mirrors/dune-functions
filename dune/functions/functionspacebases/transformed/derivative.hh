@@ -7,6 +7,8 @@
 #ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_TRANSFORMED_DERIVATIVE_HH
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_TRANSFORMED_DERIVATIVE_HH
 
+#include <array>
+
 namespace Dune::Functions::Derivatives {
 
 /**
@@ -44,7 +46,11 @@ struct Hessian { bool operator==(Hessian const&) const = default; };
 struct Laplacian { bool operator==(Laplacian const&) const = default; };
 
 //! Select evaluation of a partial derivative in coordinate direction i.
-struct Partial { int i;  bool operator==(Partial const&) const = default;  };
+template <std::size_t dim>
+struct Partial {
+  std::array<unsigned int,dim> orders;
+  bool operator==(Partial const&) const = default;
+};
 
 } // end namespace Dune::Functions::Derivatives
 

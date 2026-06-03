@@ -54,8 +54,8 @@ struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
   using type = FieldMatrix<K,LocalBasis::Traits::dimRange,Geometry::coorddimension>;
 };
 
-template <class LocalBasis, class Geometry>
-struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Partial>
+template <class LocalBasis, class Geometry, std::size_t dim>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Partial<dim>>
 {
   using type = typename LocalBasis::Traits::RangeType;
 };
@@ -100,8 +100,8 @@ struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
   using type = FieldVector<K,Geometry::coorddimension>;
 };
 
-template <class LocalBasis, class Geometry>
-struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Partial>
+template <class LocalBasis, class Geometry, std::size_t dim>
+struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Partial<dim>>
 {
   using type = typename LocalBasis::Traits::RangeType::value_type;
 };
@@ -133,8 +133,8 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Jacobian>
   using type = std::vector<typename LocalBasis::Traits::JacobianType>;
 };
 
-template <class LocalBasis>
-struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Partial>
+template <class LocalBasis, std::size_t dim>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Partial<dim>>
 {
   using type = std::vector<typename LocalBasis::Traits::JacobianType>;
 };

@@ -365,6 +365,7 @@ namespace Dune::Functions {
     }
 
     template<class DomainFieldType>
+      requires (dim == 3)
     constexpr auto operator()(const Dune::FieldVector<DomainFieldType,3>& x) const
     {
       auto xPowers = std::array<std::array<RangeFieldType,maxDegree+1>,dim>{};
@@ -390,6 +391,7 @@ namespace Dune::Functions {
     struct Derivative
     {
       template<class DomainFieldType>
+        requires (dim == 3)
       constexpr auto operator()(const Dune::FieldVector<DomainFieldType,3>& x) const
       {
         auto xPowers = std::array<std::array<RangeFieldType,maxDegree+1>,dim>{};
@@ -424,6 +426,7 @@ namespace Dune::Functions {
       struct Hessian
       {
         template<class DomainFieldType>
+          requires (dim == 3)
         constexpr auto operator()(const Dune::FieldVector<DomainFieldType,3>& x) const
         {
           auto xPowers = std::array<std::array<RangeFieldType,maxDegree+1>,dim>{};

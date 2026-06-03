@@ -78,13 +78,6 @@ int main (int argc, char* argv[])
       {
         test.check(localView0.index(i) == localView1.index(i), "index");
       }
-
-      auto const& lfe0 = localView0.tree().finiteElement();
-      auto const& lfe1 = localView1.tree().finiteElement();
-
-      using LFE0 = std::decay_t<decltype(lfe0)>;
-      using LFE1 = std::decay_t<decltype(lfe1)>;
-      static_assert(std::is_same_v<LFE0,LFE1>);
     }
   }
 

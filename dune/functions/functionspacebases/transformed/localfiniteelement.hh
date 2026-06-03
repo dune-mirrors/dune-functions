@@ -7,6 +7,7 @@
 #ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_TRANSFORMED_LOCALFINITEELEMENT_HH
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_TRANSFORMED_LOCALFINITEELEMENT_HH
 
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <type_traits>
@@ -199,10 +200,39 @@ class TransformedLocalBasis
     }
 
     //! Evaluate all shape functions using the classic LocalBasis interface.
-    void evaluateFunction(Domain const& x, std::vector<typename Traits::RangeType>& out) const
-      requires Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,Derivatives::Value>
+    void evaluateFunction(Domain const& x, std::vector<DerivativeRange<Derivatives::Value>>& out) const
     {
-      evaluate(Derivatives::Value{}, x, out);
+      if constexpr (Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,Derivatives::Value>)
+        evaluate(Derivatives::Value{}, x, out);
+      else {
+        assert(!!localBasis_);
+        localBasis_->evaluateFunction(x,out);
+      }
+    }
+
+    //! Evaluate all shape function Jacobians using the classic LocalBasis interface.
+    void evaluateJacobian(Domain const& x, std::vector<DerivativeRange<Derivatives::Jacobian>>& out) const
+    {
+      if constexpr (Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,Derivatives::Jacobian>)
+        evaluate(Derivatives::Jacobian{}, x, out);
+      else {
+        assert(!!localBasis_);
+        localBasis_->evaluateJacobian(x,out);
+      }
+    }
+
+
+    //! Evaluate all shape function partial derivatives using the classic LocalBasis interface.
+    void partial(std::array<unsigned int, Traits::dimDomain> const& partialOrders,
+                 Domain const& x,
+                 std::vector<DerivativeRange<Derivatives::Partial<Traits::dimDomain>>>& out) const
+    {
+      if constexpr (Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,Derivatives::Partial<Traits::dimDomain>>)
+        evaluate(Derivatives::Partial<Traits::dimDomain>{partialOrders}, x, out);
+      else {
+        assert(!!localBasis_);
+        localBasis_->partial(partialOrders,x,out);
+      }
     }
 
     /**

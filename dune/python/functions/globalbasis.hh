@@ -204,8 +204,10 @@ namespace Dune
       else if constexpr (LeafTreeNode<RawTree> or UniformInnerTreeNode<RawTree>)
       {
         cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, double, FieldVector<double,dimRange> > );
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, bool, std::array<bool,dimRange> > );
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, int, FieldVector<int,dimRange> > );
+        if constexpr (UniformInnerTreeNode<RawTree>) {
+          cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, bool, std::array<bool,dimRange> > );
+          cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, int, FieldVector<int,dimRange> > );
+        }
       }
 
       // Register various grid function types

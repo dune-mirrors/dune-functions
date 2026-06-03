@@ -115,6 +115,62 @@ struct hasFiniteElement<Tree, void_t<typename Tree::FiniteElement>>
   : std::true_type
 {};
 
+template<class LocalBasis>
+concept HasEvaluateJacobian =
+  requires(LocalBasis const& basis,
+           typename LocalBasis::Traits::DomainType const& x,
+           std::vector<typename LocalBasis::Traits::JacobianType>& out)
+  {
+    basis.evaluateJacobian(x, out);
+  };
+
+template<typename LocalBasis>
+auto registerLocalBasis(pybind11::handle scope)
+{
+  static auto cls = pybind11::class_<LocalBasis>(scope, "LocalBasis");
+
+  cls.def("__len__", [](const LocalBasis& basis) { return basis.size(); });
+  cls.def_property_readonly("order", [](const LocalBasis& basis) { return basis.order(); });
+  cls.def("evaluateFunction",
+          [](const LocalBasis& basis, const typename LocalBasis::Traits::DomainType& in) {
+            std::vector<typename LocalBasis::Traits::RangeType> out;
+            basis.evaluateFunction(in, out);
+            return out;
+          });
+
+  if constexpr (HasEvaluateJacobian<LocalBasis>) {
+    cls.def("evaluateJacobian",
+            [](const LocalBasis& basis, const typename LocalBasis::Traits::DomainType& in) {
+              std::vector<typename LocalBasis::Traits::JacobianType> out;
+              basis.evaluateJacobian(in, out);
+              return out;
+            });
+  }
+
+  return cls;
+}
+
+template<typename LocalFiniteElement>
+auto registerLocalFiniteElement(pybind11::handle scope, const char* name = "LocalFiniteElement")
+{
+  using LocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
+
+  if constexpr (HasEvaluateJacobian<LocalBasis>)
+    return Dune::Python::registerLocalFiniteElement<LocalFiniteElement>(scope, name);
+  else {
+    static auto cls = pybind11::class_<LocalFiniteElement>(scope, name);
+
+    registerLocalBasis<LocalBasis>(cls);
+
+    cls.def_property_readonly("localBasis", &LocalFiniteElement::localBasis, pybind11::return_value_policy::reference_internal);
+    cls.def("__len__", [](const LocalFiniteElement& lf) { return lf.size(); });
+    cls.def("size", [](const LocalFiniteElement& lf) { return lf.size(); });
+    cls.def_property_readonly("type", &LocalFiniteElement::type);
+
+    return cls;
+  }
+}
+
 template< typename Tree, std::enable_if_t< !hasFiniteElement<Tree>::value, int > = 0>
 void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree> >&)
 {

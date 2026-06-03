@@ -162,7 +162,16 @@ void interpolateLocal(VectorBackend& vector, const BitVectorBackend& bitVector, 
     auto&& fe = node.finiteElement();
     auto localF_RE = ComponentFunction(std::cref(localF), [&](auto&& y) { return nodeToRangeEntry(node, treePath, y); });
 
-    fe.localInterpolation().interpolate(localF_RE, interpolationCoefficients);
+    using LocalBasis = typename FiniteElement::Traits::LocalBasisType;
+    using LocalBasisRange = typename LocalBasis::Traits::RangeType;
+    using LocalBasisDomain = typename LocalBasis::Traits::DomainType;
+    using LocalFunctionRange = std::decay_t<decltype(localF(std::declval<LocalBasisDomain>()))>;
+
+    if constexpr (std::is_convertible_v<LocalFunctionRange,LocalBasisRange>)
+      fe.localInterpolation().interpolate(localF, interpolationCoefficients);
+    else
+      fe.localInterpolation().interpolate(localF_RE, interpolationCoefficients);
+
     for (size_t i=0; i<fe.localBasis().size(); ++i)
     {
       auto multiIndex = localView.index(node.localIndex(i));

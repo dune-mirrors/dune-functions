@@ -32,11 +32,11 @@ install(FILES
         nedelecbasis.hh
         periodicbasis.hh
         powerbasis.hh
-        pullbacktransformedlocalfiniteelement.hh
         rannacherturekbasis.hh
         raviartthomasbasis.hh
         refinedlagrangebasis.hh
         restrictedbasis.hh
+        quadraturebasisfunctioncache.hh
         nodes.hh
         subentitydofs.hh
         subspacebasis.hh

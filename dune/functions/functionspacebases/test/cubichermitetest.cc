@@ -13,14 +13,32 @@
 
 #include <dune/grid/uggrid.hh>
 #include <dune/grid/onedgrid.hh>
+#include <dune/grid/common/rangegenerators.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
 
 #include <dune/functions/functionspacebases/test/basistest.hh>
+#include <dune/functions/functionspacebases/test/testtransformedlocalbasis.hh>
 #include <dune/functions/functionspacebases/cubichermitebasis.hh>
 
 using namespace Dune;
 using namespace Dune::Functions;
 
+template<class Basis>
+Dune::TestSuite checkHermiteLocalFiniteElements(Basis& basis)
+{
+  Dune::TestSuite test("Hermite transformed local finite elements");
+
+  auto localView = basis.localView();
+  for (auto const& element : elements(basis.gridView())) {
+    localView.bind(element);
+    Dune::TypeTree::forEachLeafNode(localView.tree(), [&](auto const& node, [[maybe_unused]] auto const& treePath) {
+      test.subTest(Dune::Functions::Test::testTransformedLocalFiniteElement(
+        node.finiteElement(), element, Derivatives::Value{}));
+    });
+  }
+
+  return test;
+}
 
 int main(int argc, char *argv[])
 {
@@ -43,16 +61,18 @@ int main(int argc, char *argv[])
       auto basis = makeBasis(gridView, cubicHermite());
       std::cout << "Basis has " << basis.size() << " dofs" << std::endl;
 
-      test_1d.subTest(checkBasis(basis, EnableContinuityCheck(), CheckLocalFiniteElementFlag<2>{}, EnableDifferentiabilityCheck(),
+      test_1d.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_1d.subTest(checkHermiteLocalFiniteElements(basis));
 
       // Modify grid, update basis and check again
       const auto firstEntity = gridView.template begin<0>();
       grid->mark(1, *firstEntity);
       grid->adapt();
       basis.update(grid->leafGridView());
-      test_1d.subTest(checkBasis(basis, EnableContinuityCheck(), CheckLocalFiniteElementFlag<2>{}, EnableDifferentiabilityCheck(),
+      test_1d.subTest(checkBasis(basis, EnableContinuityCheck(), EnableDifferentiabilityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_1d.subTest(checkHermiteLocalFiniteElements(basis));
     }
 
   }
@@ -79,16 +99,18 @@ int main(int argc, char *argv[])
       auto basis = makeBasis(gridView, cubicHermite());
       std::cout << "Basis has " << basis.size() << " dofs" << std::endl;
 
-      test_2d.subTest(checkBasis(basis, CheckLocalFiniteElementFlag<1>{}, EnableContinuityCheck(),
+      test_2d.subTest(checkBasis(basis, EnableContinuityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_2d.subTest(checkHermiteLocalFiniteElements(basis));
 
       // Modify grid, update basis and check again
       const auto firstEntity = gridView.template begin<0>();
       grid->mark(1, *firstEntity);
       grid->adapt();
       basis.update(grid->leafGridView());
-      test_2d.subTest(checkBasis(basis, CheckLocalFiniteElementFlag<1>{}, EnableContinuityCheck(),
+      test_2d.subTest(checkBasis(basis, EnableContinuityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_2d.subTest(checkHermiteLocalFiniteElements(basis));
     }
 
   }
@@ -115,16 +137,18 @@ int main(int argc, char *argv[])
       auto basis = makeBasis(gridView, reducedCubicHermite());
       std::cout << "Basis has " << basis.size() << " Dofs" << std::endl;
 
-      test_2d.subTest(checkBasis(basis,CheckLocalFiniteElementFlag<1>{}, EnableContinuityCheck(),
+      test_2d.subTest(checkBasis(basis, EnableContinuityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_2d.subTest(checkHermiteLocalFiniteElements(basis));
 
       // Modify grid, update basis and check again
       const auto firstEntity = gridView.template begin<0>();
       grid->mark(1, *firstEntity);
       grid->adapt();
       basis.update(grid->leafGridView());
-      test_2d.subTest(checkBasis(basis,CheckLocalFiniteElementFlag<1>{}, EnableContinuityCheck(),
+      test_2d.subTest(checkBasis(basis, EnableContinuityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_2d.subTest(checkHermiteLocalFiniteElements(basis));
     }
 
   }
@@ -144,16 +168,18 @@ int main(int argc, char *argv[])
       auto basis = makeBasis(gridView, cubicHermite());
       std::cout << "Basis has " << basis.size() << " dofs" << std::endl;
 
-      test_3d.subTest(checkBasis(basis, EnableContinuityCheck(),CheckLocalFiniteElementFlag<1>{},
+      test_3d.subTest(checkBasis(basis, EnableContinuityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_3d.subTest(checkHermiteLocalFiniteElements(basis));
 
       // Modify grid, update basis and check again
       const auto firstEntity = gridView.template begin<0>();
       grid->mark(1, *firstEntity);
       grid->adapt();
       basis.update(grid->leafGridView());
-      test_3d.subTest(checkBasis(basis, EnableContinuityCheck(),CheckLocalFiniteElementFlag<1>{},
+      test_3d.subTest(checkBasis(basis, EnableContinuityCheck(),
                                  EnableVertexDifferentiabilityCheck()));
+      test_3d.subTest(checkHermiteLocalFiniteElements(basis));
     }
 
   }

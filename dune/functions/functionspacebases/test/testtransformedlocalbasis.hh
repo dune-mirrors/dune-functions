@@ -41,6 +41,8 @@ double norm(T const& value)
 {
   if constexpr (std::is_arithmetic_v<T>)
     return std::abs(value);
+  else if constexpr (requires { value.frobenius_norm(); })
+    return value.frobenius_norm();
   else
     return value.two_norm();
 }
@@ -56,7 +58,7 @@ double differenceNorm(T const& a, T const& b)
   else {
     auto difference = a;
     difference -= b;
-    return difference.two_norm();
+    return norm(difference);
   }
 }
 

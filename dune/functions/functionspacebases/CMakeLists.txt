@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 
 add_subdirectory("test")
+add_subdirectory("transformed")
 
 install(FILES
         basistags.hh
@@ -45,13 +46,3 @@ install(FILES
         transformedfiniteelementmixin.hh
         transformedindexbasis.hh
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases)
-
-install(FILES
-        transformed/bindcontext.hh
-        transformed/concepts.hh
-        transformed/derivative.hh
-        transformed/derivativetraits.hh
-        transformed/localfiniteelement.hh
-        transformed/piola.hh
-        transformed/pullback.hh
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/transformed)

@@ -9,6 +9,7 @@ install(FILES
         differentiablefunction.hh
         differentiablefunction_imp.hh
         differentiablefunctionfromcallables.hh
+        faceorientation.hh
         functionconcepts.hh
         geometryinancestor.hh
         indexaccess.hh

@@ -28,6 +28,26 @@ namespace TransformedLocalFiniteElementLocalBasis {
 }
 
 /**
+ * \brief Interpolation policy that leaves physical functions unchanged.
+ *
+ * This is used when the bound reference interpolation already evaluates the
+ * physical degrees of freedom directly and therefore needs no function-value
+ * pullback.
+ */
+struct IdentityLocalInterpolationTransformation
+{
+  template<class Context>
+  void bind(Context const&)
+  {}
+
+  template<class Function>
+  Function localFunctionPullback(Function const& f) const
+  {
+    return f;
+  }
+};
+
+/**
  * \brief Local-basis adapter driven by a transformation policy.
  *
  * This adapter wraps a reference local basis and applies a transformation policy
@@ -341,6 +361,9 @@ class TransformedLocalInterpolation
  * \tparam LocalBasisTag Tag to select whether localBasis() returns the reference or
  *   physical basis. Use TransformedLocalFiniteElementLocalBasis::Reference or
  *   ::Physical.
+ * \tparam InterpolationTransformation Transformation policy used to pull
+ *   functions back for local interpolation. By default this is the same policy
+ *   as the basis transformation.
  *
  * Example usage:
  * \code
@@ -356,7 +379,8 @@ class TransformedLocalInterpolation
 template<class LocalFiniteElement,
          class Context,
          class Transformation,
-         class LocalBasisTag = TransformedLocalFiniteElementLocalBasis::Physical>
+         class LocalBasisTag = TransformedLocalFiniteElementLocalBasis::Physical,
+         class InterpolationTransformation = Transformation>
 class TransformedLocalFiniteElement
 {
     using ReferenceLocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
@@ -377,7 +401,10 @@ class TransformedLocalFiniteElement
       PhysicalBasis>;
 
     //! Type of the transformed physical local interpolation.
-    using PhysicalLocalInterpolation = TransformedLocalInterpolation<ReferenceLocalInterpolation,Context,Transformation>;
+    using PhysicalLocalInterpolation = TransformedLocalInterpolation<
+      ReferenceLocalInterpolation,
+      Context,
+      InterpolationTransformation>;
 
     //! Type exposed by localInterpolation() for compatibility with existing bases.
     using LocalInterpolation = std::conditional_t<
@@ -398,9 +425,11 @@ class TransformedLocalFiniteElement
      *
      * \param transformation The transformation policy to use for basis and interpolation.
      */
-    explicit TransformedLocalFiniteElement(Transformation transformation)
+    explicit TransformedLocalFiniteElement(
+        Transformation transformation,
+        InterpolationTransformation interpolationTransformation = {})
       : basis_(std::move(transformation))
-      , physicalInterpolation_(basis_.transformation())
+      , physicalInterpolation_(std::move(interpolationTransformation))
     {}
 
     /**

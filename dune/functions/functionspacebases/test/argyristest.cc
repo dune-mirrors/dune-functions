@@ -12,15 +12,38 @@
 #include <dune/common/parallel/mpihelper.hh>
 
 #include <dune/grid/uggrid.hh>
+#include <dune/grid/common/rangegenerators.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
 
 #include <dune/functions/functionspacebases/argyrisbasis.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/test/basistest.hh>
 #include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
+#include <dune/functions/functionspacebases/test/testtransformedlocalbasis.hh>
 
 using namespace Dune;
 using namespace Dune::Functions;
+
+template<class Basis>
+Dune::TestSuite checkArgyrisLocalFiniteElements(Basis& basis)
+{
+  Dune::TestSuite test("Argyris transformed local finite elements");
+
+  auto localView = basis.localView();
+  for (auto const& element : elements(basis.gridView())) {
+    localView.bind(element);
+    Dune::TypeTree::forEachLeafNode(localView.tree(), [&](auto const& node, [[maybe_unused]] auto const& treePath) {
+      test.subTest(Dune::Functions::Test::testTransformedLocalFiniteElement(
+        node.finiteElement(),
+        element,
+        Derivatives::Value{},
+        Derivatives::Jacobian{},
+        Derivatives::Hessian{}));
+    });
+  }
+
+  return test;
+}
 
 int main(int argc, char *argv[])
 {
@@ -38,8 +61,8 @@ int main(int argc, char *argv[])
   auto basis = makeBasis(gridView, argyris());
 
   test.subTest(checkBasis(basis, EnableContinuityCheck(),
-                          EnableDifferentiabilityCheck(),
-                          CheckLocalFiniteElementFlag<2>()));
+                          EnableDifferentiabilityCheck()));
+  test.subTest(checkArgyrisLocalFiniteElements(basis));
 
   // Modify grid, update basis and check again
   const auto firstEntity = gridView.template begin<0>();
@@ -48,8 +71,8 @@ int main(int argc, char *argv[])
   basis.update(grid->leafGridView());
 
   test.subTest(checkBasis(basis, EnableContinuityCheck(),
-                          EnableDifferentiabilityCheck(),
-                          CheckLocalFiniteElementFlag<2>()));
+                          EnableDifferentiabilityCheck()));
+  test.subTest(checkArgyrisLocalFiniteElements(basis));
 
   return test.exit();
 }

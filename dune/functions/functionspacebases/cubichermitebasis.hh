@@ -514,7 +514,7 @@ namespace Dune::Functions
      * interpolation rule.  The element is not affine-equivalent: derivatives in
      * the interpolation are scaled with element-local vertex mesh sizes, and the
      * corresponding basis-set transformation is provided separately by
-     * CubicHermiteTransformation.
+     * CubicHermiteBasisSetTransformation.
      *
      * \tparam D Type used for domain coordinates
      * \tparam R Type used for function values
@@ -582,9 +582,8 @@ namespace Dune::Functions
      * derivative values are transformed with the element Jacobian and the
      * average vertex mesh-size scaling used by the interpolation rule.
      */
-    template<class D, class R, int dim, bool reduced = false>
-    class CubicHermiteTransformation
-      : public Dune::Functions::BasisSetTransformationMixin<CubicHermiteTransformation<D,R,dim,reduced>>
+    template<class D, class R, int dim, bool reduced>
+    class CubicHermiteBasisSetTransformation
     {
     public:
       template<class Context>
@@ -597,12 +596,6 @@ namespace Dune::Functions
           scaledVertexJacobians_[i] = geometry.jacobian(refElement.position(i, dim));
           scaledVertexJacobians_[i] /= context.averageVertexMeshSize(i);
         }
-      }
-
-      template<class Function>
-      Function localFunctionPullback(Function const& f) const
-      {
-        return f;
       }
 
       template<class InputValues, class OutputValues>
@@ -649,13 +642,18 @@ namespace Dune::Functions
     template<class D, class R, int dim, bool reduced, class Element>
     class CubicHermiteLocalFiniteElement
     {
-      using Context = Dune::Functions::SimplexElementContext<Element>;
+      using Context = Dune::Functions::SimplexVertexMeshSizeContext<Element>;
       using ReferenceFiniteElement = CubicHermiteReferenceLocalFiniteElement<D,R,dim,reduced>;
-      using Transformation = CubicHermiteTransformation<D,R,dim,reduced>;
+      using BasisSetTransformation = CubicHermiteBasisSetTransformation<D,R,dim,reduced>;
+      using Transformation = Dune::Functions::TransformationPipeline<
+        Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
+        Dune::Functions::AffineScalarDerivativePullbackStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<
         ReferenceFiniteElement,
         Context,
-        Transformation>;
+        Transformation,
+        Dune::Functions::TransformedLocalFiniteElementLocalBasis::Physical,
+        Dune::Functions::IdentityLocalInterpolationTransformation>;
 
     public:
       CubicHermiteLocalFiniteElement()

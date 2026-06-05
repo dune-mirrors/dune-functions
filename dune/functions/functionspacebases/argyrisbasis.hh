@@ -27,7 +27,9 @@
 #include <dune/functions/functionspacebases/functionaldescriptor.hh>
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
-#include <dune/functions/functionspacebases/transformedfiniteelementmixin.hh>
+#include <dune/functions/functionspacebases/transformed/basisset.hh>
+#include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/simplexcontext.hh>
 
 /**
  * \file Argyrisbasis.hh
@@ -547,87 +549,90 @@ namespace Dune::Functions
       std::array<FunctionalDescriptor, size()> descriptors_;
     };
 
-    // TODO: There is a copy of this further up
-    template<class D, class R>
-    struct ArgyrisLocalBasisTraits
-      : public H2LocalBasisTraits<D, 2, Dune::FieldVector<D,2>, R, 1,
-            Dune::FieldVector<R,1>, Dune::FieldMatrix<R,1,2>, Dune::FieldMatrix<R,2,2> >
-    {};
-
-    /** \brief Argyris finite element for triangles, as defined on the reference Element
+    /** \brief Reference Argyris finite element on the triangle.
      *
-     * Note that this is a non affine-equivalent finite element.
-     * It requires an additional transformation to the relate reference basis
-     * with the pullbacks of global basis.
+     * This class stores the reference basis, local coefficients, and local
+     * interpolation rule.  The Argyris element is not affine-equivalent: its
+     * physical basis is obtained through the geometry- and orientation-dependent
+     * ArgyrisBasisSetTransformation.
      *
      * \tparam D Type used for domain coordinates
      * \tparam R Type used for function values
      */
     template<class D, class R>
-    class ArgyrisLocalFiniteElement
-      : public Impl::TransformedFiniteElementMixin<ArgyrisLocalFiniteElement<D,R>, ArgyrisLocalBasisTraits<D, R> >
+    class ArgyrisReferenceLocalFiniteElement
     {
-      using Base = Impl::TransformedFiniteElementMixin< ArgyrisLocalFiniteElement<D,R>, ArgyrisLocalBasisTraits<D, R> >;
-      friend class Impl::TransformedLocalBasis<ArgyrisLocalFiniteElement<D,R>, ArgyrisLocalBasisTraits<D, R> >;
       static constexpr int dim = 2;
 
     public:
-      /** \brief Export number types, dimensions, etc.
-       */
       using size_type = std::size_t;
       using Traits = LocalFiniteElementTraits<
-          Impl::TransformedLocalBasis<ArgyrisLocalFiniteElement<D,R>, ArgyrisLocalBasisTraits<D, R> >,
+          Impl::ArgyrisReferenceLocalBasis<D,R>,
           Impl::ArgyrisLocalCoefficients,
           Impl::ArgyrisLocalInterpolation<D> >;
 
-      /** \brief Returns the assignment of the degrees of freedom to the element
-       * subentities
-       */
-      const typename Traits::LocalCoefficientsType &localCoefficients() const
+      const typename Traits::LocalBasisType& localBasis() const
+      {
+        return basis_;
+      }
+
+      const typename Traits::LocalCoefficientsType& localCoefficients() const
       {
         return coefficients_;
       }
 
-      /** \brief Returns object that evaluates degrees of freedom
-       */
-      const typename Traits::LocalInterpolationType &localInterpolation() const
+      const typename Traits::LocalInterpolationType& localInterpolation() const
       {
         return interpolation_;
       }
 
-      /** \brief The reference element that the local finite element is defined on
-       */
       static constexpr GeometryType type()
       {
         return GeometryTypes::simplex(dim);
       }
 
-      /** The size of the transformed finite element.
-       */
       static constexpr size_type size()
       {
         return Impl::ArgyrisLocalCoefficients::size();
       }
 
-      /** Binds the Finite Element to an element.
-       */
-      template<class VertexMapper,class ElementMapper, class Element>
-      void bind(VertexMapper const& vertexMapper, std::vector<D> const& globalAverageVertexMeshSize,
-                ElementMapper const& elementMapper, std::vector<std::bitset<3> >const& edgeOrientations, Element const &e)
+      template<class Context>
+      void bind(Context const& context)
       {
-        // Cache average mesh size for each vertex
-        for (auto i : range(dim+1))
-          averageVertexMeshSize_[i] = globalAverageVertexMeshSize[vertexMapper.subIndex(e, i, dim)];
+        interpolation_.bind(
+          context.element(),
+          context.averageVertexMeshSizes(),
+          context.edgeOrientations());
+      }
 
-        // Cache orientation for each mesh
-        edgeOrientation_ = edgeOrientations[elementMapper.index(e)];
+    private:
+      typename Traits::LocalBasisType basis_;
+      typename Traits::LocalCoefficientsType coefficients_;
+      typename Traits::LocalInterpolationType interpolation_;
+    };
 
-        // Bind LocalInterpolation to updated local state
-        interpolation_.bind(e, averageVertexMeshSize_, edgeOrientation_);
+    /** \brief Geometry-dependent basis-set transformation for Argyris elements.
+     *
+     * This applies the matrix-free transformation described by Kirby.  It mixes
+     * the complete reference basis set because edge-normal derivative functionals
+     * interact with value, gradient, and Hessian functionals at the vertices.
+     * The transformation depends on the element geometry, average vertex mesh
+     * sizes, and globally consistent edge orientations.
+     */
+    template<class D, class R>
+    class ArgyrisBasisSetTransformation
+    {
+      static constexpr int dim = 2;
 
-        // Compute local transformation matrices for each vertex
-        const auto& geometry = e.geometry();
-        const auto& refElement = ReferenceElements<typename Element::Geometry::ctype, dim>::simplex();
+    public:
+      template<class Context>
+      void bind(Context const& context)
+      {
+        averageVertexMeshSize_ = context.averageVertexMeshSizes();
+        edgeOrientation_ = context.edgeOrientations();
+
+        const auto& geometry = context.geometry();
+        const auto& refElement = ReferenceElements<typename Context::Geometry::ctype, dim>::simplex();
         for (auto i : range(dim+1))
         {
           vertexJacobians_[i] = geometry.jacobian(refElement.position(i, dim));
@@ -688,25 +693,16 @@ namespace Dune::Functions
         }
       }
 
-    protected:
-
-      /** \brief Returns the local basis, i.e., the set of shape functions
-       */
-      Impl::ArgyrisReferenceLocalBasis<D, R> const& referenceLocalBasis() const
-      {
-        return basis_;
-      }
-
       /** Applies the transformation. Note that we do not distinguish for
        * Scalar/Vector/Matrix Type, but only assume the Values to be Elements of a Vectorspace.
        * We assume containers with random access iterators.
        */
       template<class InputValues, class OutputValues>
-      void transform(InputValues const &inValues, OutputValues &outValues) const
+      void transformBasisSet(InputValues const &inValues, OutputValues &outValues) const
       {
         using std::pow;
-        assert(inValues.size() == size());
-        assert(outValues.size() == inValues.size());
+        assert(inValues.size() == ArgyrisLocalCoefficients::size());
+        outValues.resize(inValues.size());
         // compatibility with sympy code below
         auto &[b_0, b_1, b_2] = b;
         auto &[J_0, J_1, J_2] = vertexJacobians_;
@@ -740,9 +736,6 @@ namespace Dune::Functions
       }
 
     private:
-      typename Impl::ArgyrisReferenceLocalBasis<D, R> basis_;
-      typename Traits::LocalCoefficientsType coefficients_;
-      typename Traits::LocalInterpolationType interpolation_;
       // the transformation to correct the lack of affine equivalence boils down to
       // matrix without blockstructure, because the normal derivative dofs interact nontrivially
       // with the others, for details see Kirby's paper.
@@ -763,6 +756,86 @@ namespace Dune::Functions
       std::array<D, dim+1> averageVertexMeshSize_;
       std::bitset<3> edgeOrientation_;
 
+    };
+
+    /** \brief Argyris finite element bound through TransformedLocalFiniteElement.
+     */
+    template<class D, class R, class Element>
+    class ArgyrisLocalFiniteElement
+    {
+      using Context = Dune::Functions::SimplexVertexMeshSizeAndEdgeOrientationContext<Element>;
+      using ReferenceFiniteElement = ArgyrisReferenceLocalFiniteElement<D,R>;
+      using BasisSetTransformation = ArgyrisBasisSetTransformation<D,R>;
+      using Transformation = Dune::Functions::TransformationPipeline<
+        Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
+        Dune::Functions::AffineScalarDerivativePullbackStage<typename Element::Geometry>>;
+      using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<
+        ReferenceFiniteElement,
+        Context,
+        Transformation,
+        Dune::Functions::TransformedLocalFiniteElementLocalBasis::Physical,
+        Dune::Functions::IdentityLocalInterpolationTransformation>;
+
+    public:
+      using size_type = std::size_t;
+      using Traits = typename TransformedFiniteElement::Traits;
+
+      const typename Traits::LocalBasisType& localBasis() const
+      {
+        return transformedFiniteElement_.localBasis();
+      }
+
+      const auto& referenceBasis() const
+      {
+        return transformedFiniteElement_.referenceBasis();
+      }
+
+      const auto& physicalBasis() const
+      {
+        return transformedFiniteElement_.physicalBasis();
+      }
+
+      const typename Traits::LocalCoefficientsType& localCoefficients() const
+      {
+        return transformedFiniteElement_.localCoefficients();
+      }
+
+      const typename Traits::LocalInterpolationType& localInterpolation() const
+      {
+        return transformedFiniteElement_.localInterpolation();
+      }
+
+      static constexpr GeometryType type()
+      {
+        return GeometryTypes::simplex(2);
+      }
+
+      static constexpr size_type size()
+      {
+        return ArgyrisLocalCoefficients::size();
+      }
+
+      template<class VertexMapper, class ElementMapper>
+      void bind(VertexMapper const& vertexMapper,
+                std::vector<D> const& globalAverageVertexMeshSize,
+                ElementMapper const& elementMapper,
+                std::vector<std::bitset<3>> const& edgeOrientations,
+                Element const& element)
+      {
+        context_.bind(
+          element,
+          vertexMapper,
+          globalAverageVertexMeshSize,
+          elementMapper,
+          edgeOrientations);
+        referenceFiniteElement_.bind(context_);
+        transformedFiniteElement_.bind(referenceFiniteElement_, context_);
+      }
+
+    private:
+      Context context_;
+      ReferenceFiniteElement referenceFiniteElement_;
+      TransformedFiniteElement transformedFiniteElement_;
     };
 
   } // end namespace Impl
@@ -789,7 +862,7 @@ namespace Dune::Functions
   public:
     using size_type = std::size_t;
     using Element = typename GV::template Codim<0>::Entity;
-    using FiniteElement = typename Impl::ArgyrisLocalFiniteElement<typename GV::ctype, R>;
+    using FiniteElement = typename Impl::ArgyrisLocalFiniteElement<typename GV::ctype, R, Element>;
 
     ArgyrisNode(Mapper const& vertexMapper, Mapper const& elementMapper,
                 std::vector<typename GV::ctype> const& averageVertexMeshSize,

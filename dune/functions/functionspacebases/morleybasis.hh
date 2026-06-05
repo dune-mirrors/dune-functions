@@ -349,7 +349,7 @@ namespace Dune::Functions
      * interpolation rule.  The Morley element is not affine-equivalent: the
      * physical basis is obtained from a geometry- and orientation-dependent
      * linear transformation of the full reference basis set.  That
-     * transformation is provided separately by MorleyTransformation.
+     * transformation is provided separately by MorleyBasisSetTransformation.
      *
      * \tparam D Type used for domain coordinates
      * \tparam R Type used for function values
@@ -411,8 +411,7 @@ namespace Dune::Functions
      * orientations used by the interpolation rule.
      */
     template<class D, class R>
-    class MorleyTransformation
-      : public Dune::Functions::BasisSetTransformationMixin<MorleyTransformation<D,R>>
+    class MorleyBasisSetTransformation
     {
       static constexpr int dim = 2;
 
@@ -422,12 +421,6 @@ namespace Dune::Functions
       {
         edgeOrientation_ = context.edgeOrientations();
         fillMatrix(context.geometry());
-      }
-
-      template<class Function>
-      Function localFunctionPullback(Function const& f) const
-      {
-        return f;
       }
 
       template<class InputValues, class OutputValues>
@@ -440,8 +433,8 @@ namespace Dune::Functions
       }
 
     private:
-      template<class Geometry>
-      void fillMatrix(Geometry const &geometry)
+      template<class LocalGeometry>
+      void fillMatrix(LocalGeometry const &geometry)
       {
         std::array<R, 3> B_11;
         std::array<R, 3> B_12;
@@ -510,13 +503,18 @@ namespace Dune::Functions
     template<class D, class R, class Element>
     class MorleyLocalFiniteElement
     {
-      using Context = Dune::Functions::SimplexElementContext<Element>;
+      using Context = Dune::Functions::SimplexEdgeOrientationContext<Element>;
       using ReferenceFiniteElement = MorleyReferenceLocalFiniteElement<D,R>;
-      using Transformation = MorleyTransformation<D,R>;
+      using BasisSetTransformation = MorleyBasisSetTransformation<D,R>;
+      using Transformation = Dune::Functions::TransformationPipeline<
+        Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
+        Dune::Functions::AffineScalarDerivativePullbackStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<
         ReferenceFiniteElement,
         Context,
-        Transformation>;
+        Transformation,
+        Dune::Functions::TransformedLocalFiniteElementLocalBasis::Physical,
+        Dune::Functions::IdentityLocalInterpolationTransformation>;
 
     public:
       using size_type = std::size_t;

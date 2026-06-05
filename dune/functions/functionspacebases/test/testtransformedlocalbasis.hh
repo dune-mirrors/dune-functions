@@ -72,6 +72,8 @@ std::string derivativeName(Derivative)
     return "Value";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Jacobian>)
     return "Jacobian";
+  else if constexpr (std::is_same_v<Derivative,Derivatives::Hessian>)
+    return "Hessian";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Divergence>)
     return "Divergence";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Curl>)
@@ -221,6 +223,72 @@ finiteDifference(Basis const& basis,
   }
 
   return derivative;
+}
+
+/**
+ * \brief Approximate the physical Hessian of a scalar shape function.
+ */
+template<class Basis, class Geometry>
+typename Basis::template DerivativeRange<Derivatives::Hessian>
+finiteDifference(Basis const& basis,
+                 Geometry const& geometry,
+                 GeometryType type,
+                 Derivatives::Hessian,
+                 typename Basis::Domain const& x,
+                 std::size_t shapeFunction,
+                 double epsilon)
+{
+  static_assert(Basis::Traits::dimRange == 1,
+    "Hessian finite-difference test currently supports scalar basis functions.");
+
+  typename Basis::template DerivativeRange<Derivatives::Hessian> hessian{};
+  std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> centerValues;
+  basis.evaluate(Derivatives::Value{}, x, centerValues);
+  auto center = Dune::Functions::Impl::DenseVectorView(centerValues[shapeFunction])[0];
+
+  for (auto i : Dune::range(Geometry::coorddimension)) {
+    typename Basis::Domain up;
+    typename Basis::Domain down;
+    if (shiftedPointsInside<Basis>(geometry, type, x, i, epsilon, up, down)) {
+      std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> upValues;
+      std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> downValues;
+      basis.evaluate(Derivatives::Value{}, up, upValues);
+      basis.evaluate(Derivatives::Value{}, down, downValues);
+      auto upValue = Dune::Functions::Impl::DenseVectorView(upValues[shapeFunction])[0];
+      auto downValue = Dune::Functions::Impl::DenseVectorView(downValues[shapeFunction])[0];
+      hessian[i][i] = (upValue - 2*center + downValue)/(epsilon*epsilon);
+    }
+
+    for (auto j : Dune::range(i)) {
+      auto stepI = localStepForPhysicalDirection<Basis>(geometry, x, i, epsilon);
+      auto stepJ = localStepForPhysicalDirection<Basis>(geometry, x, j, epsilon);
+      std::array<typename Basis::Domain,4> points{x, x, x, x};
+      points[0] += stepI;
+      points[0] += stepJ;
+      points[1] += stepI;
+      points[1] -= stepJ;
+      points[2] -= stepI;
+      points[2] += stepJ;
+      points[3] -= stepI;
+      points[3] -= stepJ;
+
+      auto const& referenceElement = ReferenceElements<
+        typename Basis::Domain::value_type,
+        Basis::Traits::dimDomain>::general(type);
+      if (std::ranges::all_of(points, [&](auto const& point) { return referenceElement.checkInside(point); })) {
+        std::array<double,4> values;
+        for (auto k : Dune::range(4)) {
+          std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> pointValues;
+          basis.evaluate(Derivatives::Value{}, points[k], pointValues);
+          values[k] = Dune::Functions::Impl::DenseVectorView(pointValues[shapeFunction])[0];
+        }
+        hessian[i][j] = (values[0] - values[1] - values[2] + values[3])/(4*epsilon*epsilon);
+        hessian[j][i] = hessian[i][j];
+      }
+    }
+  }
+
+  return hessian;
 }
 
 /**

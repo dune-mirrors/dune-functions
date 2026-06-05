@@ -8,40 +8,38 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_TRANSFORMED_SIMPLEXCONTEXT_HH
 
 #include <array>
-#include <cassert>
 #include <bitset>
 #include <cstddef>
-#include <optional>
 #include <vector>
 
 #include <dune/common/rangeutilities.hh>
-#include <dune/geometry/type.hh>
+
+#include <dune/functions/functionspacebases/transformed/bindcontext.hh>
 
 namespace Dune::Functions {
 
 /**
- * \brief Bind context for simplex finite elements with per-vertex mesh-size data.
+ * \brief Bind context for simplex elements requiring per-vertex mesh sizes.
  *
- * This context extends the minimal element/geometry context by storing the
- * average mesh size associated to each local vertex.  It is intended for
- * non-affine-equivalent simplex elements such as Hermite, Morley, and Argyris
- * whose basis transformation or interpolation needs local element state beyond
- * the geometry.
+ * Every bind operation initializes the element, geometry, and mesh-size data.
  */
 template<class Element>
-class SimplexElementContext
+class SimplexVertexMeshSizeContext
 {
+    using ElementContext = ElementBindContext<Element>;
+
   public:
-    using Geometry = typename Element::Geometry;
+    using Geometry = typename ElementContext::Geometry;
     using ctype = typename Geometry::ctype;
     static constexpr int dimension = Geometry::mydimension;
 
-    SimplexElementContext() = default;
+    SimplexVertexMeshSizeContext() = default;
 
     template<class VertexMapper>
-    SimplexElementContext(Element const& element,
-                          VertexMapper const& vertexMapper,
-                          std::vector<ctype> const& globalAverageVertexMeshSize)
+    SimplexVertexMeshSizeContext(
+        Element const& element,
+        VertexMapper const& vertexMapper,
+        std::vector<ctype> const& globalAverageVertexMeshSize)
     {
       bind(element, vertexMapper, globalAverageVertexMeshSize);
     }
@@ -51,41 +49,153 @@ class SimplexElementContext
               VertexMapper const& vertexMapper,
               std::vector<ctype> const& globalAverageVertexMeshSize)
     {
-      bind(element);
+      elementContext_.bind(element);
       for (auto i : Dune::range(dimension+1))
-        averageVertexMeshSize_[i] = globalAverageVertexMeshSize[vertexMapper.subIndex(element, i, dimension)];
+        averageVertexMeshSize_[i] =
+          globalAverageVertexMeshSize[vertexMapper.subIndex(element, i, dimension)];
     }
 
-    void bind(Element const& element)
+    Element const& element() const
     {
-      element_ = &element;
-      geometry_.emplace(element.geometry());
+      return elementContext_.element();
+    }
+
+    Geometry const& geometry() const
+    {
+      return elementContext_.geometry();
+    }
+
+    Dune::GeometryType type() const
+    {
+      return elementContext_.type();
+    }
+
+    ctype averageVertexMeshSize(std::size_t i) const
+    {
+      return averageVertexMeshSize_[i];
+    }
+
+    std::array<ctype,dimension+1> const& averageVertexMeshSizes() const
+    {
+      return averageVertexMeshSize_;
+    }
+
+  private:
+    ElementContext elementContext_;
+    std::array<ctype,dimension+1> averageVertexMeshSize_{};
+};
+
+/**
+ * \brief Bind context for simplex elements requiring edge orientations.
+ *
+ * Every bind operation initializes the element, geometry, and orientation data.
+ */
+template<class Element>
+class SimplexEdgeOrientationContext
+{
+    using ElementContext = ElementBindContext<Element>;
+
+  public:
+    using Geometry = typename ElementContext::Geometry;
+    static constexpr int dimension = Geometry::mydimension;
+    static constexpr int edgeCount = dimension*(dimension+1)/2;
+
+    SimplexEdgeOrientationContext() = default;
+
+    template<class ElementMapper>
+    SimplexEdgeOrientationContext(
+        Element const& element,
+        ElementMapper const& elementMapper,
+        std::vector<std::bitset<edgeCount>> const& edgeOrientations)
+    {
+      bind(element, elementMapper, edgeOrientations);
     }
 
     template<class ElementMapper>
     void bind(Element const& element,
               ElementMapper const& elementMapper,
-              std::vector<std::bitset<dimension+1>> const& edgeOrientations)
+              std::vector<std::bitset<edgeCount>> const& edgeOrientations)
     {
-      bind(element);
+      elementContext_.bind(element);
       edgeOrientations_ = edgeOrientations[elementMapper.index(element)];
     }
 
     Element const& element() const
     {
-      assert(!!element_);
-      return *element_;
+      return elementContext_.element();
     }
 
     Geometry const& geometry() const
     {
-      assert(!!geometry_);
-      return *geometry_;
+      return elementContext_.geometry();
     }
 
     Dune::GeometryType type() const
     {
-      return element().type();
+      return elementContext_.type();
+    }
+
+    bool edgeOrientation(std::size_t i) const
+    {
+      return edgeOrientations_[i];
+    }
+
+    std::bitset<edgeCount> const& edgeOrientations() const
+    {
+      return edgeOrientations_;
+    }
+
+  private:
+    ElementContext elementContext_;
+    std::bitset<edgeCount> edgeOrientations_;
+};
+
+/**
+ * \brief Bind context for simplex elements requiring vertex sizes and orientations.
+ *
+ * Every bind operation initializes all context data required by elements such
+ * as Argyris.
+ */
+template<class Element>
+class SimplexVertexMeshSizeAndEdgeOrientationContext
+{
+    using ElementContext = ElementBindContext<Element>;
+
+  public:
+    using Geometry = typename ElementContext::Geometry;
+    using ctype = typename Geometry::ctype;
+    static constexpr int dimension = Geometry::mydimension;
+    static constexpr int edgeCount = dimension*(dimension+1)/2;
+
+    SimplexVertexMeshSizeAndEdgeOrientationContext() = default;
+
+    template<class VertexMapper, class ElementMapper>
+    void bind(Element const& element,
+              VertexMapper const& vertexMapper,
+              std::vector<ctype> const& globalAverageVertexMeshSize,
+              ElementMapper const& elementMapper,
+              std::vector<std::bitset<edgeCount>> const& edgeOrientations)
+    {
+      elementContext_.bind(element);
+      for (auto i : Dune::range(dimension+1))
+        averageVertexMeshSize_[i] =
+          globalAverageVertexMeshSize[vertexMapper.subIndex(element, i, dimension)];
+      edgeOrientations_ = edgeOrientations[elementMapper.index(element)];
+    }
+
+    Element const& element() const
+    {
+      return elementContext_.element();
+    }
+
+    Geometry const& geometry() const
+    {
+      return elementContext_.geometry();
+    }
+
+    Dune::GeometryType type() const
+    {
+      return elementContext_.type();
     }
 
     ctype averageVertexMeshSize(std::size_t i) const
@@ -103,16 +213,15 @@ class SimplexElementContext
       return edgeOrientations_[i];
     }
 
-    std::bitset<dimension+1> const& edgeOrientations() const
+    std::bitset<edgeCount> const& edgeOrientations() const
     {
       return edgeOrientations_;
     }
 
   private:
-    Element const* element_ = nullptr;
-    std::optional<Geometry> geometry_;
+    ElementContext elementContext_;
     std::array<ctype,dimension+1> averageVertexMeshSize_{};
-    std::bitset<dimension+1> edgeOrientations_;
+    std::bitset<edgeCount> edgeOrientations_;
 };
 
 } // end namespace Dune::Functions

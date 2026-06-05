@@ -12,6 +12,8 @@
 
 #include <dune/common/typetree/traversal.hh>
 
+#include <dune/functions/functionspacebases/transformed/derivative.hh>
+
 template <class Element, class GridView>
 std::string elementStr(const Element &element, const GridView &gridView);
 
@@ -41,9 +43,29 @@ struct EnableDifferentiabilityCheck
       std::vector<int> isDifferentiable(insideNode.size(), true);
       const auto &quadRule = quadRuleFactoryMethod(intersection, order);
 
-      // using Range = typename Node::FiniteElement::Traits::LocalBasisType::Traits::RangeType;
-      using JacobiRange =
-          typename Node::FiniteElement::Traits::LocalBasisType::Traits::JacobianType;
+      auto evaluatePhysicalJacobians = [&](auto const& node, auto const& point) {
+        if constexpr (requires { node.finiteElement().physicalBasis(); }) {
+          using PhysicalBasis = std::remove_cvref_t<decltype(node.finiteElement().physicalBasis())>;
+          using Jacobian = typename PhysicalBasis::template DerivativeRange<Dune::Functions::Derivatives::Jacobian>;
+          std::vector<Jacobian> jacobians;
+          node.finiteElement().physicalBasis().evaluate(
+            Dune::Functions::Derivatives::Jacobian{}, point, jacobians);
+          return jacobians;
+        }
+        else {
+          using Jacobian = typename Node::FiniteElement::Traits::LocalBasisType::Traits::JacobianType;
+          std::vector<Jacobian> localJacobians;
+          node.finiteElement().localBasis().evaluateJacobian(point, localJacobians);
+
+          auto jacobianInverseTransposed = node.element().geometry().jacobianInverseTransposed(point);
+          for (auto& jacobian : localJacobians)
+            jacobian = jacobian * transpose(jacobianInverseTransposed);
+          return localJacobians;
+        }
+      };
+
+      using JacobiRange = typename decltype(evaluatePhysicalJacobians(
+        insideNode, intersection.geometryInInside().global(quadRule[0].position())))::value_type;
       std::vector<std::vector<JacobiRange>> insideValues;
       std::vector<std::vector<JacobiRange>> outsideValues;
 
@@ -56,30 +78,18 @@ struct EnableDifferentiabilityCheck
 
       for (std::size_t k = 0; k < quadRule.size(); ++k)
       {
-        std::vector<JacobiRange> insideLocalJacobians, outsideLocalJacobians;
-
-        insideLocalJacobians.resize(insideNodeSize);
-        outsideLocalJacobians.resize(outsideNodeSize);
         insideValues[k].resize(insideNodeSize);
         outsideValues[k].resize(outsideNodeSize);
 
         auto insidePoint = intersection.geometryInInside().global(quadRule[k].position());
         auto outsidePoint = intersection.geometryInOutside().global(quadRule[k].position());
-        insideNode.finiteElement().localBasis().evaluateJacobian(insidePoint,
-                                                                  insideLocalJacobians);
-        outsideNode.finiteElement().localBasis().evaluateJacobian(outsidePoint,
-                                                                  outsideLocalJacobians);
-        auto insideJacobiInverseTransposed
-            = intersection.inside().geometry().jacobianInverseTransposed(insidePoint);
-        auto outsideJacobiInverseTransposed
-            = intersection.outside().geometry().jacobianInverseTransposed(outsidePoint);
+        auto insideJacobians = evaluatePhysicalJacobians(insideNode, insidePoint);
+        auto outsideJacobians = evaluatePhysicalJacobians(outsideNode, outsidePoint);
         for (std::size_t i = 0; i < insideNodeSize; ++i)
         {
-          // TODO make this viable for localJac of type FieldVector (at least)
-          insideValues[k][i] = insideLocalJacobians[i] * transpose(insideJacobiInverseTransposed);
+          insideValues[k][i] = insideJacobians[i];
           if (i < outsideNodeSize)
-            outsideValues[k][i]
-                = outsideLocalJacobians[i] * transpose(outsideJacobiInverseTransposed);
+            outsideValues[k][i] = outsideJacobians[i];
         }
       }
 

@@ -24,13 +24,15 @@ namespace Dune::Functions {
 
 namespace Impl {
 
-template<class InputRange, class Derivative, class LocalBasis, class Context, class... Stages>
+template<class InputRange, class Derivative, class LocalBasis, class Context,
+         class... Stages>
 struct PipelineOutputRange
 {
   using type = InputRange;
 };
 
-template<class InputRange, class Derivative, class LocalBasis, class Context, class Stage, class... Stages>
+template<class InputRange, class Derivative, class LocalBasis, class Context,
+         class Stage, class... Stages>
 struct PipelineOutputRange<InputRange,Derivative,LocalBasis,Context,Stage,Stages...>
 {
   using StageOutputRange = typename Stage::template OutputRange<Derivative,LocalBasis,Context,InputRange>;
@@ -43,7 +45,8 @@ struct GeometryDerivativeOutputRange
   using type = InputRange;
 };
 
-template<class InputRange, class Derivative, class LocalBasis, class Context, class... Stages>
+template<class InputRange, class Derivative, class LocalBasis, class Context,
+         class... Stages>
 struct PipelineIntermediateBuffers;
 
 template<class InputRange, class Derivative, class LocalBasis, class Context, class Stage>
@@ -275,7 +278,7 @@ class BasicTransformationPipeline
       struct PipelineBuffer
       {
         std::vector<ReferenceRange<Derivative>> reference;
-        typename Impl::PipelineIntermediateBuffers<
+        mutable typename Impl::PipelineIntermediateBuffers<
           ReferenceRange<Derivative>,Derivative,LocalBasis,BoundContext,Stages...>::type intermediate;
       };
 
@@ -319,6 +322,7 @@ class BasicTransformationPipeline
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
     {
+      // evaluate on the reference element
       evaluator_.evaluate(derivative,localBasis,x,out.reference);
     }
 
@@ -326,9 +330,10 @@ class BasicTransformationPipeline
     void finalize(Derivative derivative,
                   LocalBasis const& localBasis,
                   typename LocalBasis::Traits::DomainType const& x,
-                  In& in,
+                  In const& in,
                   Out& out) const
     {
+      // perform all intermediate stages in the transformation
       transform<0>(derivative,localBasis,x,in.reference,in.intermediate,out);
     }
 

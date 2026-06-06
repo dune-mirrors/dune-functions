@@ -244,6 +244,7 @@ int main()
   typename decltype(customBasis)::template PrecomputeBuffer<CustomDerivative> customBuffer;
   std::vector<typename decltype(customBasis)::template DerivativeRange<CustomDerivative>> customValues;
   customBasis.precompute(CustomDerivative{},Dune::FieldVector<double,1>{0.5},customBuffer);
+  auto referenceValues = customBuffer.reference;
   customBasis.finalize(
     CustomDerivative{},Dune::FieldVector<double,1>{0.5},customBuffer,customValues);
   auto* intermediateData = std::get<0>(customBuffer.intermediate).data();
@@ -253,6 +254,8 @@ int main()
     "custom reference evaluator is used by the pipeline");
   test.check(std::get<0>(customBuffer.intermediate).data() == intermediateData,
     "pipeline intermediate storage is reused");
+  test.check(customBuffer.reference == referenceValues,
+    "pipeline finalization leaves cached reference values unchanged");
 
   using NonAffineGeometry = Dune::MultiLinearGeometry<double,2,2>;
   std::vector<Dune::FieldVector<double,2>> nonAffineCorners{

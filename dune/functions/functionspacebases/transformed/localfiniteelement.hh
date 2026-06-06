@@ -171,7 +171,7 @@ class TransformedLocalBasis
       requires Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,D>
     void finalize(D derivative,
                   Domain const& x,
-                  PrecomputeBuffer<D>& in,
+                  PrecomputeBuffer<D> const& in,
                   std::vector<DerivativeRange<D>>& out) const
     {
       assert(!!localBasis_);
@@ -195,7 +195,7 @@ class TransformedLocalBasis
                   Domain const& x,
                   std::vector<DerivativeRange<D>>& out) const
     {
-      PrecomputeBuffer<D> precomputed;
+      PrecomputeBuffer<D> precomputed; // TODO: find a way to avoid this local variable!
       precompute(derivative, x, precomputed);
       finalize(derivative, x, precomputed, out);
     }

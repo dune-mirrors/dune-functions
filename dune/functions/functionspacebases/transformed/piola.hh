@@ -14,6 +14,7 @@
 #include <dune/common/fvector.hh>
 #include <dune/common/exceptions.hh>
 #include <dune/common/rangeutilities.hh>
+#include <dune/common/referencehelper.hh>
 
 #include <dune/functions/common/densevectorview.hh>
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
@@ -110,15 +111,15 @@ class ContravariantPiolaTransformation
     class LocalValuedFunction
     {
       public:
-        LocalValuedFunction(Function const& f, Geometry const& geometry)
-          : f_(&f)
+        LocalValuedFunction(Function f, Geometry const& geometry)
+          : f_(std::move(f))
           , geometry_(&geometry)
         {}
 
         template<class LocalCoordinate>
         auto operator()(LocalCoordinate const& x) const
         {
-          auto globalValue = (*f_)(x);
+          auto globalValue = Dune::resolveRef(f_)(x);
           using Field = std::remove_cvref_t<decltype(Impl::DenseVectorView(globalValue)[0])>;
           FieldVector<Field,Geometry::mydimension> localValue;
 
@@ -131,15 +132,15 @@ class ContravariantPiolaTransformation
         }
 
       private:
-        Function const* f_;
+        Function f_;
         Geometry const* geometry_;
     };
 
     template<class Function>
-    auto localFunctionPullback(Function const& f) const
+    auto localFunctionPullback(Function f) const
     {
       assert(!!geometry_);
-      return LocalValuedFunction<Function>(f, *geometry_);
+      return LocalValuedFunction<Function>(std::move(f), *geometry_);
     }
 
     template<class LocalBasis, class Out>
@@ -256,15 +257,15 @@ class CovariantPiolaTransformation
     class LocalValuedFunction
     {
       public:
-        LocalValuedFunction(Function const& f, Geometry const& geometry)
-          : f_(&f)
+        LocalValuedFunction(Function f, Geometry const& geometry)
+          : f_(std::move(f))
           , geometry_(&geometry)
         {}
 
         template<class LocalCoordinate>
         auto operator()(LocalCoordinate const& x) const
         {
-          auto globalValue = (*f_)(x);
+          auto globalValue = Dune::resolveRef(f_)(x);
           using Field = std::remove_cvref_t<decltype(Impl::DenseVectorView(globalValue)[0])>;
           FieldVector<Field,Geometry::mydimension> localValue;
 
@@ -276,15 +277,15 @@ class CovariantPiolaTransformation
         }
 
       private:
-        Function const* f_;
+        Function f_;
         Geometry const* geometry_;
     };
 
     template<class Function>
-    auto localFunctionPullback(Function const& f) const
+    auto localFunctionPullback(Function f) const
     {
       assert(!!geometry_);
-      return LocalValuedFunction<Function>(f, *geometry_);
+      return LocalValuedFunction<Function>(std::move(f), *geometry_);
     }
 
     template<class LocalBasis, class Out>

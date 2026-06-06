@@ -60,7 +60,7 @@ concept LocalBasisTransformation =
 
     transformation.bind(context);
     std::as_const(transformation).precompute(derivative, localBasis, x, precomputed);
-    std::as_const(transformation).finalize(derivative, localBasis, x, precomputed, out);
+    std::as_const(transformation).finalize(derivative, localBasis, x, std::as_const(precomputed), out);
   };
 
 /**
@@ -127,7 +127,7 @@ concept TransformedLocalBasis =
     { basis.order() } -> std::convertible_to<int>;
 
     basis.precompute(derivative, x, precomputed);
-    basis.finalize(derivative, x, precomputed, out);
+    basis.finalize(derivative, x, std::as_const(precomputed), out);
     basis.evaluate(derivative, x, out);
   };
 

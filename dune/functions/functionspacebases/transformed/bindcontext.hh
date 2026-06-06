@@ -14,34 +14,6 @@
 
 namespace Dune::Functions {
 
-namespace Impl {
-
-template<class Geometry>
-class GeometryContextStorage
-{
-  public:
-    void bindGeometry(Geometry const& geometry)
-    {
-      geometry_.emplace(geometry);
-    }
-
-    Geometry const& geometry() const
-    {
-      assert(!!geometry_);
-      return geometry_.value();
-    }
-
-    GeometryType type() const
-    {
-      return geometry().type();
-    }
-
-  private:
-    std::optional<Geometry> geometry_;
-};
-
-} // namespace Impl
-
 /**
  * \brief Basic bind context backed by a grid element and its geometry.
  *
@@ -70,7 +42,7 @@ class ElementBindContext
     void bind(Element const& element)
     {
       element_ = &element;
-      geometry_.bindGeometry(element.geometry());
+      geometry_.emplace(element.geometry());
     }
 
     Element const& element() const
@@ -81,7 +53,7 @@ class ElementBindContext
 
     Geometry const& geometry() const
     {
-      return geometry_.geometry();
+      return *geometry_;
     }
 
     GeometryType type() const
@@ -91,7 +63,7 @@ class ElementBindContext
 
   private:
     Element const* element_ = nullptr;
-    Impl::GeometryContextStorage<Geometry> geometry_;
+    std::optional<Geometry> geometry_;
 };
 
 /**
@@ -116,12 +88,12 @@ class GeometryBindContext
 
     void bind(Geometry const& geometry)
     {
-      geometry_.bindGeometry(geometry);
+      geometry_.emplace(geometry);
     }
 
     Geometry const& geometry() const
     {
-      return geometry_.geometry();
+      return *geometry_;
     }
 
     Dune::GeometryType type() const
@@ -130,7 +102,7 @@ class GeometryBindContext
     }
 
   private:
-    Impl::GeometryContextStorage<Geometry> geometry_;
+    std::optional<Geometry> geometry_;
 };
 
 } // end namespace Dune::Functions

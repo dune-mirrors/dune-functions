@@ -11,6 +11,7 @@
 #include <dune/common/hybridutilities.hh>
 #include <dune/common/indices.hh>
 #include <map>
+#include <optional>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -59,11 +60,18 @@ namespace Dune::Functions
       template <class D>
       using PrecomputeBuffer = std::vector<typename Basis::template PrecomputeBuffer<D>>;
 
-      using PrecomputeBuffers = std::tuple<PrecomputeBuffer<CachedDerivatives>...>;
-      using Domain = typename Basis::Domain;
-      using QuadraturePoints = std::vector<Domain>;
-      using QuadraturePointBuffers = std::tuple<
-        std::conditional_t<true,QuadraturePoints,CachedDerivatives>...>;
+      using QuadratureKey = std::tuple<
+        GeometryType,
+        int,           // delivered order
+        std::size_t>;  // number of points
+
+      template<class D>
+      struct PrecomputeCache
+      {
+        std::map<QuadratureKey,PrecomputeBuffer<D>> buffers;
+      };
+
+      using PrecomputeCaches = std::tuple<PrecomputeCache<CachedDerivatives>...>;
 
       //! Public output range type for the quantity selected by D.
       template <class D>
@@ -98,22 +106,11 @@ namespace Dune::Functions
       template <class Derivative, class ct, int dim>
       auto const& evaluate (Derivative const& d, QuadratureRule<ct, dim> const& quad)
       {
-        auto& precomputeBuffer = getPrecomputeBuffer(d);
-        auto& quadraturePoints = getQuadraturePoints(d);
-        bool quadratureChanged = quadraturePoints.size() != quad.size();
-        if (!quadratureChanged)
-          for (std::size_t iq = 0; iq < quad.size(); ++iq)
-            quadratureChanged = quadratureChanged
-              || quadraturePoints[iq] != quad[iq].position();
-
-        if (quadratureChanged)
-        {
-          quadraturePoints.resize(quad.size());
+        auto [precomputeBuffer, inserted] = getPrecomputeBuffer(d,quadratureKey(quad));
+        if (inserted) {
           precomputeBuffer.resize(quad.size());
-          for (std::size_t iq = 0; iq < quad.size(); ++iq) {
-            quadraturePoints[iq] = quad[iq].position();
+          for (std::size_t iq = 0; iq < quad.size(); ++iq)
             basis().precompute(d, quad[iq].position(), precomputeBuffer[iq]);
-          }
         }
 
         auto& evaluationBuffer = getEvaluationBuffer(d);
@@ -124,56 +121,34 @@ namespace Dune::Functions
         return evaluationBuffer;
       }
 
-      template <class Derivative>
-      QuadraturePoints& getQuadraturePoints(Derivative const& d)
-      {
-        QuadraturePoints* result = nullptr;
-        auto setResult = overload(
-          [&](Derivative const& d_ii, QuadraturePoints& points_ii) {
-            d_ii == d && (result = &points_ii);
-          },
-          [&](auto const&, auto&) {}
-        );
-        unpackIntegerSequence([&](auto... ii) {
-          (setResult(std::get<ii>(derivatives_), std::get<ii>(quadraturePoints_)), ...);
-        }, std::index_sequence_for<CachedDerivatives...>{});
-
-        assert(!!result);
-        return *result;
-      }
-
     private:
 
-      template <class Derivative>
-      PrecomputeBuffer<Derivative>& getPrecomputeBuffer (Derivative const& d)
+      template <class ct, int dim>
+      QuadratureKey quadratureKey(QuadratureRule<ct,dim> const& quad) const
       {
-        PrecomputeBuffer<Derivative>* result = nullptr;
-        auto setResult = overload(
-          [&](Derivative const& d_ii, PrecomputeBuffer<Derivative>& buffer_ii) { d_ii == d && (result = &buffer_ii); },
-          [&](auto const& d_ii, auto& buffer_ii) {}
-        );
-        unpackIntegerSequence([&](auto... ii) {
-          (setResult(std::get<ii>(derivatives_), std::get<ii>(precomputeBuffers_)), ...);
-        }, std::index_sequence_for<CachedDerivatives...>{});
+        // QuadratureRule does not expose its QuadratureType. Use stable metadata
+        // as an approximate identity. Weights are irrelevant because precompute()
+        // only evaluates the basis.
+        return {
+          quad.type(),
+          quad.order(),
+          quad.size()
+        };
+      }
 
-        assert(!!result);
-        return *result;
+      template <class Derivative>
+      std::pair<PrecomputeBuffer<Derivative>&,bool>
+      getPrecomputeBuffer (Derivative const& d, QuadratureKey const& key)
+      {
+        auto& buffers = std::get<PrecomputeCache<Derivative>>(precomputeCaches_).buffers;
+        auto [it,inserted] = buffers.try_emplace(key);
+        return {it->second,inserted};
       }
 
       template <class Derivative>
       EvaluationBuffer<Derivative>& getEvaluationBuffer (Derivative const& d)
       {
-        EvaluationBuffer<Derivative>* result = nullptr;
-        auto setResult = overload(
-          [&](Derivative const& d_ii, EvaluationBuffer<Derivative>& buffer_ii) { d_ii == d && (result = &buffer_ii); },
-          [&](auto const& d_ii, auto& buffer_ii) {}
-        );
-        unpackIntegerSequence([&](auto... ii) {
-          (setResult(std::get<ii>(derivatives_), std::get<ii>(evaluationBuffers_)), ...);
-        }, std::index_sequence_for<CachedDerivatives...>{});
-
-        assert(!!result);
-        return *result;
+        return std::get<EvaluationBuffer<Derivative>>(evaluationBuffers_);
       }
 
     private:
@@ -181,8 +156,7 @@ namespace Dune::Functions
       Node const* node_ = nullptr;
       std::tuple<CachedDerivatives...> derivatives_ = {};
 
-      PrecomputeBuffers precomputeBuffers_;
-      QuadraturePointBuffers quadraturePoints_;
+      PrecomputeCaches precomputeCaches_;
       EvaluationBuffers evaluationBuffers_;
     };
 
@@ -215,8 +189,8 @@ namespace Dune::Functions
     template <class... II>
     auto& get (TypeTree::TreePath<II...> const& tp)
     {
-      assert(cacheIterator_ != cache_.end());
-      return (cacheIterator_->second)[tp];
+      assert(cache_);
+      return (*cache_)[tp];
     }
 
     template <std::convertible_to<std::size_t>... II>
@@ -228,30 +202,20 @@ namespace Dune::Functions
     template <class LocalView>
     void bind (LocalView const& localView)
     {
-      auto key = localView.element().type();
-      auto it = cache_.find(key);
-      if (it == cache_.end())
-      {
-        bool inserted = false;
-        std::tie(it, inserted) = cache_.emplace(key,
-          TypeTree::makeTreeContainer(localView.tree(),
-            QuadratureNodeCacheFactory{cachedDerivatives_}));
-        assert(inserted);
-      }
-      cacheIterator_ = it;
+      if (!cache_)
+        cache_.emplace(TypeTree::makeTreeContainer(localView.tree(),
+          QuadratureNodeCacheFactory{cachedDerivatives_}));
+
       TypeTree::forEachLeafNode(localView.tree(), [&](auto const& node, auto const& treePath) {
-        (cacheIterator_->second)[treePath].bind(node);
+        (*cache_)[treePath].bind(node);
       });
     }
 
   private:
     std::tuple<CachedDerivatives...> cachedDerivatives_;
 
-    using Key = GeometryType;
     using Cache = TypeTree::TreeContainer<QuadratureNodeCache, Tree>;
-    std::map<Key,Cache> cache_ = {};
-
-    typename std::map<Key,Cache>::iterator cacheIterator_ = {};
+    std::optional<Cache> cache_;
   };
 
 } // end namespace Dune::Functions

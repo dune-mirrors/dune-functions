@@ -27,17 +27,15 @@ int main(int argc, char** argv)
   QuadratureBasisFunctionCache<
     typename LocalView::Tree,Derivatives::Value,Derivatives::Jacobian> cache;
 
-  QuadratureRule<double,1> firstRule;
-  firstRule.emplace_back(FieldVector<double,1>{0.25},1.0);
-  QuadratureRule<double,1> secondRule;
-  secondRule.emplace_back(FieldVector<double,1>{0.75},1.0);
+  auto const& firstRule = QuadratureRules<double,1>::rule(GeometryTypes::cube(1),1);
+  auto const& secondRule = QuadratureRules<double,1>::rule(GeometryTypes::cube(1),3);
 
   {
     auto localView = firstBasis.localView();
     localView.bind(*elements(firstBasis.gridView()).begin());
     cache.bind(localView);
     auto const& values = cache.get().evaluate(Derivatives::Value{},firstRule);
-    test.check(std::abs(values[0][0][0]-0.75) < 1e-14);
+    test.check(std::abs(values[0][0][0]-(1-firstRule[0].position()[0])) < 1e-14);
   }
 
   auto localView = secondBasis.localView();
@@ -45,12 +43,24 @@ int main(int argc, char** argv)
   cache.bind(localView);
 
   auto const& values = cache.get().evaluate(Derivatives::Value{},secondRule);
-  test.check(std::abs(values[0][0][0]-0.25) < 1e-14,
-    "equal-sized quadrature rules must not share precomputed values");
+  test.check(values.size() == secondRule.size() && values[0].size() == 2,
+    "value cache must contain all basis functions");
+  if (values.size() == secondRule.size() && values[0].size() == 2)
+    test.check(std::abs(values[0][0][0]-(1-secondRule[0].position()[0])) < 1e-14,
+      "quadrature rules with different keys must use distinct precomputations");
 
   auto const& jacobians = cache.get().evaluate(Derivatives::Jacobian{},secondRule);
-  test.check(std::abs(jacobians[0][0][0][0]+0.5) < 1e-14,
-    "cache must finalize with the currently bound local view");
+  test.check(jacobians.size() == secondRule.size() && jacobians[0].size() == 2,
+    "derivative caches must be initialized independently");
+  if (jacobians.size() == secondRule.size() && jacobians[0].size() == 2)
+    test.check(std::abs(jacobians[0][0][0][0]+0.5) < 1e-14,
+      "cache must finalize with the currently bound local view");
+
+  auto const& firstRuleValues = cache.get().evaluate(Derivatives::Value{},firstRule);
+  test.check(firstRuleValues.size() == firstRule.size() && firstRuleValues[0].size() == 2);
+  if (firstRuleValues.size() == firstRule.size() && firstRuleValues[0].size() == 2)
+    test.check(std::abs(firstRuleValues[0][0][0]-(1-firstRule[0].position()[0])) < 1e-14,
+      "precomputed buffers for different quadrature rules must coexist");
 
   return test.exit();
 }

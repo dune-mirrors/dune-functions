@@ -72,6 +72,8 @@ std::string derivativeName(Derivative)
     return "Value";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Jacobian>)
     return "Jacobian";
+  else if constexpr (std::is_same_v<Derivative,Derivatives::Gradient>)
+    return "Gradient";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Hessian>)
     return "Hessian";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Divergence>)
@@ -226,6 +228,28 @@ finiteDifference(Basis const& basis,
 }
 
 /**
+ * \brief Approximate the ambient tangential gradient of a scalar shape function.
+ */
+template<class Basis, class Geometry>
+typename Basis::template DerivativeRange<Derivatives::Gradient>
+finiteDifference(Basis const& basis,
+                 Geometry const& geometry,
+                 GeometryType type,
+                 Derivatives::Gradient,
+                 typename Basis::Domain const& x,
+                 std::size_t shapeFunction,
+                 double epsilon)
+{
+  static_assert(Basis::Traits::dimRange == 1);
+  auto jacobian = finiteDifference(
+    basis,geometry,type,Derivatives::Jacobian{},x,shapeFunction,epsilon);
+  typename Basis::template DerivativeRange<Derivatives::Gradient> gradient{};
+  for (auto direction : Dune::range(Geometry::coorddimension))
+    gradient[direction] = jacobian[0][direction];
+  return gradient;
+}
+
+/**
  * \brief Approximate the physical Hessian of a scalar shape function.
  */
 template<class Basis, class Geometry>
@@ -325,20 +349,50 @@ finiteDifference(Basis const& basis,
 {
   typename Basis::template DerivativeRange<Derivatives::Curl> curl{};
 
-  if constexpr (Geometry::coorddimension == 2) {
-    curl = componentDerivative(basis, geometry, type, x, shapeFunction, 1, 0, epsilon)
-         - componentDerivative(basis, geometry, type, x, shapeFunction, 0, 1, epsilon);
-  }
-  else {
-    static_assert(Geometry::coorddimension == 3,
-      "Curl finite-difference test supports only dimension 2 or 3.");
+  static_assert(Geometry::mydimension == 2 || Geometry::mydimension == 3,
+    "Curl finite-difference test supports only intrinsic dimension 2 or 3.");
 
-    curl[0] = componentDerivative(basis, geometry, type, x, shapeFunction, 2, 1, epsilon)
-            - componentDerivative(basis, geometry, type, x, shapeFunction, 1, 2, epsilon);
-    curl[1] = componentDerivative(basis, geometry, type, x, shapeFunction, 0, 2, epsilon)
-            - componentDerivative(basis, geometry, type, x, shapeFunction, 2, 0, epsilon);
-    curl[2] = componentDerivative(basis, geometry, type, x, shapeFunction, 1, 0, epsilon)
-            - componentDerivative(basis, geometry, type, x, shapeFunction, 0, 1, epsilon);
+  using Field = typename Basis::Traits::RangeFieldType;
+  using ReferenceVector = FieldVector<Field,Geometry::mydimension>;
+  std::array<ReferenceVector,Geometry::mydimension> derivatives{};
+  auto const& referenceElement = ReferenceElements<
+    typename Basis::Domain::value_type,
+    Basis::Traits::dimDomain>::general(type);
+
+  for (auto direction : Dune::range(Geometry::mydimension)) {
+    auto up = x;
+    auto down = x;
+    up[direction] += epsilon;
+    down[direction] -= epsilon;
+    if (!referenceElement.checkInside(up) || !referenceElement.checkInside(down))
+      continue;
+
+    auto covariantValue = [&](auto const& point) {
+      std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> values;
+      basis.evaluate(Derivatives::Value{},point,values);
+      auto value = Dune::Functions::Impl::DenseVectorView(values[shapeFunction]);
+      ReferenceVector covariant;
+      geometry.jacobianTransposed(point).mv(value,covariant);
+      return covariant;
+    };
+
+    auto upValue = covariantValue(up);
+    auto downValue = covariantValue(down);
+    derivatives[direction] = upValue;
+    derivatives[direction] -= downValue;
+    derivatives[direction] /= 2*epsilon;
+  }
+
+  auto integrationElement = geometry.integrationElement(x);
+  if constexpr (Geometry::mydimension == 2)
+    curl = (derivatives[0][1] - derivatives[1][0])/integrationElement;
+  else {
+    ReferenceVector referenceCurl;
+    referenceCurl[0] = derivatives[1][2] - derivatives[2][1];
+    referenceCurl[1] = derivatives[2][0] - derivatives[0][2];
+    referenceCurl[2] = derivatives[0][1] - derivatives[1][0];
+    geometry.jacobian(x).mv(referenceCurl,curl);
+    curl /= integrationElement;
   }
 
   return curl;

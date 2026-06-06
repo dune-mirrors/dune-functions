@@ -8,7 +8,10 @@
 
 #include <dune/functions/common/functionconcepts.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
+#include <dune/functions/functionspacebases/argyrisbasis.hh>
+#include <dune/functions/functionspacebases/cubichermitebasis.hh>
 #include <dune/functions/functionspacebases/interpolate.hh>
+#include <dune/functions/functionspacebases/morleybasis.hh>
 #include <dune/functions/functionspacebases/powerbasis.hh>
 #include <dune/functions/gridfunctions/analyticgridviewfunction.hh>
 #include <dune/functions/gridfunctions/composedgridfunction.hh>
@@ -17,6 +20,8 @@
 #include <dune/geometry/quadraturerules.hh>
 
 #include <dune/grid/yaspgrid.hh>
+#include <dune/grid/uggrid.hh>
+#include <dune/grid/utility/structuredgridfactory.hh>
 
 struct Difference2
 {
@@ -155,6 +160,50 @@ int main(int argc, char** argv)
     // `order` should be enough; `order+1` is more than enough.
     // The tolerance is ~100 times the error observed when writing this test.
     test.subTest(compare(f2prime, fprime, order+1, 1.7e-8));
+  }
+
+  // Scalar transformed bases already provide physical Jacobians. Their
+  // discrete derivatives must not apply the geometry chain rule a second time.
+  {
+    using Grid = Dune::UGGrid<2>;
+    auto transformedGrid = Dune::StructuredGridFactory<Grid>::createSimplexGrid(
+      {0.,0.},{1.,1.},{2,2});
+    auto transformedGridView = transformedGrid->leafGridView();
+    auto checkTransformedBasis = [&](auto basis) {
+      std::vector<double> coefficients(basis.size());
+      for (std::size_t i = 0; i < coefficients.size(); ++i)
+        coefficients[i] = 0.25 + 0.125*i;
+      auto discrete = Dune::Functions::makeDiscreteGlobalBasisFunction<double>(
+        basis,coefficients);
+      auto discreteDerivative = derivative(discrete);
+      auto localDerivative = localFunction(discreteDerivative);
+      constexpr double epsilon = 1e-6;
+      for (auto const& element : elements(transformedGridView)) {
+        localDerivative.bind(element);
+        auto const& rule = Dune::QuadratureRules<double,2>::rule(
+          element.type(),2);
+        for (auto const& point : rule) {
+          auto x = element.geometry().global(point.position());
+          auto finiteDifference = Dune::FieldVector<double,2>{};
+          for (int direction = 0; direction < 2; ++direction) {
+            auto up = x;
+            auto down = x;
+            up[direction] += epsilon;
+            down[direction] -= epsilon;
+            finiteDifference[direction] =
+              (discrete(up)-discrete(down))/(2*epsilon);
+          }
+          auto transformedDerivative = localDerivative(point.position());
+          test.check(
+            (transformedDerivative-finiteDifference).two_norm() < 1e-7,
+            "transformed discrete derivative agrees with finite differences");
+        }
+      }
+    };
+
+    checkTransformedBasis(makeBasis(transformedGridView,argyris()));
+    checkTransformedBasis(makeBasis(transformedGridView,morley()));
+    checkTransformedBasis(makeBasis(transformedGridView,cubicHermite()));
   }
 
   return test.exit();

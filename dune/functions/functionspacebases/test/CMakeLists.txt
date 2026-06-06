@@ -33,7 +33,11 @@ dune_add_test(SOURCES nedelecbasistest.cc LABELS quick)
 
 dune_add_test(SOURCES periodicbasistest.cc LABELS quick)
 
+dune_add_test(SOURCES quadraturebasisfunctioncachetest.cc LABELS quick)
+
 dune_add_test(SOURCES taylorhoodbasistest.cc LABELS quick)
+
+dune_add_test(SOURCES transformedembeddedgeometrytest.cc LABELS quick)
 
 dune_add_test(SOURCES rannacherturekbasistest.cc LABELS quick)
 

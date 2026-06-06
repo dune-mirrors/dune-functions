@@ -593,36 +593,61 @@ public:
         const auto& fe = node.finiteElement();
         const auto& localBasis = fe.localBasis();
 
-        if constexpr (requires { localBasis.evaluateJacobian(x, evaluationBuffer_[treePath]); }) {
-          auto& shapeFunctionJacobians = evaluationBuffer_[treePath];
-
-          localBasis.evaluateJacobian(x, shapeFunctionJacobians);
-
-          // Compute linear combinations of basis function jacobian.
-          // Non-scalar coefficients of dimension coeffDim are handled by
-          // processing the coeffDim linear combinations independently
-          // and storing them as entries of an array.
-          using RefJacobian = LocalBasisRange< std::decay_t<decltype(node)> >;
-          static constexpr auto coeffDim = decltype(flatVectorView(this->localDoFs_[node.localIndex(0)]).size())::value;
-          auto refJacobians = std::array<RefJacobian, coeffDim>{};
-          istlVectorBackend(refJacobians) = 0;
-          for (size_type i = 0; i < localBasis.size(); ++i)
-          {
+        auto accumulateJacobians = [&](auto const& shapeFunctionJacobians, bool physical) {
+          using ShapeFunctionJacobian = typename std::decay_t<
+            decltype(shapeFunctionJacobians)>::value_type;
+          static constexpr auto coeffDim = decltype(
+            flatVectorView(this->localDoFs_[node.localIndex(0)]).size())::value;
+          auto jacobians = std::array<ShapeFunctionJacobian,coeffDim>{};
+          istlVectorBackend(jacobians) = 0;
+          for (size_type i = 0; i < localBasis.size(); ++i) {
             auto c = flatVectorView(this->localDoFs_[node.localIndex(i)]);
             for (std::size_t j = 0; j < coeffDim; ++j)
-              refJacobians[j].axpy(c[j], shapeFunctionJacobians[i]);
+              jacobians[j].axpy(c[j],shapeFunctionJacobians[i]);
           }
 
-          // Transform Jacobians form local to global coordinates.
-          using Jacobian = decltype(refJacobians[0] * jacobianInverse);
-          auto jacobians = std::array<Jacobian, coeffDim>{};
-          std::transform(
-            refJacobians.begin(), refJacobians.end(), jacobians.begin(),
-            [&](const auto& refJacobian) { return refJacobian * jacobianInverse; });
+          if (!physical)
+            for (auto& jacobian : jacobians)
+              jacobian = jacobian * jacobianInverse;
 
-          // Assign computed Jacobians to node entry of range.
-          // Types are matched using the lexicographic ordering provided by flatVectorView.
-          LocalBase::assignWith(LocalBase::nodeToRangeEntry(node, treePath, y), jacobians);
+          LocalBase::assignWith(
+            LocalBase::nodeToRangeEntry(node,treePath,y),jacobians);
+        };
+
+        if constexpr (requires { fe.physicalBasis(); }) {
+          const auto& physicalBasis = fe.physicalBasis();
+          if constexpr (requires {
+            typename std::decay_t<decltype(physicalBasis)>::template DerivativeRange<
+              Derivatives::Jacobian>;
+          }) {
+            using PhysicalJacobian = typename std::decay_t<
+              decltype(physicalBasis)>::template DerivativeRange<Derivatives::Jacobian>;
+            std::vector<PhysicalJacobian> shapeFunctionJacobians;
+            if constexpr (requires {
+              physicalBasis.evaluate(Derivatives::Jacobian{},x,shapeFunctionJacobians);
+            }) {
+              physicalBasis.evaluate(
+                Derivatives::Jacobian{},x,shapeFunctionJacobians);
+              accumulateJacobians(shapeFunctionJacobians,true);
+            }
+            else if constexpr (requires {
+              physicalBasis.evaluateJacobian(x,shapeFunctionJacobians);
+            }) {
+              physicalBasis.evaluateJacobian(x,shapeFunctionJacobians);
+              accumulateJacobians(shapeFunctionJacobians,true);
+            }
+            else
+              DUNE_THROW(NotImplemented,
+                "The transformed local basis does not provide physical Jacobians.");
+          }
+          else
+            DUNE_THROW(NotImplemented,
+              "The transformed local basis does not define a Jacobian range.");
+        }
+        else if constexpr (requires { localBasis.evaluateJacobian(x, evaluationBuffer_[treePath]); }) {
+          auto& shapeFunctionJacobians = evaluationBuffer_[treePath];
+          localBasis.evaluateJacobian(x, shapeFunctionJacobians);
+          accumulateJacobians(shapeFunctionJacobians,false);
         }
         else {
           DUNE_THROW(NotImplemented,

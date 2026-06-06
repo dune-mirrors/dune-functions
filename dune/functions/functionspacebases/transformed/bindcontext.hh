@@ -14,6 +14,34 @@
 
 namespace Dune::Functions {
 
+namespace Impl {
+
+template<class Geometry>
+class GeometryContextStorage
+{
+  public:
+    void bindGeometry(Geometry const& geometry)
+    {
+      geometry_.emplace(geometry);
+    }
+
+    Geometry const& geometry() const
+    {
+      assert(!!geometry_);
+      return geometry_.value();
+    }
+
+    GeometryType type() const
+    {
+      return geometry().type();
+    }
+
+  private:
+    std::optional<Geometry> geometry_;
+};
+
+} // namespace Impl
+
 /**
  * \brief Basic bind context backed by a grid element and its geometry.
  *
@@ -21,6 +49,9 @@ namespace Dune::Functions {
  * transformations.  Transformations that need additional data, such as face
  * orientations or global vertex information, can use richer context objects
  * that refine the same concept.
+ *
+ * The element is borrowed and must outlive the context. Its geometry is copied
+ * on bind so transformations use a stable geometry snapshot.
  */
 template<class Element>
 class ElementBindContext
@@ -39,7 +70,7 @@ class ElementBindContext
     void bind(Element const& element)
     {
       element_ = &element;
-      geometry_.emplace(element.geometry());
+      geometry_.bindGeometry(element.geometry());
     }
 
     Element const& element() const
@@ -50,8 +81,7 @@ class ElementBindContext
 
     Geometry const& geometry() const
     {
-      assert(!!geometry_);
-      return *geometry_;
+      return geometry_.geometry();
     }
 
     GeometryType type() const
@@ -61,15 +91,15 @@ class ElementBindContext
 
   private:
     Element const* element_ = nullptr;
-    std::optional<Geometry> geometry_;
+    Impl::GeometryContextStorage<Geometry> geometry_;
 };
 
 /**
  * \brief Basic bind context backed directly by a geometry object.
  *
  * This context is useful for adapters that historically bind a local finite
- * element to a Geometry instead of a full grid element.  The geometry is stored
- * by pointer and must outlive the context.
+ * element to a Geometry instead of a full grid element. The geometry is copied
+ * on bind and the source object does not need to outlive the context.
  */
 template<class Geometry>
 class GeometryBindContext
@@ -86,22 +116,21 @@ class GeometryBindContext
 
     void bind(Geometry const& geometry)
     {
-      geometry_ = &geometry;
+      geometry_.bindGeometry(geometry);
     }
 
     Geometry const& geometry() const
     {
-      assert(!!geometry_);
-      return *geometry_;
+      return geometry_.geometry();
     }
 
     Dune::GeometryType type() const
     {
-      return geometry().type();
+      return geometry_.type();
     }
 
   private:
-    Geometry const* geometry_ = nullptr;
+    Impl::GeometryContextStorage<Geometry> geometry_;
 };
 
 } // end namespace Dune::Functions

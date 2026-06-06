@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <dune/geometry/type.hh>
@@ -26,26 +27,6 @@ namespace TransformedLocalFiniteElementLocalBasis {
   struct Reference {};
   struct Physical {};
 }
-
-/**
- * \brief Interpolation policy that leaves physical functions unchanged.
- *
- * This is used when the bound reference interpolation already evaluates the
- * physical degrees of freedom directly and therefore needs no function-value
- * pullback.
- */
-struct IdentityLocalInterpolationTransformation
-{
-  template<class Context>
-  void bind(Context const&)
-  {}
-
-  template<class Function>
-  Function localFunctionPullback(Function const& f) const
-  {
-    return f;
-  }
-};
 
 /**
  * \brief Local-basis adapter driven by a transformation policy.
@@ -190,7 +171,7 @@ class TransformedLocalBasis
       requires Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,D>
     void finalize(D derivative,
                   Domain const& x,
-                  PrecomputeBuffer<D> const& in,
+                  PrecomputeBuffer<D>& in,
                   std::vector<DerivativeRange<D>>& out) const
     {
       assert(!!localBasis_);
@@ -231,6 +212,20 @@ class TransformedLocalBasis
       requires (Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,Derivatives::Jacobian>)
     {
       evaluate(Derivatives::Jacobian{}, x, out);
+    }
+
+    //! Compatibility entry point for legacy LocalBasis users.
+    template<class Jacobian>
+    void evaluateJacobian(Domain const& x, std::vector<Jacobian>& out) const
+      requires (!Concept::LocalBasisTransformation<
+                  Transformation,LocalBasis,Context,Derivatives::Jacobian>
+                && requires (Transformation const& transformation,
+                             LocalBasis const& localBasis) {
+                  transformation.evaluateCompatibilityJacobian(localBasis,x,out);
+                })
+    {
+      assert(!!localBasis_);
+      transformation_.evaluateCompatibilityJacobian(*localBasis_,x,out);
     }
 
     /**
@@ -355,15 +350,13 @@ class TransformedLocalInterpolation
  * \tparam LocalFiniteElement Type of the reference local finite element to wrap.
  * \tparam Context Type of the element context providing geometry information
  *   (must satisfy LocalFiniteElementBindContext).
- * \tparam Transformation Type of the transformation policy for basis and interpolation
- *   (must satisfy LocalBasisTransformation and LocalInterpolationTransformation
- *   as needed).
+ * \tparam Transformation Type of the local-basis transformation policy.
+ * \tparam InterpolationTransformation Transformation policy used to pull
+ *   functions back for local interpolation. If this is void, the reference
+ *   interpolation is exposed directly.
  * \tparam LocalBasisTag Tag to select whether localBasis() returns the reference or
  *   physical basis. Use TransformedLocalFiniteElementLocalBasis::Reference or
  *   ::Physical.
- * \tparam InterpolationTransformation Transformation policy used to pull
- *   functions back for local interpolation. By default this is the same policy
- *   as the basis transformation.
  *
  * Example usage:
  * \code
@@ -371,7 +364,8 @@ class TransformedLocalInterpolation
  * using Context = ...; // element context type
  * using PiolaTransform = ...; // Piola transformation policy
  *
- * TransformedLocalFiniteElement<LFE, Context, PiolaTransform> tlfe(piola);
+ * TransformedLocalFiniteElement<LFE, Context, PiolaTransform, PiolaTransform>
+ *   tlfe(piola, piola);
  * tlfe.bind(lfe, context);
  * auto const& basis = tlfe.localBasis(); // returns transformed physical basis
  * \endcode
@@ -379,8 +373,8 @@ class TransformedLocalInterpolation
 template<class LocalFiniteElement,
          class Context,
          class Transformation,
-         class LocalBasisTag = TransformedLocalFiniteElementLocalBasis::Physical,
-         class InterpolationTransformation = Transformation>
+         class InterpolationTransformation = void,
+         class LocalBasisTag = TransformedLocalFiniteElementLocalBasis::Physical>
 class TransformedLocalFiniteElement
 {
     using ReferenceLocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
@@ -401,10 +395,10 @@ class TransformedLocalFiniteElement
       PhysicalBasis>;
 
     //! Type of the transformed physical local interpolation.
-    using PhysicalLocalInterpolation = TransformedLocalInterpolation<
+    using PhysicalLocalInterpolation = std::conditional_t<
+      std::is_void_v<InterpolationTransformation>,
       ReferenceLocalInterpolation,
-      Context,
-      InterpolationTransformation>;
+      TransformedLocalInterpolation<ReferenceLocalInterpolation,Context,InterpolationTransformation>>;
 
     //! Type exposed by localInterpolation() for compatibility with existing bases.
     using LocalInterpolation = std::conditional_t<
@@ -423,13 +417,21 @@ class TransformedLocalFiniteElement
     /**
      * \brief Constructor with transformation policy.
      *
-     * \param transformation The transformation policy to use for basis and interpolation.
+     * \param transformation The local-basis transformation policy.
+     * \param interpolationTransformation The physical-function pullback used by interpolation.
      */
+    template<class I = InterpolationTransformation>
     explicit TransformedLocalFiniteElement(
         Transformation transformation,
-        InterpolationTransformation interpolationTransformation = {})
+        I interpolationTransformation)
+      requires (!std::is_void_v<I> && std::is_same_v<I,InterpolationTransformation>)
       : basis_(std::move(transformation))
       , physicalInterpolation_(std::move(interpolationTransformation))
+    {}
+
+    explicit TransformedLocalFiniteElement(Transformation transformation)
+      requires std::is_void_v<InterpolationTransformation>
+      : basis_(std::move(transformation))
     {}
 
     /**
@@ -444,7 +446,8 @@ class TransformedLocalFiniteElement
     {
       lfe_ = &lfe;
       basis_.bind(lfe.localBasis());
-      physicalInterpolation_.bind(lfe.localInterpolation());
+      if constexpr (!std::is_void_v<InterpolationTransformation>)
+        physicalInterpolation_.bind(lfe.localInterpolation());
     }
 
     /**
@@ -457,7 +460,8 @@ class TransformedLocalFiniteElement
     void bind(Context const& context)
     {
       basis_.bind(context);
-      physicalInterpolation_.bind(context);
+      if constexpr (!std::is_void_v<InterpolationTransformation>)
+        physicalInterpolation_.bind(context);
       type_ = context.type();
     }
 
@@ -539,8 +543,14 @@ class TransformedLocalFiniteElement
         assert(!!lfe_);
         return lfe_->localInterpolation();
       }
-      else
-        return physicalInterpolation_;
+      else {
+        if constexpr (std::is_void_v<InterpolationTransformation>) {
+          assert(!!lfe_);
+          return lfe_->localInterpolation();
+        }
+        else
+          return physicalInterpolation_;
+      }
     }
 
     /**
@@ -564,9 +574,14 @@ class TransformedLocalFiniteElement
     }
 
   private:
+    using PhysicalInterpolationStorage = std::conditional_t<
+      std::is_void_v<InterpolationTransformation>,
+      std::monostate,
+      PhysicalLocalInterpolation>;
+
     LocalFiniteElement const* lfe_ = nullptr;
     PhysicalBasis basis_;
-    PhysicalLocalInterpolation physicalInterpolation_;
+    PhysicalInterpolationStorage physicalInterpolation_;
     GeometryType type_ = {};
 };
 

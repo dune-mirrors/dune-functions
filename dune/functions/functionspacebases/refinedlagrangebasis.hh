@@ -19,7 +19,7 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/transformed/bindcontext.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
-#include <dune/functions/functionspacebases/transformed/pullback.hh>
+#include <dune/functions/functionspacebases/transformed/basisset.hh>
 
 #include <dune/geometry/type.hh>
 
@@ -135,9 +135,13 @@ public:
     Dune::RefinedP0LocalFiniteElement<typename GV::ctype,R,dim>,
     Dune::RefinedP1LocalFiniteElement<typename GV::ctype,R,dim>>;
   using Context = ElementBindContext<Element>;
+  using Transformation = TransformationPipeline<
+    Context,
+    GeometryDerivativePullbackStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
                                                       Context,
-                                                      ScalarDerivativePullback<typename Element::Geometry>,
+                                                      Transformation,
+                                                      void,
                                                       TransformedLocalFiniteElementLocalBasis::Reference>;
 
   /**

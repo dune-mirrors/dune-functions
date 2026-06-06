@@ -37,7 +37,7 @@
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 #include <dune/functions/functionspacebases/transformed/bindcontext.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
-#include <dune/functions/functionspacebases/transformed/pullback.hh>
+#include <dune/functions/functionspacebases/transformed/basisset.hh>
 
 #include <dune/grid/common/capabilities.hh>
 
@@ -582,9 +582,13 @@ public:
   using Element = typename GV::template Codim<0>::Entity;
   using ReferenceFiniteElement = typename FiniteElementCache::FiniteElementType;
   using Context = ElementBindContext<Element>;
+  using Transformation = TransformationPipeline<
+    Context,
+    GeometryDerivativePullbackStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
                                                       Context,
-                                                      ScalarDerivativePullback<typename Element::Geometry>,
+                                                      Transformation,
+                                                      void,
                                                       TransformedLocalFiniteElementLocalBasis::Reference>;
 
   //! Constructor without order (uses the compile-time value)

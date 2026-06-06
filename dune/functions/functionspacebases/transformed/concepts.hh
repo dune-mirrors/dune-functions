@@ -60,7 +60,7 @@ concept LocalBasisTransformation =
 
     transformation.bind(context);
     std::as_const(transformation).precompute(derivative, localBasis, x, precomputed);
-    std::as_const(transformation).finalize(derivative, localBasis, x, std::as_const(precomputed), out);
+    std::as_const(transformation).finalize(derivative, localBasis, x, precomputed, out);
   };
 
 /**
@@ -79,6 +79,29 @@ concept LocalInterpolationTransformation =
   {
     transformation.bind(context);
     std::as_const(transformation).localFunctionPullback(f);
+  };
+
+/**
+ * \brief One typed stage in a local-basis transformation pipeline.
+ *
+ * A stage may change the range type.  Its output therefore depends on the
+ * derivative, local basis, bind context, and input range.
+ */
+template<class Stage, class Derivative, class LocalBasis, class Context, class InputRange>
+concept TransformationStage =
+  LocalFiniteElementBindContext<Context> &&
+  requires(Stage stage,
+           Context const& context,
+           Derivative derivative,
+           LocalBasis const& localBasis,
+           typename LocalBasis::Traits::DomainType const& x,
+           std::vector<InputRange> const& in,
+           std::vector<typename Stage::template OutputRange<
+             Derivative,LocalBasis,Context,InputRange>>& out)
+  {
+    typename Stage::template OutputRange<Derivative,LocalBasis,Context,InputRange>;
+    stage.bind(context);
+    std::as_const(stage).transform(derivative,localBasis,x,in,out);
   };
 
 /**
@@ -104,7 +127,7 @@ concept TransformedLocalBasis =
     { basis.order() } -> std::convertible_to<int>;
 
     basis.precompute(derivative, x, precomputed);
-    basis.finalize(derivative, x, std::as_const(precomputed), out);
+    basis.finalize(derivative, x, precomputed, out);
     basis.evaluate(derivative, x, out);
   };
 

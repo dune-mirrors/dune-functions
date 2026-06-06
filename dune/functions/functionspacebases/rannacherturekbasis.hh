@@ -20,7 +20,7 @@
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 #include <dune/functions/functionspacebases/transformed/bindcontext.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
-#include <dune/functions/functionspacebases/transformed/pullback.hh>
+#include <dune/functions/functionspacebases/transformed/basisset.hh>
 
 
 namespace Dune {
@@ -160,9 +160,13 @@ public:
                                                     std::conditional_t<type.isCube(),CubeFiniteElement,SimplexFiniteElement>,
                                                     LocalFiniteElementVariant<CubeFiniteElement, SimplexFiniteElement> >;
   using Context = ElementBindContext<Element>;
+  using Transformation = TransformationPipeline<
+    Context,
+    GeometryDerivativePullbackStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
                                                       Context,
-                                                      ScalarDerivativePullback<typename Element::Geometry>,
+                                                      Transformation,
+                                                      void,
                                                       TransformedLocalFiniteElementLocalBasis::Reference>;
 
   RannacherTurekNode() :

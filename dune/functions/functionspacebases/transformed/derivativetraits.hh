@@ -55,6 +55,13 @@ struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
 };
 
 template <class LocalBasis, class Geometry>
+struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Gradient>
+{
+  static_assert(LocalBasis::Traits::dimRange == 1);
+  using type = FieldVector<typename LocalBasis::Traits::RangeFieldType,Geometry::coorddimension>;
+};
+
+template <class LocalBasis, class Geometry>
 struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Divergence>
 {
   using type = typename LocalBasis::Traits::RangeFieldType;
@@ -63,7 +70,7 @@ struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Divergence>
 template <class LocalBasis, class Geometry>
 struct StandardDerivativeRange<LocalBasis,Geometry,Derivatives::Curl>
 {
-  using type = typename CurlDerivativeRange<LocalBasis,Geometry,Geometry::coorddimension>::type;
+  using type = typename CurlDerivativeRange<LocalBasis,Geometry,Geometry::mydimension>::type;
 };
 
 template <class LocalBasis, class Geometry>
@@ -95,6 +102,11 @@ struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
 };
 
 template <class LocalBasis, class Geometry>
+struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Gradient>
+  : ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Jacobian>
+{};
+
+template <class LocalBasis, class Geometry>
 struct ScalarDerivativeRange<LocalBasis,Geometry,Derivatives::Hessian>
 {
   using type = HessianMatrix<LocalBasis,Geometry::coorddimension>;
@@ -120,6 +132,11 @@ struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Jacobian>
 {
   using type = std::vector<typename LocalBasis::Traits::JacobianType>;
 };
+
+template <class LocalBasis>
+struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Gradient>
+  : PullbackPrecomputeBuffer<LocalBasis,Derivatives::Jacobian>
+{};
 
 template <class LocalBasis>
 struct PullbackPrecomputeBuffer<LocalBasis,Derivatives::Divergence>

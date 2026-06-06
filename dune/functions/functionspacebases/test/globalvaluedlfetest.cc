@@ -36,6 +36,30 @@ TestSuite checkBasisFEs(const Basis& basis, Derivative d) {
       localView.element(),
       Functions::Derivatives::Value{},
       d));
+
+    auto const& finiteElement = localView.tree().finiteElement();
+    auto const& physicalBasis = finiteElement.physicalBasis();
+    using LegacyJacobian = typename std::decay_t<
+      decltype(finiteElement.localBasis())>::Traits::JacobianType;
+    std::vector<LegacyJacobian> legacyJacobians;
+    finiteElement.localBasis().evaluateJacobian(
+      Dune::FieldVector<double,2>{0.25,0.25},legacyJacobians);
+    test.check(legacyJacobians.size() == finiteElement.size(),
+      "legacy evaluateJacobian compatibility");
+
+    for (std::size_t j = 0; j < physicalBasis.size(); ++j) {
+      auto shapeFunction = [&](auto const& x) {
+        std::vector<typename std::decay_t<decltype(physicalBasis)>::template DerivativeRange<
+          Functions::Derivatives::Value>> values;
+        physicalBasis.evaluate(Functions::Derivatives::Value{},x,values);
+        return values[j];
+      };
+      std::vector<double> coefficients;
+      finiteElement.localInterpolation().interpolate(shapeFunction,coefficients);
+      for (std::size_t i = 0; i < coefficients.size(); ++i)
+        test.check(std::abs(coefficients[i]-(i == j ? 1.0 : 0.0)) < 1e-10,
+          "physical interpolation is dual to the transformed basis");
+    }
   }
   return test;
 }

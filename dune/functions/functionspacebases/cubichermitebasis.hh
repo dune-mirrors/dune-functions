@@ -646,14 +646,15 @@ namespace Dune::Functions
       using ReferenceFiniteElement = CubicHermiteReferenceLocalFiniteElement<D,R,dim,reduced>;
       using BasisSetTransformation = CubicHermiteBasisSetTransformation<D,R,dim,reduced>;
       using Transformation = Dune::Functions::TransformationPipeline<
+        Context,
         Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
-        Dune::Functions::AffineScalarDerivativePullbackStage<typename Element::Geometry>>;
+        Dune::Functions::GeometryDerivativePullbackStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<
         ReferenceFiniteElement,
         Context,
         Transformation,
-        Dune::Functions::TransformedLocalFiniteElementLocalBasis::Physical,
-        Dune::Functions::IdentityLocalInterpolationTransformation>;
+        void,
+        Dune::Functions::TransformedLocalFiniteElementLocalBasis::Physical>;
 
     public:
       CubicHermiteLocalFiniteElement()

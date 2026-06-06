@@ -339,6 +339,7 @@ public:
   using Context = ElementBindContext<Element>;
   using FiniteElement = TransformedLocalFiniteElement<typename FiniteElementMap::FiniteElement,
                                                       Context,
+                                                      ContravariantPiolaTransformation<typename Element::Geometry>,
                                                       ContravariantPiolaTransformation<typename Element::Geometry>>;
 
   RaviartThomasNode(const FiniteElementMap* finiteElementMap) :

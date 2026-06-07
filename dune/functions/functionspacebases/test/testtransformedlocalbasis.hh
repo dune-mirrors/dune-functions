@@ -299,7 +299,7 @@ finiteDifference(Basis const& basis,
       auto const& referenceElement = ReferenceElements<
         typename Basis::Domain::value_type,
         Basis::Traits::dimDomain>::general(type);
-      if (std::ranges::all_of(points, [&](auto const& point) { return referenceElement.checkInside(point); })) {
+      if (std::all_of(points.begin(), points.end(), [&](auto const& point) { return referenceElement.checkInside(point); })) {
         std::array<double,4> values;
         for (auto k : Dune::range(4)) {
           std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> pointValues;

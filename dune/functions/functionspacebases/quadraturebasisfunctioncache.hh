@@ -7,6 +7,7 @@
 #ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_QUADRATUREBASISFUNCTIONCACHE_HH
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_QUADRATUREBASISFUNCTIONCACHE_HH
 
+#include <bits/utility.h>
 #include <concepts>
 #include <dune/common/hybridutilities.hh>
 #include <dune/common/indices.hh>
@@ -71,7 +72,8 @@ namespace Dune::Functions
         std::map<QuadratureKey,PrecomputeBuffer<D>> buffers;
       };
 
-      using PrecomputeCaches = std::tuple<PrecomputeCache<CachedDerivatives>...>;
+      using PrecomputeCaches = std::tuple<
+        std::pair<CachedDerivatives,PrecomputeCache<CachedDerivatives>>...>;
 
       //! Public output range type for the quantity selected by D.
       template <class D>
@@ -81,7 +83,8 @@ namespace Dune::Functions
       template <class D>
       using EvaluationBuffer = std::vector<std::vector<DerivativeRange<D>>>;
 
-      using EvaluationBuffers = std::tuple<EvaluationBuffer<CachedDerivatives>...>;
+      using EvaluationBuffers = std::tuple<
+        std::pair<CachedDerivatives, EvaluationBuffer<CachedDerivatives>>...>;
 
     public:
 
@@ -140,7 +143,8 @@ namespace Dune::Functions
       std::pair<PrecomputeBuffer<Derivative>&,bool>
       getPrecomputeBuffer (Derivative const& d, QuadratureKey const& key)
       {
-        auto& buffers = std::get<PrecomputeCache<Derivative>>(precomputeCaches_).buffers;
+        using Buffer = std::pair<Derivative,PrecomputeCache<Derivative>>;
+        auto& buffers = std::get<Buffer>(precomputeCaches_).second.buffers;
         auto [it,inserted] = buffers.try_emplace(key);
         return {it->second,inserted};
       }
@@ -148,7 +152,8 @@ namespace Dune::Functions
       template <class Derivative>
       EvaluationBuffer<Derivative>& getEvaluationBuffer (Derivative const& d)
       {
-        return std::get<EvaluationBuffer<Derivative>>(evaluationBuffers_);
+        using Buffer = std::pair<Derivative,EvaluationBuffer<Derivative>>;
+        return std::get<Buffer>(evaluationBuffers_).second;
       }
 
     private:

@@ -8,20 +8,20 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_QUADRATUREBASISFUNCTIONCACHE_HH
 
 #include <concepts>
-#include <dune/common/hybridutilities.hh>
-#include <dune/common/indices.hh>
 #include <map>
 #include <optional>
 #include <tuple>
 #include <utility>
 #include <vector>
 
+#include <dune/common/hybridutilities.hh>
+#include <dune/common/indices.hh>
 #include <dune/common/overloadset.hh>
-#include <dune/geometry/type.hh>
-#include <dune/geometry/quadraturerules.hh>
 #include <dune/common/typetree/traversal.hh>
 #include <dune/common/typetree/treecontainer.hh>
 #include <dune/common/typetree/treepath.hh>
+#include <dune/geometry/type.hh>
+#include <dune/geometry/quadraturerules.hh>
 
 namespace Dune::Functions
 {

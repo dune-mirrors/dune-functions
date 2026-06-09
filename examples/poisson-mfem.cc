@@ -30,6 +30,8 @@
 #include <dune/functions/functionspacebases/boundarydofs.hh>
 #include <dune/functions/backends/istlvectorbackend.hh>
 #include <dune/functions/functionspacebases/compositebasis.hh>
+#include <dune/functions/functionspacebases/transformed/derivative.hh>
+#include <dune/functions/functionspacebases/quadraturebasisfunctioncache.hh>
 #include <dune/functions/functionspacebases/subspacebasis.hh>
 #include <dune/functions/gridfunctions/analyticgridviewfunction.hh>
 #include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
@@ -42,8 +44,8 @@
 using namespace Dune;
 
 // Compute the stiffness matrix for a single element
-template <class LocalView, class MatrixType>
-void getLocalMatrix(const LocalView& localView,
+template <class LocalView, class Cache, class MatrixType>
+void getLocalMatrix(const LocalView& localView, Cache& cache,
                     MatrixType& elementMatrix)
 {
   // Get the grid element from the local FE basis view
@@ -59,20 +61,24 @@ void getLocalMatrix(const LocalView& localView,
 
   // Get set of shape functions for this element
   using namespace Dune::Indices;
-  const auto& fluxLocalFiniteElement     = localView.tree().child(_0).finiteElement();
-  const auto& pressureLocalFiniteElement = localView.tree().child(_1).finiteElement();
+  auto& fluxFECache     = cache.get(_0);
+  auto& pressureFECache = cache.get(_1);
 
   // Get a quadrature rule
-  int fluxOrder = dim*fluxLocalFiniteElement.localBasis().order();
-  int pressureOrder = dim*pressureLocalFiniteElement.localBasis().order();
+  int fluxOrder = dim*fluxFECache.basis().order();
+  int pressureOrder = dim*pressureFECache.basis().order();
   int order = std::max(2*fluxOrder, (fluxOrder-1)+pressureOrder);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
 
+  auto const& fluxValuesCache = fluxFECache.evaluate(Functions::Derivatives::Value{}, quad);
+  auto const& fluxDivergenceCache = fluxFECache.evaluate(Functions::Derivatives::Divergence{}, quad);
+  auto const& pressureValuesCache = pressureFECache.evaluate(Functions::Derivatives::Value{}, quad);
+
   // Loop over all quadrature points
-  for (const auto& quadPoint : quad)
+  for (std::size_t iq : Dune::range(quad.size()))
   {
     // Position of the current quadrature point in the reference element
-    const auto quadPos = quadPoint.position();
+    const auto quadPos = quad[iq].position();
 
     // The multiplicative factor in the integral transformation formula
     const auto integrationElement = geometry.integrationElement(quadPos);
@@ -82,32 +88,29 @@ void getLocalMatrix(const LocalView& localView,
     ///////////////////////////////////////////////////////////////////////////
 
     // Values of the flux shape functions on the current element
-    std::vector<FieldVector<double,dim> > fluxValues(fluxLocalFiniteElement.size());
-    fluxLocalFiniteElement.localBasis().evaluateFunction(quadPos, fluxValues);
+    auto const& fluxValues = fluxValuesCache[iq];
 
     // Divergence of the transformed shape functions on the physical element
-    std::vector<double> fluxDivergence(fluxLocalFiniteElement.size());
-    fluxLocalFiniteElement.localBasis().evaluate(Functions::Derivatives::Divergence{}, quadPos, fluxDivergence);
+    auto const& fluxDivergence = fluxDivergenceCache[iq];
 
     ///////////////////////////////////////////////////////////////////////////
     // Shape functions - pressure
     ///////////////////////////////////////////////////////////////////////////
 
     // Values of the pressure shape functions
-    std::vector<FieldVector<double,1> > pressureValues(pressureLocalFiniteElement.size());
-    pressureLocalFiniteElement.localBasis().evaluateFunction(quadPos, pressureValues);
+    auto const& pressureValues = pressureValuesCache[iq];
 
     /////////////////////////////
     // Flux--flux coupling
     /////////////////////////////
 
-    for (size_t i=0; i<fluxLocalFiniteElement.size(); i++)
+    for (size_t i=0; i<fluxValues.size(); i++)
     {
       size_t row = localView.tree().child(_0).localIndex(i);
-      for (size_t j=0; j<fluxLocalFiniteElement.size(); j++)
+      for (size_t j=0; j<fluxValues.size(); j++)
       {
         size_t col = localView.tree().child(_0).localIndex(j);
-        elementMatrix[row][col] += (fluxValues[i] * fluxValues[j]) * quadPoint.weight() * integrationElement;
+        elementMatrix[row][col] += (fluxValues[i] * fluxValues[j]) * quad[iq].weight() * integrationElement;
       }
     }
 
@@ -115,15 +118,15 @@ void getLocalMatrix(const LocalView& localView,
     // Flux--pressure coupling
     /////////////////////////////
 
-    for (size_t i=0; i<fluxLocalFiniteElement.size(); i++)
+    for (size_t i=0; i<fluxValues.size(); i++)
     {
       size_t fluxIndex     = localView.tree().child(_0).localIndex(i);
-      for (size_t j=0; j<pressureLocalFiniteElement.size(); j++)
+      for (size_t j=0; j<pressureValues.size(); j++)
       {
         size_t pressureIndex = localView.tree().child(_1).localIndex(j);
 
         // Pre-compute matrix contribution
-        double tmp = (fluxDivergence[i] * pressureValues[j]) * quadPoint.weight() * integrationElement;
+        double tmp = (fluxDivergence[i] * pressureValues[j]) * quad[iq].weight() * integrationElement;
 
         elementMatrix[fluxIndex][pressureIndex] += tmp;
         elementMatrix[pressureIndex][fluxIndex] += tmp;
@@ -134,8 +137,8 @@ void getLocalMatrix(const LocalView& localView,
 
 
 // Compute the source term for a single element
-template <class LocalView, class LocalVolumeTerm>
-void getVolumeTerm( const LocalView& localView,
+template <class LocalView, class Cache, class LocalVolumeTerm>
+void getVolumeTerm( const LocalView& localView, Cache& cache,
                     BlockVector<double>& localRhs,
                     LocalVolumeTerm&& localVolumeTerm)
 {
@@ -151,20 +154,22 @@ void getVolumeTerm( const LocalView& localView,
 
   // Get set of shape functions for this element
   using namespace Dune::Indices;
-  const auto& fluxLocalFiniteElement     = localView.tree().child(_0).finiteElement();
-  const auto& pressureLocalFiniteElement = localView.tree().child(_1).finiteElement();
+  auto& fluxFECache     = cache.get(_0);
+  auto& pressureFECache = cache.get(_1);
 
   // A quadrature rule
-  int fluxOrder = dim*fluxLocalFiniteElement.localBasis().order();
-  int pressureOrder = dim*pressureLocalFiniteElement.localBasis().order();
+  int fluxOrder = dim*fluxFECache.basis().order();
+  int pressureOrder = dim*pressureFECache.basis().order();
   int order = std::max(2*fluxOrder, 2*pressureOrder);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
 
+  auto const& pressureValuesCache = pressureFECache.evaluate(Functions::Derivatives::Value{}, quad);
+
   // Loop over all quadrature points
-  for (const auto& quadPoint : quad)
+  for (std::size_t iq : Dune::range(quad.size()))
   {
     // Position of the current quadrature point in the reference element
-    const auto& quadPos = quadPoint.position();
+    const auto& quadPos = quad[iq].position();
 
     // The multiplicative factor in the integral transformation formula
     const double integrationElement = element.geometry().integrationElement(quadPos);
@@ -172,14 +177,13 @@ void getVolumeTerm( const LocalView& localView,
     double functionValue = localVolumeTerm(quadPos);
 
     // Evaluate all shape function values at this point
-    std::vector<FieldVector<double,1> > pressureValues;
-    pressureLocalFiniteElement.localBasis().evaluateFunction(quadPos, pressureValues);
+    auto const& pressureValues = pressureValuesCache[iq];
 
     // Actually compute the vector entries
-    for (size_t j=0; j<pressureLocalFiniteElement.size(); j++)
+    for (size_t j=0; j<pressureValues.size(); j++)
     {
       size_t pressureIndex = localView.tree().child(_1).localIndex(j);
-      localRhs[pressureIndex] += - pressureValues[j] * functionValue * quadPoint.weight() * integrationElement;
+      localRhs[pressureIndex] += - pressureValues[j] * functionValue * quad[iq].weight() * integrationElement;
     }
   }
 }
@@ -221,8 +225,8 @@ void getOccupationPattern(const Basis& basis,
 }
 
 /** \brief Assemble the divergence stiffness matrix on the given grid view */
-template <class Basis, class MatrixType>
-void assembleMixedPoissonMatrix(const Basis& basis,
+template <class Basis, class Cache, class MatrixType>
+void assembleMixedPoissonMatrix(const Basis& basis, Cache& cache,
                                 MatrixType& matrix)
 {
   // Get the grid view from the finite element basis (use of test space arbitrary)
@@ -249,11 +253,12 @@ void assembleMixedPoissonMatrix(const Basis& basis,
   {
     // Bind the local FE basis view to the current element
     localView.bind(element);
+    cache.bind(localView);
 
     // Now let's get the element stiffness matrix
     // A dense matrix is used for the element stiffness matrix
     Matrix<double> elementMatrix;
-    getLocalMatrix(localView, elementMatrix);
+    getLocalMatrix(localView, cache, elementMatrix);
 
     // Add element stiffness matrix onto the global stiffness matrix
     for (size_t i=0; i<elementMatrix.N(); i++)
@@ -272,8 +277,8 @@ void assembleMixedPoissonMatrix(const Basis& basis,
 }
 
 /** \brief Assemble the divergence stiffness matrix on the given grid view */
-template <class Basis, class VectorType, class VolumeTerm>
-void assembleMixedPoissonRhs(const Basis& basis,
+template <class Basis, class Cache, class VectorType, class VolumeTerm>
+void assembleMixedPoissonRhs(const Basis& basis, Cache& cache,
                              VectorType& rhs,
                              VolumeTerm&& volumeTerm)
 {
@@ -297,11 +302,12 @@ void assembleMixedPoissonRhs(const Basis& basis,
   {
     // Bind the local FE basis view to the current element
     localView.bind(element);
+    cache.bind(localView);
 
     // Now get the local contribution to the right-hand side vector
     BlockVector<double> localRhs;
     localVolumeTerm.bind(element);
-    getVolumeTerm(localView, localRhs, localVolumeTerm);
+    getVolumeTerm(localView, cache, localRhs, localVolumeTerm);
 
     for (size_t i=0; i<localRhs.size(); i++)
     {
@@ -371,6 +377,9 @@ int main (int argc, char *argv[])
   auto fluxBasis = Functions::subspaceBasis(basis, _0);
   auto pressureBasis = Functions::subspaceBasis(basis, _1);
 
+  using Basis = decltype(basis);
+  using LocalView = typename Basis::LocalView;
+  auto cache = Functions::QuadratureBasisFunctionCache<typename LocalView::Tree, Functions::Derivatives::Value, Functions::Derivatives::Divergence>{};
 
   /////////////////////////////////////////////////////////
   //   Stiffness matrix and right hand side vector
@@ -391,11 +400,11 @@ int main (int argc, char *argv[])
 
   using Domain = GridType::template Codim<0>::Geometry::GlobalCoordinate;
 
-  assembleMixedPoissonMatrix(basis, stiffnessMatrix);
+  assembleMixedPoissonMatrix(basis, cache, stiffnessMatrix);
 
   auto rightHandSide = [] (const Domain& x) { return 2; };
 
-  assembleMixedPoissonRhs(basis, rhs, rightHandSide);
+  assembleMixedPoissonRhs(basis, cache, rhs, rightHandSide);
 
   // This marks the top and bottom boundary of the domain
   auto fluxDirichletIndicator = [&l] (const auto& x) {

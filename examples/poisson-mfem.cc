@@ -65,8 +65,8 @@ void getLocalMatrix(const LocalView& localView, Cache& cache,
   auto& pressureFECache = cache.get(_1);
 
   // Get a quadrature rule
-  int fluxOrder = dim*fluxFECache.basis().order();
-  int pressureOrder = dim*pressureFECache.basis().order();
+  int fluxOrder = dim*fluxFECache.order();
+  int pressureOrder = dim*pressureFECache.order();
   int order = std::max(2*fluxOrder, (fluxOrder-1)+pressureOrder);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
 
@@ -158,8 +158,8 @@ void getVolumeTerm( const LocalView& localView, Cache& cache,
   auto& pressureFECache = cache.get(_1);
 
   // A quadrature rule
-  int fluxOrder = dim*fluxFECache.basis().order();
-  int pressureOrder = dim*pressureFECache.basis().order();
+  int fluxOrder = dim*fluxFECache.order();
+  int pressureOrder = dim*pressureFECache.order();
   int order = std::max(2*fluxOrder, 2*pressureOrder);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
 

@@ -17,9 +17,10 @@
 #include <dune/geometry/type.hh>
 #include <dune/localfunctions/common/localbasis.hh>
 
-#include <dune/functions/functionspacebases/transformed/basisset.hh>
 #include <dune/functions/functionspacebases/transformed/bindcontext.hh>
+#include <dune/functions/functionspacebases/transformed/geometryderivative.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/pipeline.hh>
 #include <dune/functions/functionspacebases/transformed/piola.hh>
 
 namespace {
@@ -128,17 +129,46 @@ public:
     double,1,Dune::FieldVector<double,1>,Dune::FieldMatrix<double,1,2>>;
 };
 
+struct DummyLocalCoefficients {};
+struct DummyLocalInterpolation {};
+
+class ReferenceLocalFiniteElement
+{
+public:
+  using Traits = Dune::LocalFiniteElementTraits<
+    AffineScalarLocalBasis,DummyLocalCoefficients,DummyLocalInterpolation>;
+
+  AffineScalarLocalBasis const& localBasis() const { return basis_; }
+  DummyLocalCoefficients const& localCoefficients() const { return coefficients_; }
+  DummyLocalInterpolation const& localInterpolation() const { return interpolation_; }
+
+private:
+  AffineScalarLocalBasis basis_;
+  DummyLocalCoefficients coefficients_;
+  DummyLocalInterpolation interpolation_;
+};
+
+struct InvalidContext {};
+struct InvalidInterpolationTransformation {};
+
+template<class LocalFiniteElement, class Context, class Transformation,
+         class InterpolationTransformation, Dune::Functions::LocalBasisMode mode>
+concept ValidTransformedLocalFiniteElement =
+  requires {
+    typename Dune::Functions::TransformedLocalFiniteElement<
+      LocalFiniteElement,Context,Transformation,InterpolationTransformation,mode>;
+  };
+
 bool close(double a, double b)
 {
   return std::abs(a-b) < 1e-12;
 }
 
-} // namespace
-
-int main()
+/**
+ * \brief Check contravariant surface Piola values, divergence, and interpolation pullback.
+ */
+void testContravariantSurfacePiola(Dune::TestSuite& test)
 {
-  Dune::TestSuite test;
-
   using SurfaceGeometry = Dune::MultiLinearGeometry<double,2,3>;
   std::vector<Dune::FieldVector<double,3>> surfaceCorners{
     Dune::FieldVector<double,3>{0,0,0},
@@ -149,58 +179,76 @@ int main()
   AffineVectorLocalBasis<2> vectorBasis;
   Dune::FieldVector<double,2> x{0.25,0.25};
 
-  {
-    using Transformation = Dune::Functions::ContravariantPiolaTransformation<SurfaceGeometry>;
-    Dune::Functions::TransformedLocalBasis<
-      AffineVectorLocalBasis<2>,decltype(surfaceContext),Transformation> basis;
-    basis.bind(vectorBasis);
-    basis.bind(surfaceContext);
+  using Transformation = Dune::Functions::ContravariantPiolaTransformation<SurfaceGeometry>;
+  Dune::Functions::TransformedLocalBasis<
+    AffineVectorLocalBasis<2>,decltype(surfaceContext),Transformation> basis;
+  basis.bind(vectorBasis);
+  basis.bind(surfaceContext);
 
-    std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Value>> values;
-    std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Divergence>> divergences;
-    basis.evaluate(Dune::Functions::Derivatives::Value{},x,values);
-    basis.evaluate(Dune::Functions::Derivatives::Divergence{},x,divergences);
+  std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Value>> values;
+  std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Divergence>> divergences;
+  basis.evaluate(Dune::Functions::Derivatives::Value{},x,values);
+  basis.evaluate(Dune::Functions::Derivatives::Divergence{},x,divergences);
 
-    test.check(close(values[0][0],1.0/6.0));
-    test.check(close(values[0][1],5.0/8.0));
-    test.check(close(values[0][2],0.0));
-    test.check(close(divergences[0],4.0/6.0));
+  test.check(close(values[0][0],1.0/6.0));
+  test.check(close(values[0][1],5.0/8.0));
+  test.check(close(values[0][2],0.0));
+  test.check(close(divergences[0],4.0/6.0));
 
-    Transformation transformation;
-    transformation.bind(surfaceContext);
-    auto pullback = transformation.localFunctionPullback(
-      [](auto const&) { return Dune::FieldVector<double,3>{1,2,7}; });
-    auto local = pullback(x);
-    test.check(close(local[0],3.0));
-    test.check(close(local[1],4.0));
-  }
+  Transformation transformation;
+  transformation.bind(surfaceContext);
+  auto pullback = transformation.localFunctionPullback(
+    [](auto const&) { return Dune::FieldVector<double,3>{1,2,7}; });
+  auto local = pullback(x);
+  test.check(close(local[0],3.0));
+  test.check(close(local[1],4.0));
+}
 
-  {
-    using Transformation = Dune::Functions::CovariantPiolaTransformation<SurfaceGeometry>;
-    Dune::Functions::TransformedLocalBasis<
-      AffineVectorLocalBasis<2>,decltype(surfaceContext),Transformation> basis;
-    basis.bind(vectorBasis);
-    basis.bind(surfaceContext);
+/**
+ * \brief Check covariant surface Piola values, curl, and interpolation pullback.
+ */
+void testCovariantSurfacePiola(Dune::TestSuite& test)
+{
+  using SurfaceGeometry = Dune::MultiLinearGeometry<double,2,3>;
+  std::vector<Dune::FieldVector<double,3>> surfaceCorners{
+    Dune::FieldVector<double,3>{0,0,0},
+    Dune::FieldVector<double,3>{2,0,0},
+    Dune::FieldVector<double,3>{0,3,0}};
+  SurfaceGeometry surface(Dune::GeometryTypes::simplex(2),surfaceCorners);
+  Dune::Functions::GeometryBindContext<SurfaceGeometry> surfaceContext(surface);
+  AffineVectorLocalBasis<2> vectorBasis;
+  Dune::FieldVector<double,2> x{0.25,0.25};
 
-    std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Value>> values;
-    std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Curl>> curls;
-    basis.evaluate(Dune::Functions::Derivatives::Value{},x,values);
-    basis.evaluate(Dune::Functions::Derivatives::Curl{},x,curls);
+  using Transformation = Dune::Functions::CovariantPiolaTransformation<SurfaceGeometry>;
+  Dune::Functions::TransformedLocalBasis<
+    AffineVectorLocalBasis<2>,decltype(surfaceContext),Transformation> basis;
+  basis.bind(vectorBasis);
+  basis.bind(surfaceContext);
 
-    test.check(close(values[0][0],1.0/4.0));
-    test.check(close(values[0][1],5.0/12.0));
-    test.check(close(values[0][2],0.0));
-    test.check(close(curls[0],1.0/6.0));
+  std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Value>> values;
+  std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Curl>> curls;
+  basis.evaluate(Dune::Functions::Derivatives::Value{},x,values);
+  basis.evaluate(Dune::Functions::Derivatives::Curl{},x,curls);
 
-    Transformation transformation;
-    transformation.bind(surfaceContext);
-    auto pullback = transformation.localFunctionPullback(
-      [](auto const&) { return Dune::FieldVector<double,3>{1,2,7}; });
-    auto local = pullback(x);
-    test.check(close(local[0],2.0));
-    test.check(close(local[1],6.0));
-  }
+  test.check(close(values[0][0],1.0/4.0));
+  test.check(close(values[0][1],5.0/12.0));
+  test.check(close(values[0][2],0.0));
+  test.check(close(curls[0],1.0/6.0));
 
+  Transformation transformation;
+  transformation.bind(surfaceContext);
+  auto pullback = transformation.localFunctionPullback(
+    [](auto const&) { return Dune::FieldVector<double,3>{1,2,7}; });
+  auto local = pullback(x);
+  test.check(close(local[0],2.0));
+  test.check(close(local[1],6.0));
+}
+
+/**
+ * \brief Check tangential gradients and reusable pipeline storage.
+ */
+void testScalarGradientAndPipeline(Dune::TestSuite& test)
+{
   using CurveGeometry = Dune::MultiLinearGeometry<double,1,2>;
   std::vector<Dune::FieldVector<double,2>> curveCorners{
     Dune::FieldVector<double,2>{0,0},
@@ -208,7 +256,7 @@ int main()
   CurveGeometry curve(Dune::GeometryTypes::simplex(1),curveCorners);
   using CurveContext = Dune::Functions::GeometryBindContext<CurveGeometry>;
   CurveContext curveContext(curve);
-  using CurveStage = Dune::Functions::GeometryDerivativePullbackStage<CurveGeometry>;
+  using CurveStage = Dune::Functions::GeometryDerivativeStage<CurveGeometry>;
   static_assert(!Dune::Functions::Concept::TransformationStage<
     CurveStage,
     Dune::Functions::Derivatives::Hessian,
@@ -220,7 +268,7 @@ int main()
     AffineScalarLocalBasis,
     CurveContext,
     Dune::Functions::Derivatives::Curl>);
-  using ScalarTransformation = Dune::Functions::TransformationPipeline<
+  using ScalarTransformation = Dune::Functions::BasisEvaluationPipeline<
     CurveContext,CurveStage>;
   AffineScalarLocalBasis scalarBasis;
   Dune::Functions::TransformedLocalBasis<
@@ -235,7 +283,7 @@ int main()
   test.check(close(gradients[0][0],0.25));
   test.check(close(gradients[0][1],0.25));
 
-  using CustomPipeline = Dune::Functions::BasicTransformationPipeline<
+  using CustomPipeline = Dune::Functions::BasicBasisEvaluationPipeline<
     CustomReferenceEvaluator,CurveContext,PassThroughStage,PassThroughStage>;
   Dune::Functions::TransformedLocalBasis<
     AffineScalarLocalBasis,CurveContext,CustomPipeline> customBasis;
@@ -256,7 +304,13 @@ int main()
     "pipeline intermediate storage is reused");
   test.check(customBuffer.reference == referenceValues,
     "pipeline finalization leaves cached reference values unchanged");
+}
 
+/**
+ * \brief Check compile-time policy diagnostics and non-affine Hessian rejection.
+ */
+void testPolicyConstraintsAndHessianRejection(Dune::TestSuite& test)
+{
   using NonAffineGeometry = Dune::MultiLinearGeometry<double,2,2>;
   std::vector<Dune::FieldVector<double,2>> nonAffineCorners{
     {0,0},{1,0},{0,1},{1.2,1}};
@@ -264,25 +318,61 @@ int main()
     Dune::GeometryTypes::cube(2),nonAffineCorners);
   Dune::Functions::GeometryBindContext<NonAffineGeometry> nonAffineContext(
     nonAffineGeometry);
-  Dune::Functions::GeometryDerivativePullbackStage<NonAffineGeometry> hessianStage;
-  hessianStage.bind(nonAffineContext);
+  Dune::Functions::GeometryDerivativeTransformation<NonAffineGeometry> hessianTransformation;
+  hessianTransformation.bind(nonAffineContext);
   ScalarLocalBasis2 scalarBasis2;
-  std::vector<Dune::FieldMatrix<double,2,2>> referenceHessians(1);
-  std::vector<Dune::FieldMatrix<double,2,2>> physicalHessians;
+  Dune::FieldMatrix<double,2,2> referenceHessian;
+  Dune::FieldMatrix<double,2,2> physicalHessian;
   bool rejectedNonAffineHessian = false;
   try {
-    hessianStage.transform(
+    hessianTransformation.transform(
       Dune::Functions::Derivatives::Hessian{},
       scalarBasis2,
       Dune::FieldVector<double,2>{0.5,0.5},
-      referenceHessians,
-      physicalHessians);
+      referenceHessian,
+      physicalHessian);
   }
   catch (Dune::NotImplemented const&) {
     rejectedNonAffineHessian = true;
   }
   test.check(rejectedNonAffineHessian,
     "non-affine physical Hessians are rejected explicitly");
+
+  using Context = Dune::Functions::GeometryBindContext<NonAffineGeometry>;
+  using Transformation = Dune::Functions::BasisEvaluationPipeline<
+    Context,Dune::Functions::GeometryDerivativeStage<NonAffineGeometry>>;
+  static_assert(Dune::Functions::Concept::ReferenceLocalFiniteElement<
+    ReferenceLocalFiniteElement>);
+  static_assert(ValidTransformedLocalFiniteElement<
+    ReferenceLocalFiniteElement,
+    Context,
+    Transformation,
+    Dune::Functions::NoInterpolationTransformation,
+    Dune::Functions::LocalBasisMode::physical>);
+  static_assert(!ValidTransformedLocalFiniteElement<
+    ReferenceLocalFiniteElement,
+    InvalidContext,
+    Transformation,
+    Dune::Functions::NoInterpolationTransformation,
+    Dune::Functions::LocalBasisMode::physical>);
+  static_assert(!ValidTransformedLocalFiniteElement<
+    ReferenceLocalFiniteElement,
+    Context,
+    Transformation,
+    InvalidInterpolationTransformation,
+    Dune::Functions::LocalBasisMode::physical>);
+}
+
+} // namespace
+
+int main()
+{
+  Dune::TestSuite test;
+
+  testContravariantSurfacePiola(test);
+  testCovariantSurfacePiola(test);
+  testScalarGradientAndPipeline(test);
+  testPolicyConstraintsAndHessianRejection(test);
 
   return test.exit();
 }

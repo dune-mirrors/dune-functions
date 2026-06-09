@@ -338,8 +338,7 @@ public:
   using FiniteElementMap = typename Impl::RaviartThomasLocalFiniteElementMap<GV, dim, double, k>;
   using Context = ElementBindContext<Element>;
   using FiniteElement = TransformedLocalFiniteElement<
-    typename FiniteElementMap::FiniteElement,
-    Context,
+    typename FiniteElementMap::FiniteElement, Context,
     ContravariantPiolaTransformation<typename Element::Geometry>,
     ContravariantPiolaTransformation<typename Element::Geometry>>;
 

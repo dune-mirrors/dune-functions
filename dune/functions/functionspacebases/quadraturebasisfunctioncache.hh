@@ -26,11 +26,13 @@
 namespace Dune::Functions
 {
   /**
-   * \brief Cache the evaluations of basis functions and their Jacobians in all quadrature points.
+   * \brief Cache selected physical-basis evaluations at quadrature points.
    *
-   * The cache is constructed over a basis-tree and allows to store vectors of evaluations for all
-   * basis functions on the leaf nodes of that tree. The tree cache is initialized at
-   * evaluation at quadrature points.
+   * Each leaf cache exposes the bound physical basis and caches its reference
+   * precomputations independently for every derivative tag. Quadrature rules are
+   * identified approximately by geometry type, delivered order, and point count.
+   * Finalization is repeated after every bind and therefore always uses the
+   * currently bound physical element.
    *
    * \b Example
    * \code{.cpp}
@@ -48,7 +50,7 @@ namespace Dune::Functions
     }
    * \endcode
    */
-  template <class Tree, class... CachedDerivatives>
+  template <class Tree, class... Derivatives>
   class QuadratureBasisFunctionCache
   {
     template <class Node>
@@ -71,7 +73,7 @@ namespace Dune::Functions
         std::map<QuadratureKey,PrecomputeBuffer<D>> buffers;
       };
 
-      using PrecomputeCaches = std::tuple<PrecomputeCache<CachedDerivatives>...>;
+      using PrecomputeCaches = std::tuple<PrecomputeCache<Derivatives>...>;
 
       //! Public output range type for the quantity selected by D.
       template <class D>
@@ -87,13 +89,13 @@ namespace Dune::Functions
         EvaluationBuffer<D> buffers;
       };
 
-      using EvaluationBuffers = std::tuple<EvaluationCache<CachedDerivatives>...>;
+      using EvaluationBuffers = std::tuple<EvaluationCache<Derivatives>...>;
 
     public:
 
       QuadratureNodeCache () = default;
 
-      explicit QuadratureNodeCache (Node const& node, CachedDerivatives const&... d)
+      explicit QuadratureNodeCache (Node const& node, Derivatives const&... d)
         : node_(&node)
         , derivatives_(d...)
       {}
@@ -102,6 +104,18 @@ namespace Dune::Functions
       {
         assert(!!node_);
         return node_->finiteElement().physicalBasis();
+      }
+
+      //! Return the number of shape functions in the bound physical basis.
+      std::size_t size() const
+      {
+        return basis().size();
+      }
+
+      //! Return the polynomial order of the bound physical basis.
+      int order() const
+      {
+        return basis().order();
       }
 
       void bind(Node const& node)
@@ -160,7 +174,7 @@ namespace Dune::Functions
     private:
 
       Node const* node_ = nullptr;
-      std::tuple<CachedDerivatives...> derivatives_ = {};
+      std::tuple<Derivatives...> derivatives_ = {};
 
       PrecomputeCaches precomputeCaches_;
       EvaluationBuffers evaluationBuffers_;
@@ -168,7 +182,7 @@ namespace Dune::Functions
 
     struct QuadratureNodeCacheFactory
     {
-      explicit QuadratureNodeCacheFactory (std::tuple<CachedDerivatives...> const& cachedDerivatives)
+      explicit QuadratureNodeCacheFactory (std::tuple<Derivatives...> const& cachedDerivatives)
         : cachedDerivatives_(cachedDerivatives)
       {}
 
@@ -180,15 +194,15 @@ namespace Dune::Functions
         }, cachedDerivatives_);
       }
 
-      std::tuple<CachedDerivatives...> cachedDerivatives_;
+      std::tuple<Derivatives...> cachedDerivatives_;
     };
 
   public:
     QuadratureBasisFunctionCache ()
-      : cachedDerivatives_(CachedDerivatives{}...)
+      : cachedDerivatives_(Derivatives{}...)
     {}
 
-    explicit QuadratureBasisFunctionCache (CachedDerivatives const&... d)
+    explicit QuadratureBasisFunctionCache (Derivatives const&... d)
       : cachedDerivatives_(d...)
     {}
 
@@ -218,7 +232,7 @@ namespace Dune::Functions
     }
 
   private:
-    std::tuple<CachedDerivatives...> cachedDerivatives_;
+    std::tuple<Derivatives...> cachedDerivatives_;
 
     using Cache = TypeTree::TreeContainer<QuadratureNodeCache, Tree>;
     std::optional<Cache> cache_;

@@ -7,7 +7,9 @@ install(FILES
         concepts.hh
         derivative.hh
         derivativetraits.hh
+        geometryderivative.hh
         localfiniteelement.hh
+        pipeline.hh
         piola.hh
         referenceevaluation.hh
         simplexcontext.hh

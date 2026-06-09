@@ -17,6 +17,25 @@
 namespace Dune::Functions::Concept {
 
 /**
+ * \brief Structural interface of a reference local finite element.
+ */
+template<class LocalFiniteElement>
+concept ReferenceLocalFiniteElement =
+  requires(LocalFiniteElement const& finiteElement) {
+    typename LocalFiniteElement::Traits;
+    typename LocalFiniteElement::Traits::LocalBasisType;
+    typename LocalFiniteElement::Traits::LocalCoefficientsType;
+    typename LocalFiniteElement::Traits::LocalInterpolationType;
+
+    { finiteElement.localBasis() }
+      -> std::same_as<typename LocalFiniteElement::Traits::LocalBasisType const&>;
+    { finiteElement.localCoefficients() }
+      -> std::same_as<typename LocalFiniteElement::Traits::LocalCoefficientsType const&>;
+    { finiteElement.localInterpolation() }
+      -> std::same_as<typename LocalFiniteElement::Traits::LocalInterpolationType const&>;
+  };
+
+/**
  * \brief Minimal bind context for local finite-element transformations.
  *
  * A bind context is the geometry-dependent state made available to local
@@ -33,6 +52,27 @@ concept LocalFiniteElementBindContext =
   };
 
 /**
+ * \brief Structural requirements shared by all local-basis transformations.
+ */
+template<class Transformation, class LocalBasis, class Context>
+concept LocalBasisTransformationPolicy =
+  LocalFiniteElementBindContext<Context> &&
+  requires(Transformation transformation, Context const& context) {
+    typename Transformation::template Traits<LocalBasis,Context>;
+    transformation.bind(context);
+  };
+
+/**
+ * \brief Structural requirements shared by interpolation transformations.
+ */
+template<class Transformation, class Context>
+concept InterpolationTransformationPolicy =
+  LocalFiniteElementBindContext<Context> &&
+  requires(Transformation transformation, Context const& context) {
+    transformation.bind(context);
+  };
+
+/**
  * \brief Staged transformation for a selected derivative quantity.
  *
  * The transformation owns the element-dependent part of the evaluation
@@ -45,7 +85,7 @@ concept LocalFiniteElementBindContext =
  */
 template<class Transformation, class LocalBasis, class Context, class Derivative>
 concept LocalBasisTransformation =
-  LocalFiniteElementBindContext<Context> &&
+  LocalBasisTransformationPolicy<Transformation,LocalBasis,Context> &&
   requires(Transformation transformation,
            LocalBasis const& localBasis,
            Context const& context,
@@ -72,7 +112,7 @@ concept LocalBasisTransformation =
  */
 template<class Transformation, class Context, class Function>
 concept LocalInterpolationTransformation =
-  LocalFiniteElementBindContext<Context> &&
+  InterpolationTransformationPolicy<Transformation,Context> &&
   requires(Transformation transformation,
            Context const& context,
            Function const& f)

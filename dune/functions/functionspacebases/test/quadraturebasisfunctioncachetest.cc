@@ -3,12 +3,16 @@
 
 #include <config.h>
 
-#include <dune/common/test/testsuite.hh>
+#include <type_traits>
+
+#include <dune/common/indices.hh>
 #include <dune/common/parallel/mpihelper.hh>
+#include <dune/common/test/testsuite.hh>
 #include <dune/geometry/quadraturerules.hh>
 #include <dune/grid/uggrid.hh>
-#include <dune/grid/yaspgrid.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
+#include <dune/grid/yaspgrid.hh>
+#include <doc/grids/gridfactory/hybridtestgrids.hh>
 
 #include <dune/functions/functionspacebases/compositebasis.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
@@ -16,21 +20,25 @@
 #include <dune/functions/functionspacebases/raviartthomasbasis.hh>
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
 
-int main(int argc, char** argv)
-{
-  using namespace Dune;
-  using namespace Dune::Functions;
-  using namespace Dune::Functions::BasisFactory;
+namespace {
 
-  MPIHelper::instance(argc,argv);
-  TestSuite test;
+using namespace Dune;
+using namespace Dune::Functions;
+using namespace Dune::Functions::BasisFactory;
+
+/**
+ * \brief Check rule-key coexistence and rebinding after local-view destruction.
+ */
+void testRuleCachingAndRebinding(TestSuite& test)
+{
   YaspGrid<1> firstGrid({1.0},{1});
   YaspGrid<1> secondGrid({2.0},{1});
   auto firstBasis = makeBasis(firstGrid.leafGridView(),lagrange<1>());
   auto secondBasis = makeBasis(secondGrid.leafGridView(),lagrange<1>());
   using LocalView = decltype(firstBasis)::LocalView;
   QuadratureBasisFunctionCache<
-    typename LocalView::Tree,Functions::Derivatives::Value,Functions::Derivatives::Jacobian> cache;
+    typename LocalView::Tree,
+    Functions::Derivatives::Value,Functions::Derivatives::Jacobian> cache;
 
   auto const& firstRule = QuadratureRules<double,1>::rule(GeometryTypes::cube(1),1);
   auto const& secondRule = QuadratureRules<double,1>::rule(GeometryTypes::cube(1),3);
@@ -67,26 +75,95 @@ int main(int argc, char** argv)
     test.check(std::abs(firstRuleValues[0][0][0]-(1-firstRule[0].position()[0])) < 1e-14,
       "precomputed buffers for different quadrature rules must coexist");
 
+  test.check(cache.get().size() == 2);
+  test.check(cache.get().order() == 1);
+  test.check(cache.get().basis().size() == cache.get().size());
+}
 
-  // test mixed finite elements
-  auto triGrid = Dune::StructuredGridFactory<UGGrid<2>>::createSimplexGrid({0.0,0.0},{1.0,1.0},{2,2});
-  auto mixedBasis = makeBasis(triGrid->leafGridView(),composite(
-    lagrange<1>(), raviartThomas<1>(), blockedLexicographic()));
-  using MixedLocalView = decltype(mixedBasis)::LocalView;
+/**
+ * \brief Check that one tree cache supports simplex and cube elements.
+ */
+void testHybridGeometryTypes(TestSuite& test)
+{
+  auto grid = make2DHybridTestGrid<UGGrid<2>>();
+  auto basis = makeBasis(grid->leafGridView(),lagrange<1>());
+  auto localView = basis.localView();
   QuadratureBasisFunctionCache<
-    typename MixedLocalView::Tree,Functions::Derivatives::Value,Functions::Derivatives::Jacobian,
-    Functions::Derivatives::Divergence> mixedCache;
+    typename decltype(localView)::Tree,
+    Functions::Derivatives::Value,Functions::Derivatives::Jacobian> cache;
 
-  {
-    using namespace Dune::Indices;
-    auto localView = mixedBasis.localView();
-    localView.bind(*elements(mixedBasis.gridView()).begin());
-    mixedCache.bind(localView);
-    auto const& mixedRule = QuadratureRules<double,2>::rule(GeometryTypes::simplex(2),3);
-    auto const& values = mixedCache.get(_0).evaluate(Functions::Derivatives::Value{},mixedRule);
-    auto const& jacobians = mixedCache.get(_0).evaluate(Functions::Derivatives::Jacobian{},mixedRule);
-    auto const& divs = mixedCache.get(_1).evaluate(Functions::Derivatives::Divergence{},mixedRule);
+  bool testedSimplex = false;
+  bool testedCube = false;
+  for (auto const& element : elements(basis.gridView())) {
+    localView.bind(element);
+    cache.bind(localView);
+    auto const& rule = QuadratureRules<double,2>::rule(element.type(),2);
+    auto const& values = cache.get().evaluate(Functions::Derivatives::Value{},rule);
+    auto const& jacobians = cache.get().evaluate(Functions::Derivatives::Jacobian{},rule);
+    test.check(values.size() == rule.size());
+    test.check(jacobians.size() == rule.size());
+    test.check(values[0].size() == cache.get().size());
+    test.check(jacobians[0].size() == cache.get().size());
+    testedSimplex = testedSimplex || element.type().isSimplex();
+    testedCube = testedCube || element.type().isCube();
   }
+  test.check(testedSimplex && testedCube,
+    "hybrid cache test must visit simplex and cube elements");
+}
+
+/**
+ * \brief Check heterogeneous derivative tags and result range types.
+ */
+void testMixedDerivativeRanges(TestSuite& test)
+{
+  auto grid = StructuredGridFactory<UGGrid<2>>::createSimplexGrid(
+    {0.0,0.0},{1.0,1.0},{2,2});
+  auto basis = makeBasis(grid->leafGridView(),composite(
+    lagrange<1>(),raviartThomas<1>(),blockedLexicographic()));
+  auto localView = basis.localView();
+  QuadratureBasisFunctionCache<
+    typename decltype(localView)::Tree,
+    Functions::Derivatives::Value,
+    Functions::Derivatives::Jacobian,
+    Functions::Derivatives::Divergence> cache;
+
+  localView.bind(*elements(basis.gridView()).begin());
+  cache.bind(localView);
+  auto const& rule = QuadratureRules<double,2>::rule(GeometryTypes::simplex(2),3);
+
+  using namespace Dune::Indices;
+  auto& scalarCache = cache.get(_0);
+  auto& piolaCache = cache.get(_1);
+  auto const& scalarValues = scalarCache.evaluate(Functions::Derivatives::Value{},rule);
+  auto const& scalarJacobians = scalarCache.evaluate(Functions::Derivatives::Jacobian{},rule);
+  auto const& piolaValues = piolaCache.evaluate(Functions::Derivatives::Value{},rule);
+  auto const& divergences = piolaCache.evaluate(Functions::Derivatives::Divergence{},rule);
+
+  static_assert(std::same_as<
+    std::remove_cvref_t<decltype(scalarValues[0][0])>,FieldVector<double,1>>);
+  static_assert(std::same_as<
+    std::remove_cvref_t<decltype(scalarJacobians[0][0])>,FieldMatrix<double,1,2>>);
+  static_assert(std::same_as<
+    std::remove_cvref_t<decltype(piolaValues[0][0])>,FieldVector<double,2>>);
+  static_assert(std::same_as<
+    std::remove_cvref_t<decltype(divergences[0][0])>,double>);
+
+  test.check(scalarValues[0].size() == scalarCache.size());
+  test.check(scalarJacobians[0].size() == scalarCache.size());
+  test.check(piolaValues[0].size() == piolaCache.size());
+  test.check(divergences[0].size() == piolaCache.size());
+}
+
+} // namespace
+
+int main(int argc, char** argv)
+{
+  Dune::MPIHelper::instance(argc,argv);
+  Dune::TestSuite test;
+
+  testRuleCachingAndRebinding(test);
+  testHybridGeometryTypes(test);
+  testMixedDerivativeRanges(test);
 
   return test.exit();
 }

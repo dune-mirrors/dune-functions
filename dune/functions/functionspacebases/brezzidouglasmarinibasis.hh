@@ -234,10 +234,9 @@ public:
   using Element = typename GV::template Codim<0>::Entity;
   using FiniteElementMap = typename Impl::BDMLocalFiniteElementMap<GV, double, k>;
   using Context = ElementBindContext<Element>;
-  using FiniteElement = TransformedLocalFiniteElement<typename FiniteElementMap::FiniteElement,
-                                                      Context,
-                                                      ContravariantPiolaTransformation<typename Element::Geometry>,
-                                                      ContravariantPiolaTransformation<typename Element::Geometry>>;
+  using FiniteElement = TransformedLocalFiniteElement<typename FiniteElementMap::FiniteElement, Context,
+    ContravariantPiolaTransformation<typename Element::Geometry>,
+    ContravariantPiolaTransformation<typename Element::Geometry>>;
 
   BrezziDouglasMariniNode(const FiniteElementMap* finiteElementMap) :
     finiteElementMap_(finiteElementMap)

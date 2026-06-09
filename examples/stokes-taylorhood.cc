@@ -77,7 +77,7 @@ void getLocalMatrix(
 
   // Get a quadrature rule
   // { begin_quad_loop_begin }
-  int order = 2*(dim*velocityFECache.basis().order()-1);
+  int order = 2*(dim*velocityFECache.order()-1);
   const auto& quad = QuadratureRules<double, dim>::rule(element.type(), order);
 
   // Get set of shape functions for this element

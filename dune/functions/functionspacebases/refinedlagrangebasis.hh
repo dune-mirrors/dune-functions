@@ -18,8 +18,9 @@
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/transformed/bindcontext.hh>
+#include <dune/functions/functionspacebases/transformed/geometryderivative.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
-#include <dune/functions/functionspacebases/transformed/basisset.hh>
+#include <dune/functions/functionspacebases/transformed/pipeline.hh>
 
 #include <dune/geometry/type.hh>
 
@@ -135,14 +136,10 @@ public:
     Dune::RefinedP0LocalFiniteElement<typename GV::ctype,R,dim>,
     Dune::RefinedP1LocalFiniteElement<typename GV::ctype,R,dim>>;
   using Context = ElementBindContext<Element>;
-  using Transformation = TransformationPipeline<
-    Context,
-    GeometryDerivativePullbackStage<typename Element::Geometry>>;
-  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
-                                                      Context,
-                                                      Transformation,
-                                                      void,
-                                                      TransformedLocalFiniteElementLocalBasis::Reference>;
+  using Transformation = BasisEvaluationPipeline<Context,
+    GeometryDerivativeStage<typename Element::Geometry>>;
+  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
+    Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;
 
   /**
    * \brief The default constructor initializes all members to their default.

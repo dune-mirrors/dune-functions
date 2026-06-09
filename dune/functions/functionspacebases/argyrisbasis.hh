@@ -28,7 +28,9 @@
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/transformed/basisset.hh>
+#include <dune/functions/functionspacebases/transformed/geometryderivative.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/pipeline.hh>
 #include <dune/functions/functionspacebases/transformed/simplexcontext.hh>
 
 /**
@@ -766,16 +768,13 @@ namespace Dune::Functions
       using Context = Dune::Functions::SimplexVertexMeshSizeAndEdgeOrientationContext<Element>;
       using ReferenceFiniteElement = ArgyrisReferenceLocalFiniteElement<D,R>;
       using BasisSetTransformation = ArgyrisBasisSetTransformation<D,R>;
-      using Transformation = Dune::Functions::TransformationPipeline<
-        Context,
+      using Transformation = Dune::Functions::BasisEvaluationPipeline<Context,
         Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
-        Dune::Functions::GeometryDerivativePullbackStage<typename Element::Geometry>>;
+        Dune::Functions::GeometryDerivativeStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<
-        ReferenceFiniteElement,
-        Context,
-        Transformation,
-        void,
-        Dune::Functions::TransformedLocalFiniteElementLocalBasis::Physical>;
+        ReferenceFiniteElement,Context,Transformation,
+        Dune::Functions::NoInterpolationTransformation,
+        Dune::Functions::LocalBasisMode::physical>;
 
     public:
       using size_type = std::size_t;
@@ -823,12 +822,8 @@ namespace Dune::Functions
                 std::vector<std::bitset<3>> const& edgeOrientations,
                 Element const& element)
       {
-        context_.bind(
-          element,
-          vertexMapper,
-          globalAverageVertexMeshSize,
-          elementMapper,
-          edgeOrientations);
+        context_.bind(element, vertexMapper, globalAverageVertexMeshSize,
+          elementMapper, edgeOrientations);
         referenceFiniteElement_.bind(context_);
         transformedFiniteElement_.bind(referenceFiniteElement_, context_);
       }

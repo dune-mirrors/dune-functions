@@ -30,7 +30,9 @@
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/transformed/basisset.hh>
+#include <dune/functions/functionspacebases/transformed/geometryderivative.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
+#include <dune/functions/functionspacebases/transformed/pipeline.hh>
 #include <dune/functions/functionspacebases/transformed/simplexcontext.hh>
 
 
@@ -645,16 +647,13 @@ namespace Dune::Functions
       using Context = Dune::Functions::SimplexVertexMeshSizeContext<Element>;
       using ReferenceFiniteElement = CubicHermiteReferenceLocalFiniteElement<D,R,dim,reduced>;
       using BasisSetTransformation = CubicHermiteBasisSetTransformation<D,R,dim,reduced>;
-      using Transformation = Dune::Functions::TransformationPipeline<
-        Context,
+      using Transformation = Dune::Functions::BasisEvaluationPipeline<Context,
         Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
-        Dune::Functions::GeometryDerivativePullbackStage<typename Element::Geometry>>;
+        Dune::Functions::GeometryDerivativeStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<
-        ReferenceFiniteElement,
-        Context,
-        Transformation,
-        void,
-        Dune::Functions::TransformedLocalFiniteElementLocalBasis::Physical>;
+        ReferenceFiniteElement,Context,Transformation,
+        Dune::Functions::NoInterpolationTransformation,
+        Dune::Functions::LocalBasisMode::physical>;
 
     public:
       CubicHermiteLocalFiniteElement()

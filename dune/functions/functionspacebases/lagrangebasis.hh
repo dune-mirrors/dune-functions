@@ -36,8 +36,9 @@
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 #include <dune/functions/functionspacebases/transformed/bindcontext.hh>
+#include <dune/functions/functionspacebases/transformed/geometryderivative.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
-#include <dune/functions/functionspacebases/transformed/basisset.hh>
+#include <dune/functions/functionspacebases/transformed/pipeline.hh>
 
 #include <dune/grid/common/capabilities.hh>
 
@@ -582,14 +583,10 @@ public:
   using Element = typename GV::template Codim<0>::Entity;
   using ReferenceFiniteElement = typename FiniteElementCache::FiniteElementType;
   using Context = ElementBindContext<Element>;
-  using Transformation = TransformationPipeline<
-    Context,
-    GeometryDerivativePullbackStage<typename Element::Geometry>>;
-  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
-                                                      Context,
-                                                      Transformation,
-                                                      void,
-                                                      TransformedLocalFiniteElementLocalBasis::Reference>;
+  using Transformation = BasisEvaluationPipeline<Context,
+    GeometryDerivativeStage<typename Element::Geometry>>;
+  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
+    Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;
 
   //! Constructor without order (uses the compile-time value)
   LagrangeNode() :

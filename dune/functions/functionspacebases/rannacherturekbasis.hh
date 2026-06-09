@@ -19,8 +19,9 @@
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
 #include <dune/functions/functionspacebases/leafprebasismixin.hh>
 #include <dune/functions/functionspacebases/transformed/bindcontext.hh>
+#include <dune/functions/functionspacebases/transformed/geometryderivative.hh>
 #include <dune/functions/functionspacebases/transformed/localfiniteelement.hh>
-#include <dune/functions/functionspacebases/transformed/basisset.hh>
+#include <dune/functions/functionspacebases/transformed/pipeline.hh>
 
 
 namespace Dune {
@@ -157,17 +158,13 @@ public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
   using ReferenceFiniteElement = std::conditional_t<hasFixedElementType,
-                                                    std::conditional_t<type.isCube(),CubeFiniteElement,SimplexFiniteElement>,
-                                                    LocalFiniteElementVariant<CubeFiniteElement, SimplexFiniteElement> >;
+    std::conditional_t<type.isCube(), CubeFiniteElement, SimplexFiniteElement>,
+    LocalFiniteElementVariant<CubeFiniteElement, SimplexFiniteElement> >;
   using Context = ElementBindContext<Element>;
-  using Transformation = TransformationPipeline<
-    Context,
-    GeometryDerivativePullbackStage<typename Element::Geometry>>;
-  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement,
-                                                      Context,
-                                                      Transformation,
-                                                      void,
-                                                      TransformedLocalFiniteElementLocalBasis::Reference>;
+  using Transformation = BasisEvaluationPipeline<Context,
+    GeometryDerivativeStage<typename Element::Geometry>>;
+  using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
+    Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;
 
   RannacherTurekNode() :
     referenceFiniteElement_()
@@ -193,8 +190,9 @@ public:
   {
     context_.bind(e);
     if constexpr (!hasFixedElementType)
-      referenceFiniteElement_ = e.type().isCube() ? static_cast<ReferenceFiniteElement>(CubeFiniteElement())
-                                                  : static_cast<ReferenceFiniteElement>(SimplexFiniteElement()) ;
+      referenceFiniteElement_ = e.type().isCube()
+        ? static_cast<ReferenceFiniteElement>(CubeFiniteElement())
+        : static_cast<ReferenceFiniteElement>(SimplexFiniteElement()) ;
     finiteElement_.bind(referenceFiniteElement_, context_);
     this->setSize(finiteElement_.size());
   }

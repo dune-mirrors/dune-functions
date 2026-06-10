@@ -192,6 +192,38 @@ auto makeUniformDescriptor (std::size_t n, Child child)
 
 namespace Impl {
 
+template <class, class = void>
+struct BlockType
+{
+  using type = Unknown;
+};
+
+template <class ChildDescriptor>
+struct BlockType<Vector<ChildDescriptor>> : std::type_identity<ChildDescriptor>
+{
+};
+
+template <class ChildDescriptor>
+struct BlockType<UniformVector<ChildDescriptor>> : std::type_identity<ChildDescriptor>
+{
+};
+
+template <class ChildDescriptor, std::size_t i>
+struct BlockType<Array<ChildDescriptor, i>> : std::type_identity<ChildDescriptor>
+{
+};
+
+template <class ChildDescriptor, std::size_t i>
+struct BlockType<UniformArray<ChildDescriptor, i>> : std::type_identity<ChildDescriptor>
+{
+};
+
+template <class... ChildDescriptors>
+struct BlockType<Tuple<ChildDescriptors...>, std::void_t<std::common_type_t<ChildDescriptors...>>>
+    : std::type_identity<std::common_type_t<ChildDescriptors...>>
+{
+};
+
 template<class InnerFunc, class LeafFunc>
 struct TreeTransform
 {

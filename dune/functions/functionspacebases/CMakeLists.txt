@@ -43,4 +43,5 @@ install(FILES
         taylorhoodbasis.hh
         transformedfiniteelementmixin.hh
         transformedindexbasis.hh
+        vectorbasis.hh
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases)

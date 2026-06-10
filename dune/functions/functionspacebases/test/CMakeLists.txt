@@ -45,6 +45,8 @@ dune_add_test(SOURCES subspacebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES compositebasistest.cc LABELS quick)
 
+dune_add_test(SOURCES vectorbasistest.cc LABELS quick)
+
 dune_add_test(SOURCES makebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES hierarchicallagrangebasistest.cc LABELS quick)

@@ -12,6 +12,7 @@ install(FILES
         functionconcepts.hh
         geometryinancestor.hh
         indexaccess.hh
+        innerproduct.hh
         interfaces.hh
         localfunction.hh
         localfunction_imp.hh
@@ -19,6 +20,7 @@ install(FILES
         multiindex.hh
         overflowarray.hh
         polymorphicsmallobject.hh
+        pullback.hh
         reserveddeque.hh
         signature.hh
         squeezetensor.hh

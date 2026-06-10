@@ -78,6 +78,8 @@ std::string derivativeName(Derivative)
     return "Hessian";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Divergence>)
     return "Divergence";
+  else if constexpr (std::is_same_v<Derivative,Derivatives::DivDiv>)
+    return "DivDiv";
   else if constexpr (std::is_same_v<Derivative,Derivatives::Curl>)
     return "Curl";
   else
@@ -87,15 +89,20 @@ std::string derivativeName(Derivative)
 /**
  * \brief Default physical step length for central finite differences.
  *
- * For first derivatives, the central-difference truncation error is O(h^2)
- * while roundoff behaves like eps/h.  Thus eps^(1/3) is a more balanced
- * default than sqrt(eps).
+ * For first derivatives this uses eps^(1/3). Second derivatives use
+ * eps^(1/4) to account for their stronger roundoff amplification.
  */
-template<class Basis>
+template<class Basis, class Derivative>
 double finiteDifferenceEpsilon()
 {
   using Field = TestField<Basis>;
-  return std::cbrt(static_cast<double>(std::numeric_limits<Field>::epsilon()));
+  auto epsilon = static_cast<double>(std::numeric_limits<Field>::epsilon());
+  if constexpr (std::is_same_v<Derivative,Derivatives::Hessian>
+    || std::is_same_v<Derivative,Derivatives::Laplacian>
+    || std::is_same_v<Derivative,Derivatives::DivDiv>)
+    return std::sqrt(std::sqrt(epsilon));
+  else
+    return std::cbrt(epsilon);
 }
 
 /**
@@ -335,6 +342,77 @@ finiteDifference(Basis const& basis,
 }
 
 /**
+ * \brief Approximate the double divergence of a symmetric tensor field.
+ */
+template<class Basis, class Geometry>
+typename Basis::template DerivativeRange<Derivatives::DivDiv>
+finiteDifference(Basis const& basis,
+                 Geometry const& geometry,
+                 GeometryType type,
+                 Derivatives::DivDiv,
+                 typename Basis::Domain const& x,
+                 std::size_t shapeFunction,
+                 double epsilon)
+{
+  static_assert(Geometry::mydimension == Geometry::coorddimension);
+
+  using Result = typename Basis::template DerivativeRange<Derivatives::DivDiv>;
+  Result divDiv{};
+
+  std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> centerValues;
+  basis.evaluate(Derivatives::Value{},x,centerValues);
+
+  for (auto i : Dune::range(Geometry::coorddimension)) {
+    typename Basis::Domain up;
+    typename Basis::Domain down;
+    if (shiftedPointsInside<Basis>(geometry,type,x,i,epsilon,up,down)) {
+      std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> upValues;
+      std::vector<typename Basis::template DerivativeRange<Derivatives::Value>> downValues;
+      basis.evaluate(Derivatives::Value{},up,upValues);
+      basis.evaluate(Derivatives::Value{},down,downValues);
+      divDiv += (upValues[shapeFunction][i][i]
+        - 2*centerValues[shapeFunction][i][i]
+        + downValues[shapeFunction][i][i])/(epsilon*epsilon);
+    }
+
+    for (auto j : Dune::range(i)) {
+      auto stepI = localStepForPhysicalDirection<Basis>(geometry,x,i,epsilon);
+      auto stepJ = localStepForPhysicalDirection<Basis>(geometry,x,j,epsilon);
+      std::array<typename Basis::Domain,4> points{x,x,x,x};
+      points[0] += stepI;
+      points[0] += stepJ;
+      points[1] += stepI;
+      points[1] -= stepJ;
+      points[2] -= stepI;
+      points[2] += stepJ;
+      points[3] -= stepI;
+      points[3] -= stepJ;
+
+      auto const& referenceElement = ReferenceElements<
+        typename Basis::Domain::value_type,
+        Basis::Traits::dimDomain>::general(type);
+      if (std::ranges::all_of(points,[&](auto const& point) {
+            return referenceElement.checkInside(point);
+          })) {
+        std::array<std::vector<
+          typename Basis::template DerivativeRange<Derivatives::Value>>,4> values;
+        for (auto pointIndex : Dune::range(points.size()))
+          basis.evaluate(Derivatives::Value{},points[pointIndex],values[pointIndex]);
+
+        auto mixedDerivative =
+          (values[0][shapeFunction][i][j]
+           - values[1][shapeFunction][i][j]
+           - values[2][shapeFunction][i][j]
+           + values[3][shapeFunction][i][j])/(4*epsilon*epsilon);
+        divDiv += 2*mixedDerivative;
+      }
+    }
+  }
+
+  return divDiv;
+}
+
+/**
  * \brief Approximate curl by central differences of transformed values.
  */
 template<class Basis, class Geometry>
@@ -491,7 +569,7 @@ TestSuite testTransformedLocalFiniteElement(LocalFiniteElement const& finiteElem
 
   test.check(finiteElement.size() == basis.size(), "finite element and physical basis sizes agree");
   (test.subTest(Impl::testDerivative(basis, element, derivatives, 4,
-    Impl::finiteDifferenceEpsilon<Basis>(),
+    Impl::finiteDifferenceEpsilon<Basis,Derivatives>(),
     Impl::finiteDifferenceTolerance<Basis>())), ...);
 
   return test;

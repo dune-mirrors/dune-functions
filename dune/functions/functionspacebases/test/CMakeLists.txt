@@ -23,6 +23,8 @@ dune_add_test(SOURCES globalvaluedlfetest.cc LABELS quick)
 
 dune_add_test(SOURCES gridviewfunctionspacebasistest.cc LABELS quick)
 
+dune_add_test(SOURCES hellanherrmannjohnsonbasistest.cc LABELS quick)
+
 dune_add_test(SOURCES lagrangebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES lagrangedgbasistest.cc LABELS quick)

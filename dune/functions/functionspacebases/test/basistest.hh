@@ -24,6 +24,7 @@
 
 #include <dune/geometry/quadraturerules.hh>
 
+#include <dune/functions/common/pullback.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
 #include <dune/functions/functionspacebases/test/testboundlocalfe.hh>
@@ -455,6 +456,19 @@ struct EnableNormalContinuityCheck : public EnableContinuityCheck
       return jump * intersection.unitOuterNormal(x);
     };
     return localJumpContinuityCheck(normalJump, order_, tol_);
+  }
+};
+
+// Enable a normal-normal continuity check for symmetric tensor-valued bases.
+struct EnableNormalNormalContinuityCheck : public EnableContinuityCheck
+{
+  auto localContinuityCheck() const
+  {
+    auto normalNormalJump = [](auto&& jump, auto&& intersection, auto&& x) -> double {
+      auto normal = intersection.unitOuterNormal(x);
+      return Dune::Functions::Impl::pullback(jump,normal);
+    };
+    return localJumpContinuityCheck(normalNormalJump, order_, tol_);
   }
 };
 

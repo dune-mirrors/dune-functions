@@ -35,6 +35,9 @@ struct Gradient { bool operator==(Gradient const&) const = default; };
 //! Select evaluation of divergences.
 struct Divergence { bool operator==(Divergence const&) const = default; };
 
+//! Select evaluation of the double divergence of tensor-valued functions.
+struct DivDiv { bool operator==(DivDiv const&) const = default; };
+
 //! Select evaluation of curls.
 struct Curl { bool operator==(Curl const&) const = default; };
 

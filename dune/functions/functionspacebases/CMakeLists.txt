@@ -20,6 +20,8 @@ install(FILES
         flatvectorview.hh
         functionaldescriptor.hh
         globalvaluedlocalfiniteelement.hh
+        hellanherrmannjohnsonbasis.hh
+        hellanherrmannjohnsonbasis_inc.hh
         hierarchicallagrangebasis.hh
         hierarchicallagrangewithelementbubblebasis.hh
         hierarchicnodetorangemap.hh

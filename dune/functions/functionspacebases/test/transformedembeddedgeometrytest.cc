@@ -94,6 +94,23 @@ public:
     out[0][1][0] = 2;
     out[0][1][1] = 3;
   }
+
+  void evaluateDivergence(typename Traits::DomainType const&,
+                          std::vector<double>& out) const
+  {
+    divergenceEvaluated = true;
+    out = {4};
+  }
+
+  void evaluateCurl(typename Traits::DomainType const&,
+                    std::vector<double>& out) const
+  {
+    curlEvaluated = true;
+    out = {1};
+  }
+
+  mutable bool divergenceEvaluated = false;
+  mutable bool curlEvaluated = false;
 };
 
 class AffineScalarLocalBasis
@@ -124,9 +141,38 @@ public:
 class ScalarLocalBasis2
 {
 public:
-  using Traits = Dune::LocalBasisTraits<
-    double,2,Dune::FieldVector<double,2>,
-    double,1,Dune::FieldVector<double,1>,Dune::FieldMatrix<double,1,2>>;
+  struct Traits : Dune::LocalBasisTraits<
+      double,2,Dune::FieldVector<double,2>,
+      double,1,Dune::FieldVector<double,1>,Dune::FieldMatrix<double,1,2>>
+  {
+    using HessianType = Dune::FieldMatrix<double,2,2>;
+  };
+
+  std::size_t size() const { return 1; }
+  int order() const { return 2; }
+
+  void evaluateFunction(typename Traits::DomainType const& x,
+                        std::vector<typename Traits::RangeType>& out) const
+  {
+    out.resize(1);
+    out[0][0] = x[0]*x[0] + 3*x[1]*x[1];
+  }
+
+  void evaluateHessian(typename Traits::DomainType const&,
+                       std::vector<typename Traits::HessianType>& out) const
+  {
+    out.resize(1);
+    out[0] = 0;
+    out[0][0][0] = 2;
+    out[0][1][1] = 6;
+  }
+
+  void evaluateLaplacian(typename Traits::DomainType const&,
+                         std::vector<typename Traits::RangeType>& out) const
+  {
+    out.resize(1);
+    out[0][0] = 8;
+  }
 };
 
 struct DummyLocalCoefficients {};
@@ -187,6 +233,9 @@ void testContravariantSurfacePiola(Dune::TestSuite& test)
 
   std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Value>> values;
   std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Divergence>> divergences;
+  using DivergenceBuffer = decltype(basis)::PrecomputeBuffer<
+    Dune::Functions::Derivatives::Divergence>;
+  static_assert(std::same_as<typename DivergenceBuffer::value_type,double>);
   basis.evaluate(Dune::Functions::Derivatives::Value{},x,values);
   basis.evaluate(Dune::Functions::Derivatives::Divergence{},x,divergences);
 
@@ -194,6 +243,8 @@ void testContravariantSurfacePiola(Dune::TestSuite& test)
   test.check(close(values[0][1],5.0/8.0));
   test.check(close(values[0][2],0.0));
   test.check(close(divergences[0],4.0/6.0));
+  test.check(vectorBasis.divergenceEvaluated,
+    "contravariant Piola precomputation uses reference divergence directly");
 
   Transformation transformation;
   transformation.bind(surfaceContext);
@@ -227,6 +278,9 @@ void testCovariantSurfacePiola(Dune::TestSuite& test)
 
   std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Value>> values;
   std::vector<decltype(basis)::DerivativeRange<Dune::Functions::Derivatives::Curl>> curls;
+  using CurlBuffer = decltype(basis)::PrecomputeBuffer<
+    Dune::Functions::Derivatives::Curl>;
+  static_assert(std::same_as<typename CurlBuffer::value_type,double>);
   basis.evaluate(Dune::Functions::Derivatives::Value{},x,values);
   basis.evaluate(Dune::Functions::Derivatives::Curl{},x,curls);
 
@@ -234,6 +288,8 @@ void testCovariantSurfacePiola(Dune::TestSuite& test)
   test.check(close(values[0][1],5.0/12.0));
   test.check(close(values[0][2],0.0));
   test.check(close(curls[0],1.0/6.0));
+  test.check(vectorBasis.curlEvaluated,
+    "covariant Piola precomputation uses reference curl directly");
 
   Transformation transformation;
   transformation.bind(surfaceContext);
@@ -268,7 +324,7 @@ void testScalarGradientAndPipeline(Dune::TestSuite& test)
     AffineScalarLocalBasis,
     CurveContext,
     Dune::Functions::Derivatives::Curl>);
-  using ScalarTransformation = Dune::Functions::BasisEvaluationPipeline<
+  using ScalarTransformation = Dune::Functions::GeometryDerivativePipeline<
     CurveContext,CurveStage>;
   AffineScalarLocalBasis scalarBasis;
   Dune::Functions::TransformedLocalBasis<
@@ -278,6 +334,15 @@ void testScalarGradientAndPipeline(Dune::TestSuite& test)
 
   std::vector<decltype(transformedScalarBasis)::DerivativeRange<
     Dune::Functions::Derivatives::Gradient>> gradients;
+  typename decltype(transformedScalarBasis)::PrecomputeBuffer<
+    Dune::Functions::Derivatives::Gradient> gradientBuffer;
+  transformedScalarBasis.precompute(
+    Dune::Functions::Derivatives::Gradient{},
+    Dune::FieldVector<double,1>{0.5},
+    gradientBuffer);
+  static_assert(std::same_as<
+    typename decltype(gradientBuffer.reference)::value_type,
+    Dune::FieldVector<double,1>>);
   transformedScalarBasis.evaluate(
     Dune::Functions::Derivatives::Gradient{},Dune::FieldVector<double,1>{0.5},gradients);
   test.check(close(gradients[0][0],0.25));
@@ -304,6 +369,46 @@ void testScalarGradientAndPipeline(Dune::TestSuite& test)
     "pipeline intermediate storage is reused");
   test.check(customBuffer.reference == referenceValues,
     "pipeline finalization leaves cached reference values unchanged");
+}
+
+/**
+ * \brief Check semantic reference Laplacians and Hessian-based physical Laplacians.
+ */
+void testReferenceOperatorSelection(Dune::TestSuite& test)
+{
+  ScalarLocalBasis2 localBasis;
+  Dune::FieldVector<double,2> x{0.25,0.25};
+
+  std::vector<Dune::FieldVector<double,1>> referenceLaplacians;
+  Dune::Functions::ReferenceLocalBasisEvaluator{}.evaluate(
+    Dune::Functions::Derivatives::Laplacian{},localBasis,x,referenceLaplacians);
+  test.check(close(referenceLaplacians[0][0],8),
+    "reference evaluator computes the named reference Laplacian");
+
+  using Geometry = Dune::MultiLinearGeometry<double,2,2>;
+  std::vector<Dune::FieldVector<double,2>> corners{
+    {0,0},{2,0},{0,3}};
+  Geometry geometry(Dune::GeometryTypes::simplex(2),corners);
+  using Context = Dune::Functions::GeometryBindContext<Geometry>;
+  Context context(geometry);
+  using Transformation = Dune::Functions::GeometryDerivativePipeline<
+    Context,Dune::Functions::GeometryDerivativeStage<Geometry>>;
+  Dune::Functions::TransformedLocalBasis<
+    ScalarLocalBasis2,Context,Transformation> basis;
+  basis.bind(localBasis);
+  basis.bind(context);
+
+  using LaplacianBuffer = decltype(basis)::PrecomputeBuffer<
+    Dune::Functions::Derivatives::Laplacian>;
+  static_assert(std::same_as<
+    typename decltype(std::declval<LaplacianBuffer>().reference)::value_type,
+    Dune::FieldMatrix<double,2,2>>);
+
+  std::vector<decltype(basis)::DerivativeRange<
+    Dune::Functions::Derivatives::Laplacian>> physicalLaplacians;
+  basis.evaluate(Dune::Functions::Derivatives::Laplacian{},x,physicalLaplacians);
+  test.check(close(physicalLaplacians[0][0],7.0/6.0),
+    "geometry pipeline obtains the physical Laplacian from the reference Hessian");
 }
 
 /**
@@ -339,7 +444,7 @@ void testPolicyConstraintsAndHessianRejection(Dune::TestSuite& test)
     "non-affine physical Hessians are rejected explicitly");
 
   using Context = Dune::Functions::GeometryBindContext<NonAffineGeometry>;
-  using Transformation = Dune::Functions::BasisEvaluationPipeline<
+  using Transformation = Dune::Functions::GeometryDerivativePipeline<
     Context,Dune::Functions::GeometryDerivativeStage<NonAffineGeometry>>;
   static_assert(Dune::Functions::Concept::ReferenceLocalFiniteElement<
     ReferenceLocalFiniteElement>);
@@ -372,6 +477,7 @@ int main()
   testContravariantSurfacePiola(test);
   testCovariantSurfacePiola(test);
   testScalarGradientAndPipeline(test);
+  testReferenceOperatorSelection(test);
   testPolicyConstraintsAndHessianRejection(test);
 
   return test.exit();

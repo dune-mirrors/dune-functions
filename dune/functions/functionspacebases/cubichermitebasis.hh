@@ -647,7 +647,7 @@ namespace Dune::Functions
       using Context = Dune::Functions::SimplexVertexMeshSizeContext<Element>;
       using ReferenceFiniteElement = CubicHermiteReferenceLocalFiniteElement<D,R,dim,reduced>;
       using BasisSetTransformation = CubicHermiteBasisSetTransformation<D,R,dim,reduced>;
-      using Transformation = Dune::Functions::BasisEvaluationPipeline<Context,
+      using Transformation = Dune::Functions::GeometryDerivativePipeline<Context,
         Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
         Dune::Functions::GeometryDerivativeStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<

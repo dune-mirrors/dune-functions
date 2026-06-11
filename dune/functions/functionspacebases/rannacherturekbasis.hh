@@ -161,7 +161,7 @@ public:
     std::conditional_t<type.isCube(), CubeFiniteElement, SimplexFiniteElement>,
     LocalFiniteElementVariant<CubeFiniteElement, SimplexFiniteElement> >;
   using Context = ElementBindContext<Element>;
-  using Transformation = BasisEvaluationPipeline<Context,
+  using Transformation = GeometryDerivativePipeline<Context,
     GeometryDerivativeStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
     Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;

@@ -8,67 +8,116 @@
 #define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_TRANSFORMED_REFERENCEEVALUATION_HH
 
 #include <array>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <dune/common/fmatrix.hh>
+#include <dune/common/fvector.hh>
 #include <dune/common/rangeutilities.hh>
 
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
-#include <dune/functions/functionspacebases/transformed/derivativetraits.hh>
 
 namespace Dune::Functions {
 
 namespace Impl {
 
-template<class LocalBasis, class Derivative>
-struct ReferenceDerivativeRange;
+template<class LocalBasis>
+using ReferenceHessianMatrix = FieldMatrix<
+  typename LocalBasis::Traits::RangeFieldType,
+  LocalBasis::Traits::dimDomain,
+  LocalBasis::Traits::dimDomain>;
 
 template<class LocalBasis>
-struct ReferenceDerivativeRange<LocalBasis,Derivatives::Value>
+using ReferenceHessianTensor = std::array<
+  ReferenceHessianMatrix<LocalBasis>,
+  LocalBasis::Traits::dimRange>;
+
+template<class LocalBasis, bool hasHessianType>
+struct ReferenceHessianRange;
+
+template<class LocalBasis>
+struct ReferenceHessianRange<LocalBasis,true>
+{
+  using type = typename LocalBasis::Traits::HessianType;
+};
+
+template<class LocalBasis>
+struct ReferenceHessianRange<LocalBasis,false>
+{
+  using type = std::conditional_t<
+    LocalBasis::Traits::dimRange == 1,
+    ReferenceHessianMatrix<LocalBasis>,
+    ReferenceHessianTensor<LocalBasis>>;
+};
+
+template<class LocalBasis, class Derivative>
+struct ReferenceOperatorRange;
+
+template<class LocalBasis>
+struct ReferenceOperatorRange<LocalBasis,Derivatives::Value>
 {
   using type = typename LocalBasis::Traits::RangeType;
 };
 
 template<class LocalBasis>
-struct ReferenceDerivativeRange<LocalBasis,Derivatives::Jacobian>
+struct ReferenceOperatorRange<LocalBasis,Derivatives::Jacobian>
 {
   using type = typename LocalBasis::Traits::JacobianType;
 };
 
 template<class LocalBasis>
-struct ReferenceDerivativeRange<LocalBasis,Derivatives::Gradient>
-  : ReferenceDerivativeRange<LocalBasis,Derivatives::Jacobian>
-{};
-
-template<class LocalBasis>
-struct ReferenceDerivativeRange<LocalBasis,Derivatives::Divergence>
-  : ReferenceDerivativeRange<LocalBasis,Derivatives::Jacobian>
-{};
-
-template<class LocalBasis>
-struct ReferenceDerivativeRange<LocalBasis,Derivatives::Curl>
-  : ReferenceDerivativeRange<LocalBasis,Derivatives::Jacobian>
-{};
-
-template<class LocalBasis>
-struct ReferenceDerivativeRange<LocalBasis,Derivatives::Hessian>
+struct ReferenceOperatorRange<LocalBasis,Derivatives::Gradient>
 {
-  using type = typename PullbackPrecomputeBuffer<LocalBasis,Derivatives::Hessian>::type::value_type;
+  static_assert(LocalBasis::Traits::dimRange == 1);
+  using type = FieldVector<
+    typename LocalBasis::Traits::RangeFieldType,
+    LocalBasis::Traits::dimDomain>;
 };
 
 template<class LocalBasis>
-struct ReferenceDerivativeRange<LocalBasis,Derivatives::Laplacian>
-  : ReferenceDerivativeRange<LocalBasis,Derivatives::Hessian>
-{};
+struct ReferenceOperatorRange<LocalBasis,Derivatives::Divergence>
+{
+  using type = typename LocalBasis::Traits::RangeFieldType;
+};
+
+template<class LocalBasis>
+struct ReferenceOperatorRange<LocalBasis,Derivatives::Curl>
+{
+  using Field = typename LocalBasis::Traits::RangeFieldType;
+  using type = std::conditional_t<
+    LocalBasis::Traits::dimDomain == 2,
+    Field,
+    FieldVector<Field,3>>;
+};
+
+template<class LocalBasis>
+struct ReferenceOperatorRange<LocalBasis,Derivatives::Hessian>
+{
+  using type = typename ReferenceHessianRange<
+    LocalBasis,
+    requires { typename LocalBasis::Traits::HessianType; }>::type;
+};
+
+template<class LocalBasis>
+struct ReferenceOperatorRange<LocalBasis,Derivatives::Laplacian>
+{
+  using type = typename LocalBasis::Traits::RangeType;
+};
 
 } // namespace Impl
 
 /**
- * \brief Evaluate the reference quantity needed for a transformed derivative.
+ * \brief Evaluate named differential operators on a reference local basis.
+ *
+ * Each derivative tag denotes the corresponding mathematical operator on the
+ * reference element. Selecting a different reference operator as input for a
+ * physical transformation is the responsibility of ReferenceEvaluation.
  */
 struct ReferenceLocalBasisEvaluator
 {
   template<class Derivative, class LocalBasis>
-  using Range = typename Impl::ReferenceDerivativeRange<LocalBasis,Derivative>::type;
+  using Range = typename Impl::ReferenceOperatorRange<LocalBasis,Derivative>::type;
 
   template<class LocalBasis, class Out>
   void evaluate(Derivatives::Value,
@@ -79,12 +128,8 @@ struct ReferenceLocalBasisEvaluator
     localBasis.evaluateFunction(x,out);
   }
 
-  template<class Derivative, class LocalBasis, class Out>
-    requires (std::is_same_v<Derivative,Derivatives::Jacobian>
-           || std::is_same_v<Derivative,Derivatives::Gradient>
-           || std::is_same_v<Derivative,Derivatives::Divergence>
-           || std::is_same_v<Derivative,Derivatives::Curl>)
-  void evaluate(Derivative,
+  template<class LocalBasis, class Out>
+  void evaluate(Derivatives::Jacobian,
                 LocalBasis const& localBasis,
                 typename LocalBasis::Traits::DomainType const& x,
                 Out& out) const
@@ -92,10 +137,71 @@ struct ReferenceLocalBasisEvaluator
     localBasis.evaluateJacobian(x,out);
   }
 
-  template<class Derivative, class LocalBasis, class Out>
-    requires (std::is_same_v<Derivative,Derivatives::Hessian>
-           || std::is_same_v<Derivative,Derivatives::Laplacian>)
-  void evaluate(Derivative,
+  template<class LocalBasis, class Out>
+  void evaluate(Derivatives::Gradient,
+                LocalBasis const& localBasis,
+                typename LocalBasis::Traits::DomainType const& x,
+                Out& out) const
+  {
+    if constexpr (requires { localBasis.evaluateGradient(x,out); })
+      localBasis.evaluateGradient(x,out);
+    else {
+      std::vector<Range<Derivatives::Jacobian,LocalBasis>> jacobians;
+      localBasis.evaluateJacobian(x,jacobians);
+      out.resize(jacobians.size());
+      for (auto i : Dune::range(out.size()))
+        out[i] = jacobians[i][0];
+    }
+  }
+
+  template<class LocalBasis, class Out>
+  void evaluate(Derivatives::Divergence,
+                LocalBasis const& localBasis,
+                typename LocalBasis::Traits::DomainType const& x,
+                Out& out) const
+  {
+    if constexpr (requires { localBasis.evaluateDivergence(x,out); })
+      localBasis.evaluateDivergence(x,out);
+    else {
+      std::vector<Range<Derivatives::Jacobian,LocalBasis>> jacobians;
+      localBasis.evaluateJacobian(x,jacobians);
+      out.resize(jacobians.size());
+      for (auto i : Dune::range(out.size())) {
+        out[i] = {};
+        for (auto j : Dune::range(LocalBasis::Traits::dimDomain))
+          out[i] += jacobians[i][j][j];
+      }
+    }
+  }
+
+  template<class LocalBasis, class Out>
+    requires (LocalBasis::Traits::dimDomain == 2
+           || LocalBasis::Traits::dimDomain == 3)
+  void evaluate(Derivatives::Curl,
+                LocalBasis const& localBasis,
+                typename LocalBasis::Traits::DomainType const& x,
+                Out& out) const
+  {
+    if constexpr (requires { localBasis.evaluateCurl(x,out); })
+      localBasis.evaluateCurl(x,out);
+    else {
+      std::vector<Range<Derivatives::Jacobian,LocalBasis>> jacobians;
+      localBasis.evaluateJacobian(x,jacobians);
+      out.resize(jacobians.size());
+      if constexpr (LocalBasis::Traits::dimDomain == 2)
+        for (auto i : Dune::range(out.size()))
+          out[i] = jacobians[i][1][0] - jacobians[i][0][1];
+      else
+        for (auto i : Dune::range(out.size())) {
+          out[i][0] = jacobians[i][2][1] - jacobians[i][1][2];
+          out[i][1] = jacobians[i][0][2] - jacobians[i][2][0];
+          out[i][2] = jacobians[i][1][0] - jacobians[i][0][1];
+        }
+    }
+  }
+
+  template<class LocalBasis, class Out>
+  void evaluate(Derivatives::Hessian,
                 LocalBasis const& localBasis,
                 typename LocalBasis::Traits::DomainType const& x,
                 Out& out) const
@@ -114,14 +220,85 @@ struct ReferenceLocalBasisEvaluator
           ++order[j];
           localBasis.partial(order,x,partialValues);
 
-          for (auto k : Dune::range(out.size()))
-            for (auto r : Dune::range(LocalBasis::Traits::dimRange)) {
-              out[k][r][i][j] = partialValues[k][r];
-              out[k][r][j][i] = partialValues[k][r];
+          for (auto k : Dune::range(out.size())) {
+            if constexpr (LocalBasis::Traits::dimRange == 1) {
+              out[k][i][j] = partialValues[k][0];
+              out[k][j][i] = partialValues[k][0];
             }
+            else
+              for (auto r : Dune::range(LocalBasis::Traits::dimRange)) {
+                out[k][r][i][j] = partialValues[k][r];
+                out[k][r][j][i] = partialValues[k][r];
+              }
+          }
         }
     }
   }
+
+  template<class LocalBasis, class Out>
+  void evaluate(Derivatives::Laplacian,
+                LocalBasis const& localBasis,
+                typename LocalBasis::Traits::DomainType const& x,
+                Out& out) const
+  {
+    if constexpr (requires { localBasis.evaluateLaplacian(x,out); })
+      localBasis.evaluateLaplacian(x,out);
+    else {
+      std::vector<Range<Derivatives::Hessian,LocalBasis>> hessians;
+      evaluate(Derivatives::Hessian{},localBasis,x,hessians);
+      out.resize(hessians.size());
+      for (auto i : Dune::range(out.size())) {
+        out[i] = {};
+        if constexpr (LocalBasis::Traits::dimRange == 1)
+          for (auto j : Dune::range(LocalBasis::Traits::dimDomain))
+            out[i][0] += hessians[i][j][j];
+        else
+          for (auto r : Dune::range(LocalBasis::Traits::dimRange))
+            for (auto j : Dune::range(LocalBasis::Traits::dimDomain))
+              out[i][r] += hessians[i][r][j][j];
+      }
+    }
+  }
+};
+
+//! Keep the requested derivative as reference evaluation operator.
+struct IdentityReferenceOperator
+{
+  template<class Derivative>
+  using Operator = Derivative;
+};
+
+/**
+ * \brief Adapt requested derivatives to the reference operators needed by a transformation.
+ */
+template<class OperatorPolicy = IdentityReferenceOperator,
+         class Evaluator = ReferenceLocalBasisEvaluator>
+class ReferenceEvaluation
+{
+  public:
+    template<class Derivative>
+    using Operator = typename OperatorPolicy::template Operator<Derivative>;
+
+    template<class Derivative, class LocalBasis>
+    using Range = typename Evaluator::template Range<Operator<Derivative>,LocalBasis>;
+
+    ReferenceEvaluation() = default;
+
+    explicit ReferenceEvaluation(Evaluator evaluator)
+      : evaluator_(std::move(evaluator))
+    {}
+
+    template<class Derivative, class LocalBasis, class Out>
+    void evaluate(Derivative,
+                  LocalBasis const& localBasis,
+                  typename LocalBasis::Traits::DomainType const& x,
+                  Out& out) const
+    {
+      evaluator_.evaluate(Operator<Derivative>{},localBasis,x,out);
+    }
+
+  private:
+    Evaluator evaluator_;
 };
 
 } // namespace Dune::Functions

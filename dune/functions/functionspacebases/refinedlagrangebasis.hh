@@ -136,7 +136,7 @@ public:
     Dune::RefinedP0LocalFiniteElement<typename GV::ctype,R,dim>,
     Dune::RefinedP1LocalFiniteElement<typename GV::ctype,R,dim>>;
   using Context = ElementBindContext<Element>;
-  using Transformation = BasisEvaluationPipeline<Context,
+  using Transformation = GeometryDerivativePipeline<Context,
     GeometryDerivativeStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
     Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;

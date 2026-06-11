@@ -25,9 +25,7 @@ namespace Dune::Functions {
 namespace Impl {
 
 template<class LocalBasis, class Geometry, class Derivative>
-struct ContravariantPiolaRange
-  : StandardDerivativeRange<LocalBasis,Geometry,Derivative>
-{};
+struct ContravariantPiolaRange;
 
 template<class LocalBasis, class Geometry>
 struct ContravariantPiolaRange<LocalBasis,Geometry,Derivatives::Value>
@@ -41,10 +39,17 @@ struct ContravariantPiolaRange<LocalBasis,Geometry,Derivatives::Divergence>
   using type = typename LocalBasis::Traits::RangeFieldType;
 };
 
+template<class LocalBasis, class Geometry>
+struct ContravariantPiolaRange<LocalBasis,Geometry,Derivatives::Jacobian>
+{
+  using type = FieldMatrix<
+    typename LocalBasis::Traits::RangeFieldType,
+    Geometry::coorddimension,
+    Geometry::coorddimension>;
+};
+
 template<class LocalBasis, class Geometry, class Derivative>
-struct CovariantPiolaRange
-  : StandardDerivativeRange<LocalBasis,Geometry,Derivative>
-{};
+struct CovariantPiolaRange;
 
 template<class LocalBasis, class Geometry, int dimension>
 struct CovariantCurlRange
@@ -64,14 +69,22 @@ struct CovariantCurlRange<LocalBasis,Geometry,3>
 
 template<class LocalBasis, class Geometry>
 struct CovariantPiolaRange<LocalBasis,Geometry,Derivatives::Value>
-  : ContravariantPiolaRange<LocalBasis,Geometry,Derivatives::Value>
-{};
+{
+  using type = FieldVector<
+    typename LocalBasis::Traits::RangeFieldType,
+    Geometry::coorddimension>;
+};
 
 template<class LocalBasis, class Geometry>
 struct CovariantPiolaRange<LocalBasis,Geometry,Derivatives::Curl>
   : CovariantCurlRange<LocalBasis,Geometry,Geometry::mydimension>
 {
 };
+
+template<class LocalBasis, class Geometry>
+struct CovariantPiolaRange<LocalBasis,Geometry,Derivatives::Jacobian>
+  : ContravariantPiolaRange<LocalBasis,Geometry,Derivatives::Jacobian>
+{};
 
 template<class LocalBasis, class Geometry, template<class,class,class> class Range>
 struct PiolaDerivativeTraits
@@ -149,7 +162,7 @@ class ContravariantPiolaTransformation
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
     {
-      ReferenceLocalBasisEvaluator{}.evaluate(Derivatives::Value{},localBasis,x,out);
+      evaluator_.evaluate(Derivatives::Value{},localBasis,x,out);
     }
 
     template<class LocalBasis, class Out>
@@ -158,7 +171,7 @@ class ContravariantPiolaTransformation
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
     {
-      ReferenceLocalBasisEvaluator{}.evaluate(Derivatives::Divergence{},localBasis,x,out);
+      evaluator_.evaluate(Derivatives::Divergence{},localBasis,x,out);
     }
 
     template<class LocalBasis, class In, class Out>
@@ -220,15 +233,12 @@ class ContravariantPiolaTransformation
 
       auto integrationElement = geometry_->integrationElement(x);
 
-      for (auto i : Dune::range(in.size())) {
-        out[i] = {};
-        for (auto j : Dune::range(Geometry::mydimension))
-          out[i] += in[i][j][j];
-        out[i] /= integrationElement;
-      }
+      for (auto i : Dune::range(in.size()))
+        out[i] = in[i] / integrationElement;
     }
 
   private:
+    ReferenceLocalBasisEvaluator evaluator_;
     Geometry const* geometry_ = nullptr;
 };
 
@@ -294,7 +304,7 @@ class CovariantPiolaTransformation
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
     {
-      ReferenceLocalBasisEvaluator{}.evaluate(Derivatives::Value{},localBasis,x,out);
+      evaluator_.evaluate(Derivatives::Value{},localBasis,x,out);
     }
 
     template<class LocalBasis, class Out>
@@ -303,7 +313,7 @@ class CovariantPiolaTransformation
                     typename LocalBasis::Traits::DomainType const& x,
                     Out& out) const
     {
-      ReferenceLocalBasisEvaluator{}.evaluate(Derivatives::Curl{},localBasis,x,out);
+      evaluator_.evaluate(Derivatives::Curl{},localBasis,x,out);
     }
 
     template<class LocalBasis, class In, class Out>
@@ -319,8 +329,7 @@ class CovariantPiolaTransformation
       auto jacobianInverseTransposed = geometry_->jacobianInverseTransposed(x);
 
       for (auto i : Dune::range(in.size())) {
-        auto tmp = in[i];
-        auto tmpDenseVector = Impl::DenseVectorView(tmp);
+        auto tmpDenseVector = Impl::DenseVectorView(in[i]);
         auto outDenseVector = Impl::DenseVectorView(out[i]);
         jacobianInverseTransposed.mv(tmpDenseVector, outDenseVector);
       }
@@ -340,25 +349,16 @@ class CovariantPiolaTransformation
       auto integrationElement = geometry_->integrationElement(x);
 
       if constexpr (Geometry::mydimension == 2) {
-        for (auto i : Dune::range(in.size())) {
-          out[i] = in[i][1][0] - in[i][0][1];
-          out[i] /= integrationElement;
-        }
+        for (auto i : Dune::range(in.size()))
+          out[i] = in[i] / integrationElement;
       }
       else {
         static_assert(Geometry::mydimension == 3,
           "CovariantPiolaTransformation::finalize(Curl) supports only intrinsic dimension 2 or 3.");
 
         auto jacobian = geometry_->jacobian(x);
-        using Field = typename LocalBasis::Traits::RangeFieldType;
-
         for (auto i : Dune::range(in.size())) {
-          FieldVector<Field,Geometry::mydimension> referenceCurl;
-          referenceCurl[0] = in[i][2][1] - in[i][1][2];
-          referenceCurl[1] = in[i][0][2] - in[i][2][0];
-          referenceCurl[2] = in[i][1][0] - in[i][0][1];
-
-          auto referenceCurlDenseVector = Impl::DenseVectorView(referenceCurl);
+          auto referenceCurlDenseVector = Impl::DenseVectorView(in[i]);
           auto outDenseVector = Impl::DenseVectorView(out[i]);
           jacobian.mv(referenceCurlDenseVector, outDenseVector);
           out[i] /= integrationElement;
@@ -391,6 +391,7 @@ class CovariantPiolaTransformation
     }
 
   private:
+    ReferenceLocalBasisEvaluator evaluator_;
     Geometry const* geometry_ = nullptr;
 };
 

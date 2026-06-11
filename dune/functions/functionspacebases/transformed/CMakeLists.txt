@@ -6,7 +6,6 @@ install(FILES
         bindcontext.hh
         concepts.hh
         derivative.hh
-        derivativetraits.hh
         geometryderivative.hh
         localfiniteelement.hh
         pipeline.hh

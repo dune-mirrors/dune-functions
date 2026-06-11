@@ -21,6 +21,18 @@ namespace Dune::Functions {
 
 namespace Impl {
 
+template<class Derivative>
+struct GeometryReferenceOperator
+{
+  using type = Derivative;
+};
+
+template<>
+struct GeometryReferenceOperator<Derivatives::Laplacian>
+{
+  using type = Derivatives::Hessian;
+};
+
 template<class Derivative, class LocalBasis, class Geometry, class InputRange>
 struct GeometryDerivativeOutputRange
 {
@@ -49,6 +61,19 @@ struct GeometryDerivativeOutputRange<Derivatives::Laplacian,LocalBasis,Geometry,
 };
 
 } // namespace Impl
+
+/**
+ * \brief Select reference operators required for physical geometry derivatives.
+ *
+ * An affine physical Laplacian depends on the complete reference Hessian. All
+ * other currently supported operations use their corresponding reference
+ * operator directly.
+ */
+struct GeometryDerivativeReferenceOperator
+{
+  template<class Derivative>
+  using Operator = typename Impl::GeometryReferenceOperator<Derivative>::type;
+};
 
 /**
  * \brief Pointwise transformation from reference to physical scalar derivatives.
@@ -97,7 +122,7 @@ class GeometryDerivativeTransformation
     {
       static_assert(LocalBasis::Traits::dimRange == 1);
       assert(!!geometry_);
-      geometry_->jacobianInverseTransposed(x).mv(in[0],out);
+      geometry_->jacobianInverseTransposed(x).mv(in,out);
     }
 
     template<class LocalBasis, class InputRange, class OutputRange>
@@ -143,6 +168,10 @@ class GeometryDerivativeTransformation
 template<class Geometry>
 using GeometryDerivativeStage =
   RangeTransformationStage<GeometryDerivativeTransformation<Geometry>>;
+
+template<class Context, class... Stages>
+using GeometryDerivativePipeline = BasicBasisEvaluationPipeline<
+  ReferenceEvaluation<GeometryDerivativeReferenceOperator>,Context,Stages...>;
 
 } // end namespace Dune::Functions
 

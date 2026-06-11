@@ -229,7 +229,7 @@ class BasicBasisEvaluationPipeline
 
 template<class Context, class... Stages>
 using BasisEvaluationPipeline = BasicBasisEvaluationPipeline<
-  ReferenceLocalBasisEvaluator,Context,Stages...>;
+  ReferenceEvaluation<>,Context,Stages...>;
 
 } // end namespace Dune::Functions
 

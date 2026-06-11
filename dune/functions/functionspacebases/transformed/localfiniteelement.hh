@@ -210,10 +210,14 @@ class TransformedLocalBasis
     }
 
     //! Evaluate all shape function Jacobians using the classic LocalBasis interface.
-    void evaluateJacobian(Domain const& x, std::vector<DerivativeRange<Derivatives::Jacobian>>& out) const
-      requires (Concept::LocalBasisTransformation<Transformation,LocalBasis,Context,Derivatives::Jacobian>)
+    template<class Derivative = Derivatives::Jacobian>
+      requires (std::same_as<Derivative,Derivatives::Jacobian>
+        && Concept::LocalBasisTransformation<
+          Transformation,LocalBasis,Context,Derivative>)
+    void evaluateJacobian(Domain const& x,
+                          std::vector<DerivativeRange<Derivative>>& out) const
     {
-      evaluate(Derivatives::Jacobian{}, x, out);
+      evaluate(Derivative{}, x, out);
     }
 
     //! Compatibility entry point for legacy LocalBasis users.

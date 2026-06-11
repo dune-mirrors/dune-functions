@@ -583,7 +583,7 @@ public:
   using Element = typename GV::template Codim<0>::Entity;
   using ReferenceFiniteElement = typename FiniteElementCache::FiniteElementType;
   using Context = ElementBindContext<Element>;
-  using Transformation = BasisEvaluationPipeline<Context,
+  using Transformation = GeometryDerivativePipeline<Context,
     GeometryDerivativeStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
     Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;

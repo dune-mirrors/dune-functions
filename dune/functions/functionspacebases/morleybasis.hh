@@ -508,7 +508,7 @@ namespace Dune::Functions
       using Context = Dune::Functions::SimplexEdgeOrientationContext<Element>;
       using ReferenceFiniteElement = MorleyReferenceLocalFiniteElement<D,R>;
       using BasisSetTransformation = MorleyBasisSetTransformation<D,R>;
-      using Transformation = Dune::Functions::BasisEvaluationPipeline<Context,
+      using Transformation = Dune::Functions::GeometryDerivativePipeline<Context,
         Dune::Functions::BasisSetTransformationStage<BasisSetTransformation>,
         Dune::Functions::GeometryDerivativeStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<

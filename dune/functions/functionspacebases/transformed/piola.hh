@@ -18,6 +18,7 @@
 #include <dune/common/std/no_unique_address.hh>
 
 #include <dune/functions/common/densevectorview.hh>
+#include <dune/functions/common/pullback.hh>
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
 #include <dune/functions/functionspacebases/transformed/referenceevaluation.hh>
 
@@ -86,6 +87,24 @@ template<class LocalBasis, class Geometry>
 struct CovariantPiolaRange<LocalBasis,Geometry,Derivatives::Jacobian>
   : ContravariantPiolaRange<LocalBasis,Geometry,Derivatives::Jacobian>
 {};
+
+template<class LocalBasis, class Geometry, class Derivative>
+struct DoubleContravariantPiolaRange;
+
+template<class LocalBasis, class Geometry>
+struct DoubleContravariantPiolaRange<LocalBasis,Geometry,Derivatives::Value>
+{
+  using type = FieldMatrix<
+    typename LocalBasis::Traits::RangeFieldType,
+    Geometry::coorddimension,
+    Geometry::coorddimension>;
+};
+
+template<class LocalBasis, class Geometry>
+struct DoubleContravariantPiolaRange<LocalBasis,Geometry,Derivatives::DivDiv>
+{
+  using type = typename LocalBasis::Traits::RangeFieldType;
+};
 
 template<class LocalBasis, class Geometry, template<class,class,class> class Range>
 struct PiolaDerivativeTraits
@@ -393,6 +412,119 @@ class CovariantPiolaTransformation
 
   private:
     DUNE_NO_UNIQUE_ADDRESS ReferenceLocalBasisEvaluator evaluator_;
+    Geometry const* geometry_ = nullptr;
+};
+
+/**
+ * \brief Double-contravariant tensor Piola transformation.
+ *
+ * For an affine geometry with Jacobian \f$J\f$ and volume factor \f$\mu\f$,
+ * values are mapped as
+ * \f$\sigma = \mu^{-2} J\widehat\sigma J^T\f$. The corresponding double
+ * divergence is scaled by \f$\mu^{-2}\f$.
+ */
+template<class Geometry>
+class DoubleContravariantTransformation
+{
+  public:
+    template<class LocalBasis, class Context>
+    using Traits = Impl::PiolaDerivativeTraits<
+      LocalBasis,Geometry,Impl::DoubleContravariantPiolaRange>;
+
+    template<class Context>
+    void bind(Context const& context)
+    {
+      geometry_ = &context.geometry();
+    }
+
+    template<class Function>
+    class LocalValuedFunction
+    {
+      public:
+        LocalValuedFunction(Function function, Geometry const& geometry)
+          : function_(std::move(function))
+          , geometry_(&geometry)
+        {}
+
+        template<class LocalCoordinate>
+        auto operator()(LocalCoordinate const& x) const
+        {
+          auto jacobianInverseTransposed = geometry_->jacobianInverseTransposed(x);
+          auto integrationElement = geometry_->integrationElement(x);
+          auto value = Impl::pullback(
+            Dune::resolveRef(function_)(x),jacobianInverseTransposed);
+          value *= integrationElement*integrationElement;
+          return value;
+        }
+
+      private:
+        Function function_;
+        Geometry const* geometry_;
+    };
+
+    template<class Function>
+    auto localFunctionPullback(Function function) const
+    {
+      assert(!!geometry_);
+      return LocalValuedFunction<Function>(std::move(function),*geometry_);
+    }
+
+    template<class LocalBasis, class Out>
+    void precompute(Derivatives::Value,
+                    LocalBasis const& localBasis,
+                    typename LocalBasis::Traits::DomainType const& x,
+                    Out& out) const
+    {
+      evaluator_.evaluate(Derivatives::Value{},localBasis,x,out);
+    }
+
+    template<class LocalBasis, class Out>
+    void precompute(Derivatives::DivDiv,
+                    LocalBasis const& localBasis,
+                    typename LocalBasis::Traits::DomainType const& x,
+                    Out& out) const
+    {
+      evaluator_.evaluate(Derivatives::DivDiv{},localBasis,x,out);
+    }
+
+    template<class LocalBasis, class In, class Out>
+    void finalize(Derivatives::Value,
+                  LocalBasis const&,
+                  typename LocalBasis::Traits::DomainType const& x,
+                  In const& in,
+                  Out& out) const
+    {
+      assert(!!geometry_);
+      out.resize(in.size());
+
+      auto jacobianTransposed = geometry_->jacobianTransposed(x);
+      auto integrationElement = geometry_->integrationElement(x);
+      for (auto i : Dune::range(in.size())) {
+        out[i] = Impl::pullback(in[i],jacobianTransposed);
+        out[i] /= integrationElement*integrationElement;
+      }
+    }
+
+    template<class LocalBasis, class In, class Out>
+    void finalize(Derivatives::DivDiv,
+                  LocalBasis const&,
+                  typename LocalBasis::Traits::DomainType const& x,
+                  In const& in,
+                  Out& out) const
+    {
+      assert(!!geometry_);
+      if (!geometry_->affine())
+        DUNE_THROW(NotImplemented,
+          "Double-contravariant double divergences require affine geometry");
+
+      out.resize(in.size());
+      auto integrationElement = geometry_->integrationElement(x);
+      for (auto i : Dune::range(in.size()))
+        out[i] = in[i]/(integrationElement*integrationElement);
+    }
+
+  private:
+    ReferenceLocalBasisEvaluator evaluator_;
     Geometry const* geometry_ = nullptr;
 };
 

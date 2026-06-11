@@ -97,6 +97,12 @@ struct ReferenceOperatorRange<LocalBasis,Derivatives::Divergence>
 };
 
 template<class LocalBasis>
+struct ReferenceOperatorRange<LocalBasis,Derivatives::DivDiv>
+{
+  using type = typename LocalBasis::Traits::RangeFieldType;
+};
+
+template<class LocalBasis>
 struct ReferenceOperatorRange<LocalBasis,Derivatives::Curl>
 {
   using Field = typename LocalBasis::Traits::RangeFieldType;
@@ -187,6 +193,20 @@ struct ReferenceLocalBasisEvaluator
           out[i] += jacobians[i][j][j];
       }
     }
+  }
+
+  template<class LocalBasis, class Out>
+    requires requires(LocalBasis const& localBasis,
+                      typename LocalBasis::Traits::DomainType const& x,
+                      Out& out) {
+      localBasis.evaluateDivDiv(x,out);
+    }
+  void evaluate(Derivatives::DivDiv,
+                LocalBasis const& localBasis,
+                typename LocalBasis::Traits::DomainType const& x,
+                Out& out) const
+  {
+    localBasis.evaluateDivDiv(x,out);
   }
 
   template<class LocalBasis, class Out>

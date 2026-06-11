@@ -196,15 +196,11 @@ struct ReferenceLocalBasisEvaluator
   }
 
   template<class LocalBasis, class Out>
-    requires requires(LocalBasis const& localBasis,
-                      typename LocalBasis::Traits::DomainType const& x,
-                      Out& out) {
-      localBasis.evaluateDivDiv(x,out);
-    }
   void evaluate(Derivatives::DivDiv,
                 LocalBasis const& localBasis,
                 typename LocalBasis::Traits::DomainType const& x,
                 Out& out) const
+    requires requires { localBasis.evaluateDivDiv(x,out); }
   {
     localBasis.evaluateDivDiv(x,out);
   }

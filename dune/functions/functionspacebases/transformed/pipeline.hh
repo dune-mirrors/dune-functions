@@ -95,13 +95,8 @@ class RangeTransformationStage
                    typename LocalBasis::Traits::DomainType const& x,
                    std::vector<InputRange> const& in,
                    std::vector<OutputRange>& out) const
-      requires requires(Transformation const& transformation,
-                        Derivative d,
-                        LocalBasis const& basis,
-                        typename LocalBasis::Traits::DomainType const& point,
-                        InputRange const& input,
-                        OutputRange& output) {
-        transformation.transform(d,basis,point,input,output);
+      requires requires(Transformation const& transformation) {
+        transformation.transform(derivative,localBasis,x,in[0],out[0]);
       }
     {
       out.resize(in.size());

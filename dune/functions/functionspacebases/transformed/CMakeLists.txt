@@ -10,6 +10,7 @@ install(FILES
         localfiniteelement.hh
         pipeline.hh
         piola.hh
+        precomputeidentity.hh
         referenceevaluation.hh
         simplexcontext.hh
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/functions/functionspacebases/transformed)

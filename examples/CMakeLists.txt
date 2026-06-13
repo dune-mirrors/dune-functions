@@ -28,3 +28,8 @@ add_executable("poisson-mfem" poisson-mfem.cc)
 target_link_libraries(poisson-mfem PRIVATE Dune::Functions)
 set_property(TARGET poisson-mfem PROPERTY EXCLUDE_FROM_ALL 1)
 add_dependencies(build_examples poisson-mfem)
+
+add_executable("transformed-basis-benchmark" transformed-basis-benchmark.cc)
+target_link_libraries(transformed-basis-benchmark PRIVATE Dune::Functions)
+set_property(TARGET transformed-basis-benchmark PROPERTY EXCLUDE_FROM_ALL 1)
+add_dependencies(build_examples transformed-basis-benchmark)

@@ -4,16 +4,15 @@
 // SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md
 // SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 
-#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_QUADRATUREBASISFUNCTIONCACHE_HH
-#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_QUADRATUREBASISFUNCTIONCACHE_HH
+#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_QUADRATUREBASISFUNCTIONCACHE2_HH
+#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_QUADRATUREBASISFUNCTIONCACHE2_HH
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <tuple>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -47,7 +46,7 @@ namespace Dune::Functions
    * \b Example
    * \code{.cpp}
     auto localView = basis.localView();
-    auto cache = QuadratureBasisFunctionCache<LocalView::Tree, Derivatives::Value>{};
+    auto cache = QuadratureBasisFunctionCache2<LocalView::Tree, Derivatives::Value>{};
     for (auto& e : elements(basis.gridView()))
     {
       localView.bind(e);
@@ -61,7 +60,7 @@ namespace Dune::Functions
    * \endcode
    */
   template <class Tree, class... Derivatives>
-  class QuadratureBasisFunctionCache
+  class QuadratureBasisFunctionCache2
   {
     template <class Node>
     class QuadratureNodeCache
@@ -76,19 +75,6 @@ namespace Dune::Functions
         bool operator==(PrecomputeKey const&) const = default;
       };
 
-      struct PrecomputeKeyHash
-      {
-        std::size_t operator()(PrecomputeKey const& key) const noexcept
-        {
-          auto result = std::hash<void const*>{}(key.basis.object);
-          result ^= std::hash<std::size_t>{}(key.basis.generation)
-            + 0x9e3779b9 + (result << 6) + (result >> 2);
-          result ^= std::hash<void const*>{}(key.quadratureRule)
-            + 0x9e3779b9 + (result << 6) + (result >> 2);
-          return result;
-        }
-      };
-
       //! Buffer type stored in the cache for the quantity selected by D.
       template <class D>
       using PrecomputeBuffer = std::vector<typename Basis::template PrecomputeBuffer<D>>;
@@ -96,8 +82,7 @@ namespace Dune::Functions
       template<class D>
       struct PrecomputeCache
       {
-        std::unordered_map<
-          PrecomputeKey,PrecomputeBuffer<D>,PrecomputeKeyHash> buffers;
+        std::vector<std::pair<PrecomputeKey, PrecomputeBuffer<D>>> buffers;
       };
 
       using PrecomputeCaches = std::tuple<PrecomputeCache<Derivatives>...>;
@@ -184,10 +169,14 @@ namespace Dune::Functions
       std::pair<PrecomputeBuffer<Derivative>&,bool>
       getPrecomputeBuffer (Derivative const& d, PrecomputeKey const& key)
       {
-        auto& buffers =
-          std::get<PrecomputeCache<Derivative>>(precomputeCaches_).buffers;
-        auto [it,inserted] = buffers.try_emplace(key);
-        return {it->second,inserted};
+        using Cache = PrecomputeCache<Derivative>;
+        using Buffer = PrecomputeBuffer<Derivative>;
+        auto& buffers = std::get<Cache>(precomputeCaches_).buffers;
+        if (auto it = std::find_if(buffers.begin(), buffers.end(),
+              [&](auto& v) { return v.first == key; }); it != buffers.end())
+          return {it->second, false};
+        else
+          return {buffers.emplace_back(key,Buffer{}).second, true};
       }
 
       template <class Derivative>
@@ -223,11 +212,11 @@ namespace Dune::Functions
     };
 
   public:
-    QuadratureBasisFunctionCache ()
+    QuadratureBasisFunctionCache2 ()
       : cachedDerivatives_(Derivatives{}...)
     {}
 
-    explicit QuadratureBasisFunctionCache (Derivatives const&... d)
+    explicit QuadratureBasisFunctionCache2 (Derivatives const&... d)
       : cachedDerivatives_(d...)
     {}
 

@@ -75,6 +75,16 @@ void testRuleCachingAndRebinding(TestSuite& test)
     test.check(std::abs(firstRuleValues[0][0][0]-(1-firstRule[0].position()[0])) < 1e-14,
       "precomputed buffers for different quadrature rules must coexist");
 
+  cache.clear();
+  cache.bind(localView);
+  auto const& valuesAfterClear =
+    cache.get().evaluate(Functions::Derivatives::Value{},secondRule);
+  test.check(valuesAfterClear.size() == secondRule.size());
+  if (valuesAfterClear.size() == secondRule.size())
+    test.check(std::abs(valuesAfterClear[0][0][0]
+      -(1-secondRule[0].position()[0])) < 1e-14,
+      "cache must remain usable after explicit invalidation");
+
   test.check(cache.get().size() == 2);
   test.check(cache.get().order() == 1);
   test.check(cache.get().basis().size() == cache.get().size());
@@ -154,6 +164,56 @@ void testMixedDerivativeRanges(TestSuite& test)
   test.check(divergences[0].size() == piolaCache.size());
 }
 
+/**
+ * \brief Check that Piola precomputations distinguish orientation variants.
+ */
+void testPiolaOrientationVariants(TestSuite& test)
+{
+  YaspGrid<2> grid({1.0,1.0},{2,2});
+  auto basis = makeBasis(grid.leafGridView(),raviartThomas<1>());
+  auto localView = basis.localView();
+  QuadratureBasisFunctionCache<
+    typename decltype(localView)::Tree,
+    Functions::Derivatives::Value,
+    Functions::Derivatives::Divergence> cache;
+  auto const& rule =
+    QuadratureRules<double,2>::rule(GeometryTypes::cube(2),3);
+
+  for (auto const& element : elements(basis.gridView())) {
+    localView.bind(element);
+    cache.bind(localView);
+    auto& leafCache = cache.get();
+    auto const& cachedValues =
+      leafCache.evaluate(Functions::Derivatives::Value{},rule);
+    auto const& cachedDivergences =
+      leafCache.evaluate(Functions::Derivatives::Divergence{},rule);
+
+    using PhysicalBasis =
+      typename decltype(localView)::Tree::FiniteElement::PhysicalBasis;
+    std::vector<
+      typename PhysicalBasis::template DerivativeRange<
+        Functions::Derivatives::Value>> values;
+    std::vector<
+      typename PhysicalBasis::template DerivativeRange<
+        Functions::Derivatives::Divergence>> divergences;
+
+    for (std::size_t iq = 0; iq < rule.size(); ++iq) {
+      auto const& position = rule[iq].position();
+      leafCache.basis().evaluate(
+        Functions::Derivatives::Value{},position,values);
+      leafCache.basis().evaluate(
+        Functions::Derivatives::Divergence{},position,divergences);
+
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        test.check((values[i]-cachedValues[iq][i]).two_norm() < 1e-14,
+          "cached Piola values must use the bound orientation variant");
+        test.check(std::abs(divergences[i]-cachedDivergences[iq][i]) < 1e-14,
+          "cached Piola divergences must use the bound orientation variant");
+      }
+    }
+  }
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -164,6 +224,7 @@ int main(int argc, char** argv)
   testRuleCachingAndRebinding(test);
   testHybridGeometryTypes(test);
   testMixedDerivativeRanges(test);
+  testPiolaOrientationVariants(test);
 
   return test.exit();
 }

@@ -10,6 +10,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <memory>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -20,6 +21,7 @@
 
 #include <dune/functions/functionspacebases/transformed/concepts.hh>
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
+#include <dune/functions/functionspacebases/transformed/precomputeidentity.hh>
 
 namespace Dune::Functions {
 
@@ -516,6 +518,26 @@ class TransformedLocalFiniteElement
     {
       assert(!!lfe_);
       return lfe_->localBasis();
+    }
+
+    /**
+     * \brief Return an identity for reference-basis precomputation.
+     *
+     * By default, the identity is the address of the bound reference finite
+     * element. A reference finite element can provide
+     * `precomputeIdentity()` returning LocalBasisPrecomputeIdentity to add a
+     * generation or supply another stable identity.
+     *
+     * The default identity remains valid until the reference finite-element
+     * storage is rebuilt. Caches using it must be cleared after a basis update.
+     */
+    LocalBasisPrecomputeIdentity precomputeIdentity() const
+    {
+      assert(!!lfe_);
+      if constexpr (requires { lfe_->precomputeIdentity(); })
+        return lfe_->precomputeIdentity();
+      else
+        return {std::addressof(*lfe_),0};
     }
 
     /**

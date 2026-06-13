@@ -506,7 +506,7 @@ namespace Dune::Functions
       typename GV::ctype,R,GV::dimension,k>;
     using Transformation = DoubleContravariantTransformation<typename Element::Geometry>;
     using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
-      Transformation, LocalBasisMode::physical, LocalInterpolationMode::transformed>;
+      Transformation, LocalBasisMode::physical, InterpolationMode::transformed>;
 
     HellanHerrmannJohnsonNode() = default;
 

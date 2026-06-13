@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include <dune/common/std/no_unique_address.hh>
+
 #include <dune/functions/functionspacebases/transformed/concepts.hh>
 #include <dune/functions/functionspacebases/transformed/referenceevaluation.hh>
 
@@ -163,7 +165,7 @@ class BasicBasisEvaluationPipeline
       : stages_(std::move(stages)...)
     {}
 
-    BasicBasisEvaluationPipeline(ReferenceEvaluator evaluator, Stages... stages)
+    explicit BasicBasisEvaluationPipeline(ReferenceEvaluator evaluator, Stages... stages)
       : stages_(std::move(stages)...)
       , evaluator_(std::move(evaluator))
     {}
@@ -219,7 +221,7 @@ class BasicBasisEvaluationPipeline
     }
 
     std::tuple<Stages...> stages_;
-    ReferenceEvaluator evaluator_;
+    DUNE_NO_UNIQUE_ADDRESS ReferenceEvaluator evaluator_;
 };
 
 template<class Context, class... Stages>

@@ -15,12 +15,27 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/rangeutilities.hh>
+#include <dune/common/std/no_unique_address.hh>
 
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
 
 namespace Dune::Functions {
 
 namespace Impl {
+
+template <class C>
+static constexpr int rank = std::rank_v<C>;
+
+template <class K, std::size_t N>
+static constexpr int rank<std::array<K,N>> = 1+rank<K>;
+
+template <class K, int N>
+static constexpr int rank<Dune::FieldVector<K,N>> = 1+rank<K>;
+
+template <class K, int N, int M>
+static constexpr int rank<Dune::FieldMatrix<K,N,M>> = 2+rank<K>;
+
+
 
 template<class LocalBasis>
 using ReferenceHessianMatrix = FieldMatrix<
@@ -45,10 +60,10 @@ struct ReferenceHessianRange<LocalBasis,true>
 template<class LocalBasis>
 struct ReferenceHessianRange<LocalBasis,false>
 {
+  using RangeType = typename LocalBasis::Traits::RangeType;
   using type = std::conditional_t<
-    LocalBasis::Traits::dimRange == 1,
-    ReferenceHessianMatrix<LocalBasis>,
-    ReferenceHessianTensor<LocalBasis>>;
+    rank<RangeType> == 0, ReferenceHessianMatrix<LocalBasis>, std::conditional_t<
+    rank<RangeType> == 1, ReferenceHessianTensor<LocalBasis>, void>>;
 };
 
 template<class LocalBasis, class Derivative>
@@ -221,7 +236,7 @@ struct ReferenceLocalBasisEvaluator
           localBasis.partial(order,x,partialValues);
 
           for (auto k : Dune::range(out.size())) {
-            if constexpr (LocalBasis::Traits::dimRange == 1) {
+            if constexpr (Impl::rank<typename Out::value_type> == 2) {
               out[k][i][j] = partialValues[k][0];
               out[k][j][i] = partialValues[k][0];
             }
@@ -249,7 +264,7 @@ struct ReferenceLocalBasisEvaluator
       out.resize(hessians.size());
       for (auto i : Dune::range(out.size())) {
         out[i] = {};
-        if constexpr (LocalBasis::Traits::dimRange == 1)
+        if constexpr (Impl::rank<Range<Derivatives::Hessian,LocalBasis>> == 2)
           for (auto j : Dune::range(LocalBasis::Traits::dimDomain))
             out[i][0] += hessians[i][j][j];
         else
@@ -298,7 +313,7 @@ class ReferenceEvaluation
     }
 
   private:
-    Evaluator evaluator_;
+    DUNE_NO_UNIQUE_ADDRESS Evaluator evaluator_;
 };
 
 } // namespace Dune::Functions

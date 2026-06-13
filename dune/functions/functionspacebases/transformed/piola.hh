@@ -15,6 +15,7 @@
 #include <dune/common/exceptions.hh>
 #include <dune/common/rangeutilities.hh>
 #include <dune/common/referencehelper.hh>
+#include <dune/common/std/no_unique_address.hh>
 
 #include <dune/functions/common/densevectorview.hh>
 #include <dune/functions/functionspacebases/transformed/derivative.hh>
@@ -238,7 +239,7 @@ class ContravariantPiolaTransformation
     }
 
   private:
-    ReferenceLocalBasisEvaluator evaluator_;
+    DUNE_NO_UNIQUE_ADDRESS ReferenceLocalBasisEvaluator evaluator_;
     Geometry const* geometry_ = nullptr;
 };
 
@@ -391,7 +392,7 @@ class CovariantPiolaTransformation
     }
 
   private:
-    ReferenceLocalBasisEvaluator evaluator_;
+    DUNE_NO_UNIQUE_ADDRESS ReferenceLocalBasisEvaluator evaluator_;
     Geometry const* geometry_ = nullptr;
 };
 

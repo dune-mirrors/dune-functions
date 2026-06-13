@@ -224,7 +224,8 @@ public:
   using FiniteElement = TransformedLocalFiniteElement<typename FiniteElementMap::FiniteElement,
                                                       Context,
                                                       CovariantPiolaTransformation<typename Element::Geometry>,
-                                                      CovariantPiolaTransformation<typename Element::Geometry>>;
+                                                      LocalBasisMode::physical,
+                                                      InterpolationMode::transformed>;
 
   NedelecNode(const FiniteElementMap* finiteElementMap) :
     finiteElementMap_(finiteElementMap)

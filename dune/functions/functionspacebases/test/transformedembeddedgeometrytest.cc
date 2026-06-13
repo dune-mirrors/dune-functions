@@ -195,14 +195,14 @@ private:
 };
 
 struct InvalidContext {};
-struct InvalidInterpolationTransformation {};
 
 template<class LocalFiniteElement, class Context, class Transformation,
-         class InterpolationTransformation, Dune::Functions::LocalBasisMode mode>
+         Dune::Functions::LocalBasisMode basisMode,
+         Dune::Functions::InterpolationMode interpolationMode>
 concept ValidTransformedLocalFiniteElement =
   requires {
     typename Dune::Functions::TransformedLocalFiniteElement<
-      LocalFiniteElement,Context,Transformation,InterpolationTransformation,mode>;
+      LocalFiniteElement,Context,Transformation,basisMode,interpolationMode>;
   };
 
 bool close(double a, double b)
@@ -452,20 +452,14 @@ void testPolicyConstraintsAndHessianRejection(Dune::TestSuite& test)
     ReferenceLocalFiniteElement,
     Context,
     Transformation,
-    Dune::Functions::NoInterpolationTransformation,
-    Dune::Functions::LocalBasisMode::physical>);
+    Dune::Functions::LocalBasisMode::physical,
+    Dune::Functions::InterpolationMode::reference>);
   static_assert(!ValidTransformedLocalFiniteElement<
     ReferenceLocalFiniteElement,
     InvalidContext,
     Transformation,
-    Dune::Functions::NoInterpolationTransformation,
-    Dune::Functions::LocalBasisMode::physical>);
-  static_assert(!ValidTransformedLocalFiniteElement<
-    ReferenceLocalFiniteElement,
-    Context,
-    Transformation,
-    InvalidInterpolationTransformation,
-    Dune::Functions::LocalBasisMode::physical>);
+    Dune::Functions::LocalBasisMode::physical,
+    Dune::Functions::InterpolationMode::reference>);
 }
 
 } // namespace

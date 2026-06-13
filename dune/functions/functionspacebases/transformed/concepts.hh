@@ -63,16 +63,6 @@ concept LocalBasisTransformationPolicy =
   };
 
 /**
- * \brief Structural requirements shared by interpolation transformations.
- */
-template<class Transformation, class Context>
-concept InterpolationTransformationPolicy =
-  LocalFiniteElementBindContext<Context> &&
-  requires(Transformation transformation, Context const& context) {
-    transformation.bind(context);
-  };
-
-/**
  * \brief Staged transformation for a selected derivative quantity.
  *
  * The transformation owns the element-dependent part of the evaluation
@@ -112,7 +102,7 @@ concept LocalBasisTransformation =
  */
 template<class Transformation, class Context, class Function>
 concept LocalInterpolationTransformation =
-  InterpolationTransformationPolicy<Transformation,Context> &&
+  LocalFiniteElementBindContext<Context> &&
   requires(Transformation transformation,
            Context const& context,
            Function const& f)

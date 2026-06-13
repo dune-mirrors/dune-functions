@@ -773,7 +773,6 @@ namespace Dune::Functions
         Dune::Functions::GeometryDerivativeStage<typename Element::Geometry>>;
       using TransformedFiniteElement = Dune::Functions::TransformedLocalFiniteElement<
         ReferenceFiniteElement,Context,Transformation,
-        Dune::Functions::NoInterpolationTransformation,
         Dune::Functions::LocalBasisMode::physical>;
 
     public:

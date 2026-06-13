@@ -236,7 +236,7 @@ public:
   using Context = ElementBindContext<Element>;
   using FiniteElement = TransformedLocalFiniteElement<typename FiniteElementMap::FiniteElement, Context,
     ContravariantPiolaTransformation<typename Element::Geometry>,
-    ContravariantPiolaTransformation<typename Element::Geometry>>;
+    LocalBasisMode::physical, InterpolationMode::transformed>;
 
   BrezziDouglasMariniNode(const FiniteElementMap* finiteElementMap) :
     finiteElementMap_(finiteElementMap)

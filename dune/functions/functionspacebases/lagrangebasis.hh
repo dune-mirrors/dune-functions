@@ -956,7 +956,7 @@ public:
   using Transformation = GeometryDerivativePipeline<Context,
     GeometryDerivativeStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
-    Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;
+    Transformation, LocalBasisMode::reference>;
 
   //! Constructor without order (uses the compile-time value)
   LagrangeNode() :

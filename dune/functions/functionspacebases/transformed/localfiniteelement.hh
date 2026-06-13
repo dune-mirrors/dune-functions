@@ -28,8 +28,8 @@ namespace Dune::Functions {
 //! Select which basis is exposed by TransformedLocalFiniteElement::localBasis().
 enum class LocalBasisMode { reference, physical };
 
-//! Select direct exposure of the reference local interpolation.
-struct NoInterpolationTransformation {};
+//! Select which interpolation is exposed by TransformedLocalFiniteElement::localInterpolation().
+enum class InterpolationMode { reference, transformed };
 
 /**
  * \brief Local-basis adapter driven by a transformation policy.
@@ -349,20 +349,18 @@ class TransformedLocalInterpolation
  * local finite element, while basis evaluation and interpolation are handled
  * through transformation policies.
  *
- * The class supports two modes controlled by the LocalBasisMode template parameter:
- * - physical (default): localBasis() returns the transformed physical basis, and
- *   localInterpolation() returns the transformed interpolation.
- * - reference: localBasis() returns the reference basis, and localInterpolation()
- *   returns the reference interpolation.
+ * The basis and interpolation compatibility interfaces are selected independently
+ * by the LocalBasisMode and InterpolationMode template parameters.
  *
  * \tparam LocalFiniteElement Type of the reference local finite element to wrap.
  * \tparam Context Type of the element context providing geometry information
  *   (must satisfy LocalFiniteElementBindContext).
  * \tparam Transformation Type of the local-basis transformation policy.
- * \tparam InterpolationTransformation Transformation policy used to pull
- *   functions back for local interpolation. NoInterpolationTransformation
- *   exposes the reference interpolation directly.
- * \tparam mode Select whether localBasis() returns the reference or physical basis.
+ *   In transformed interpolation mode, this policy must additionally provide
+ *   localFunctionPullback() for the interpolated function type.
+ * \tparam basisMode Select whether localBasis() returns the reference or physical basis.
+ * \tparam interpolationMode Select whether localInterpolation() returns the
+ *   reference interpolation or an interpolation using Transformation::localFunctionPullback().
  *
  * Example usage:
  * \code
@@ -370,8 +368,8 @@ class TransformedLocalInterpolation
  * using Context = ...; // element context type
  * using PiolaTransform = ...; // Piola transformation policy
  *
- * TransformedLocalFiniteElement<LFE, Context, PiolaTransform, PiolaTransform>
- *   tlfe(piola, piola);
+ * TransformedLocalFiniteElement<LFE, Context, PiolaTransform,
+ *   LocalBasisMode::physical, InterpolationMode::transformed> tlfe(piola);
  * tlfe.bind(lfe, context);
  * auto const& basis = tlfe.localBasis(); // returns transformed physical basis
  * \endcode
@@ -379,17 +377,16 @@ class TransformedLocalInterpolation
 template<Concept::ReferenceLocalFiniteElement LocalFiniteElement,
          Concept::LocalFiniteElementBindContext Context,
          Concept::LocalBasisTransformationPolicy<typename LocalFiniteElement::Traits::LocalBasisType,Context> Transformation,
-         class InterpolationTransformation = NoInterpolationTransformation,
-         LocalBasisMode mode = LocalBasisMode::physical>
-  requires (std::same_as<InterpolationTransformation,NoInterpolationTransformation>
-    || Concept::InterpolationTransformationPolicy<InterpolationTransformation,Context>)
+         LocalBasisMode basisMode = LocalBasisMode::physical,
+         InterpolationMode interpolationMode = InterpolationMode::reference>
 class TransformedLocalFiniteElement
 {
     using ReferenceLocalBasis = typename LocalFiniteElement::Traits::LocalBasisType;
     using ReferenceLocalInterpolation = typename LocalFiniteElement::Traits::LocalInterpolationType;
     using ReferenceLocalCoefficients = typename LocalFiniteElement::Traits::LocalCoefficientsType;
 
-    static constexpr bool useInterpolationTransformation = not std::same_as<InterpolationTransformation,NoInterpolationTransformation>;
+    static constexpr bool useInterpolationTransformation =
+      interpolationMode == InterpolationMode::transformed;
 
   public:
     //! Type of the reference local basis.
@@ -399,20 +396,18 @@ class TransformedLocalFiniteElement
     using PhysicalBasis = TransformedLocalBasis<ReferenceLocalBasis,Context,Transformation>;
 
     //! Type exposed by localBasis() for compatibility with existing bases.
-    using LocalBasis = std::conditional_t<mode == LocalBasisMode::physical,
+    using LocalBasis = std::conditional_t<basisMode == LocalBasisMode::physical,
       PhysicalBasis,
       ReferenceBasis>;
 
     //! Type of the transformed physical local interpolation.
     using PhysicalLocalInterpolation = std::conditional_t<useInterpolationTransformation,
       TransformedLocalInterpolation<
-        ReferenceLocalInterpolation,Context,InterpolationTransformation>,
+        ReferenceLocalInterpolation,Context,Transformation>,
       ReferenceLocalInterpolation>;
 
     //! Type exposed by localInterpolation() for compatibility with existing bases.
-    using LocalInterpolation = std::conditional_t<mode == LocalBasisMode::physical,
-      PhysicalLocalInterpolation,
-      ReferenceLocalInterpolation>;
+    using LocalInterpolation = PhysicalLocalInterpolation;
 
     //! Export number types, dimensions, etc.
     using Traits = LocalFiniteElementTraits<LocalBasis,ReferenceLocalCoefficients,LocalInterpolation>;
@@ -426,13 +421,15 @@ class TransformedLocalFiniteElement
      * \brief Constructor with transformation policy.
      *
      * \param transformation The local-basis transformation policy.
-     * \param interpolationTransformation The physical-function pullback used by interpolation.
-     */
-    TransformedLocalFiniteElement(Transformation transformation,
-                                  InterpolationTransformation interpolationTransformation)
-      requires (useInterpolationTransformation)
-      : basis_(std::move(transformation))
-      , physicalInterpolation_(std::move(interpolationTransformation))
+     *
+     * In transformed interpolation mode, the policy is copied into the basis
+     * adapter and moved into the interpolation adapter.  This gives both adapters
+     * independent bound state while keeping a single public policy parameter.
+    */
+    explicit TransformedLocalFiniteElement(Transformation transformation)
+      requires (useInterpolationTransformation && std::copy_constructible<Transformation>)
+      : basis_(transformation)
+      , physicalInterpolation_(std::move(transformation))
     {}
 
     explicit TransformedLocalFiniteElement(Transformation transformation)
@@ -486,14 +483,14 @@ class TransformedLocalFiniteElement
     /**
      * \brief Access the local basis.
      *
-     * Depending on the mode template parameter, this returns either the
+     * Depending on basisMode, this returns either the
      * reference basis or the transformed physical basis.
      *
      * \return The local basis (reference or physical).
      */
     LocalBasis const& localBasis() const
     {
-      if constexpr (mode == LocalBasisMode::physical)
+      if constexpr (basisMode == LocalBasisMode::physical)
         return physicalBasis();
       else
         return referenceBasis();
@@ -556,14 +553,15 @@ class TransformedLocalFiniteElement
     /**
      * \brief Access the local interpolation.
      *
-     * Depending on the mode template parameter, this returns either the
-     * reference interpolation or the transformed physical interpolation.
+     * Depending on interpolationMode, this returns either the reference
+     * interpolation or an interpolation using the transformation's physical
+     * function pullback.
      *
      * \return The local interpolation (reference or physical).
      */
     LocalInterpolation const& localInterpolation() const
     {
-      if constexpr (mode == LocalBasisMode::physical and useInterpolationTransformation)
+      if constexpr (useInterpolationTransformation)
         return physicalInterpolation_;
       else {
         assert(!!lfe_);

@@ -139,7 +139,7 @@ public:
   using Transformation = GeometryDerivativePipeline<Context,
     GeometryDerivativeStage<typename Element::Geometry>>;
   using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
-    Transformation, NoInterpolationTransformation, LocalBasisMode::reference>;
+    Transformation, LocalBasisMode::reference>;
 
   /**
    * \brief The default constructor initializes all members to their default.

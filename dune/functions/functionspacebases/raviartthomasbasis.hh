@@ -340,7 +340,7 @@ public:
   using FiniteElement = TransformedLocalFiniteElement<
     typename FiniteElementMap::FiniteElement, Context,
     ContravariantPiolaTransformation<typename Element::Geometry>,
-    ContravariantPiolaTransformation<typename Element::Geometry>>;
+    LocalBasisMode::physical, InterpolationMode::transformed>;
 
   RaviartThomasNode(const FiniteElementMap* finiteElementMap) :
     finiteElementMap_(finiteElementMap)

@@ -134,7 +134,7 @@ namespace Dune::Functions
 
       /** \brief get i'th index
        */
-      LocalKey const &localKey(size_type i) const
+      LocalKey const& localKey(size_type i) const
       {
         return localKeys_[i];
       }
@@ -207,10 +207,11 @@ namespace Dune::Functions
       {
         return Range({{a00,a01},{a01,a11}});
       }
+
       template <class Range>
       static Range sym(R a00, R a01, R a02, R a11, R a12, R a22)
       {
-        return Range({{a00,a01,a02},{a01,a11,a12}, {a02,a12,a22}});
+        return Range({{a00,a01,a02},{a01,a11,a12},{a02,a12,a22}});
       }
     };
 
@@ -245,9 +246,9 @@ namespace Dune::Functions
         out.clear();
         out.resize(size(), C(0));
 
-        if constexpr(dim == 2)
+        if constexpr (dim == 2)
           interpolate2d(f, out);
-        else if constexpr(dim == 3)
+        else if constexpr (dim == 3)
           interpolate3d(f, out);
         else
           DUNE_THROW(Dune::NotImplemented, "HHJ-interpolation only implemented for dim in {2,3}");
@@ -278,7 +279,7 @@ namespace Dune::Functions
             }
           }
         }
-        else{
+        else {
           Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim-1, k> edgeLagrangebasis;
           thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim-1, k>::Traits::RangeType> edgeValues;
           static constexpr std::size_t edgeSize = edgeLagrangebasis.size();
@@ -357,7 +358,7 @@ namespace Dune::Functions
         }
         else {
           Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim-1, k> faceLagrangebasis;
-          thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim-1, k>::Traits::RangeType> faceValues;
+          thread_local std::vector<typename Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim-1, k>::Traits::RangeType> faceValues;
           static constexpr std::size_t faceSize = faceLagrangebasis.size();
 
           for (int i = 0; i < refElem.size(1); ++i) {
@@ -375,11 +376,11 @@ namespace Dune::Functions
           }
 
           Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k - 1> cellLagrangebasis1;
-          thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k-1>::Traits::RangeType > cellValues1;
+          thread_local std::vector<typename Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k-1>::Traits::RangeType > cellValues1;
           static constexpr std::size_t cellSize1 = cellLagrangebasis1.size();
 
           Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k> cellLagrangebasis2;
-          thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k>::Traits::RangeType > cellValues2;
+          thread_local std::vector<typename Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k>::Traits::RangeType > cellValues2;
           static constexpr std::size_t cellSize2 = cellLagrangebasis2.size();
 
           int startCell1 = refElem.size(1) * faceSize;
@@ -505,7 +506,7 @@ namespace Dune::Functions
       typename GV::ctype,R,GV::dimension,k>;
     using Transformation = DoubleContravariantTransformation<typename Element::Geometry>;
     using FiniteElement = TransformedLocalFiniteElement<ReferenceFiniteElement, Context,
-      Transformation, Transformation, LocalBasisMode::physical>;
+      Transformation, LocalBasisMode::physical, LocalInterpolationMode::transformed>;
 
     HellanHerrmannJohnsonNode() = default;
 

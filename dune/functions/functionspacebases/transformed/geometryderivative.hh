@@ -157,7 +157,7 @@ class GeometryDerivativeTransformation
       auto&& Jinv = geometry_->jacobianInverse(x);
       auto hessian = Jinv.transposed() * in * Jinv;
       out = {};
-      for (auto j : Dune::range(Geometry::coorddimension))
+      for (auto j : Dune::range(int{Geometry::coorddimension}))
         out[0] += hessian[j][j];
     }
 

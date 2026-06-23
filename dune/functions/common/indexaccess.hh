@@ -300,14 +300,25 @@ namespace Imp {
   template<class C, class MultiIndex, class IsFinal>
   constexpr decltype(auto) resolveDynamicMultiIndex(C&& c, const MultiIndex& multiIndex, const IsFinal& isFinal)
   {
+    constexpr bool stopRecursion = decltype(isFinal(c))::value;
+    constexpr bool hasDynamicAccess = requires { c[0]; };
+
     // If c is already considered final simply return it,
     // else resolve the next multiIndex entry.
-    return Hybrid::ifElse(isFinal(c), [&, c = forwardCapture(std::forward<C>(c))](auto) -> decltype(auto) {
+    if constexpr (stopRecursion)
+    {
       assert(multiIndex.size() == 0);
-      return c.forward();
-    }, [&](auto) -> decltype(auto) {
-      auto hasDynamicAccess = callableCheck([](auto&& cc) -> std::void_t<decltype(cc[0])> {});
-
+      // There are two possibilities for the result:
+      // If c is an l-value reference, then C is of the form C=RawC& and we return an l-value reference.
+      // If c is an r-value reference, then C is of the form C=RawC and we return a copy of c by value.
+      // Notice that we should neither return plain c nor std::forward<C>(c) here.
+      // The former would bind a returned r-value reference to an r-value reference (which is an l-value!).
+      // The latter would deduce C&& as return value and thus return an r-value reference to the temporary
+      // which is gone after the function call.
+      return static_cast<C>(c);
+    }
+    else
+    {
       // Split multiIndex into first entry and remaining ones.
       auto i = multiIndex[0];
       auto tail = multiIndex.pop();
@@ -317,34 +328,32 @@ namespace Imp {
       // If c has a dynamic operator[] this is straight forward.
       // Else the dynamic multiIndex[0] has to be translated into
       // a static one using hybridIndexAccess.
-      return Hybrid::ifElse(hasDynamicAccess(c), [&](auto id) -> decltype(auto) {
-        return Imp::resolveDynamicMultiIndex(id(c)[i], tail, isFinal);
-      }, [&](auto id) -> decltype(auto) {
+      if constexpr (hasDynamicAccess)
+        return Imp::resolveDynamicMultiIndex(c[i], tail, isFinal);
+      else
+      {
         // auto indexRange = range(Hybrid::size(id(c)));
-        auto indexRange = typename decltype(range(Hybrid::size(id(c))))::integer_sequence();
+        auto indexRange = typename decltype(range(Hybrid::size(c)))::integer_sequence();
         return Hybrid::switchCases(indexRange, i, [&](auto static_i) -> decltype(auto){
           // Do rescursion with static version of i
-          return Imp::resolveDynamicMultiIndex(id(c)[static_i], tail, isFinal);
+          return Imp::resolveDynamicMultiIndex(c[static_i], tail, isFinal);
         }, [&]() -> decltype(auto){
           // As fallback we use c[0] this is needed, because there must be one branch that matches.
-          return Imp::resolveDynamicMultiIndex(id(c)[Dune::Indices::_0], tail, isFinal);
+          return Imp::resolveDynamicMultiIndex(c[Dune::Indices::_0], tail, isFinal);
         });
-      });
-    });
+      }
+    }
   }
 
   template<class C, class MultiIndex>
   constexpr decltype(auto) resolveStaticMultiIndex(C&& c, const MultiIndex& multiIndex)
   {
-    auto isExhausted = Hybrid::equal_to(Hybrid::size(multiIndex), Dune::Indices::_0);
-    return Hybrid::ifElse(isExhausted, [&, c = forwardCapture(std::forward<C>(c))](auto) -> decltype(auto) {
-      return c.forward();
-    }, [&](auto id) -> decltype(auto) {
-      auto head = multiIndex[Dune::Indices::_0];
-      auto tail = multiIndex.pop();
-
-      return Imp::resolveStaticMultiIndex(id(c)[head], tail);
-    });
+    constexpr bool stopRecursion = (decltype(Hybrid::size(multiIndex))::value == 0);
+    // Cf. resolveDynamicMultiIndex() for the explanation of the static_cast used in the first branch.
+    if constexpr (stopRecursion)
+      return static_cast<C>(c);
+    else
+      return Imp::resolveStaticMultiIndex(c[multiIndex[Dune::Indices::_0]], multiIndex.pop());
   }
 
 } // namespace Imp
@@ -398,7 +407,7 @@ constexpr decltype(auto) resolveDynamicMultiIndex(C&& c, const MultiIndex& multi
 template<class C, class MultiIndex>
 constexpr decltype(auto) resolveDynamicMultiIndex(C&& c, const MultiIndex& multiIndex)
 {
-  auto hasNoIndexAccess = negatePredicate(callableCheck([](auto&& cc) -> std::void_t<decltype(cc[Dune::Indices::_0])> {}));
+  auto hasNoIndexAccess = [](auto&& cc ) { return std::bool_constant<not requires { cc[Dune::Indices::_0]; }>{}; };
   return Imp::resolveDynamicMultiIndex(std::forward<C>(c), Imp::shiftedDynamicMultiIndex<0>(multiIndex), hasNoIndexAccess);
 }
 

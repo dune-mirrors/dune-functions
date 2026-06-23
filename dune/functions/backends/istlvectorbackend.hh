@@ -136,7 +136,7 @@ class ISTLVectorBackend
     and not Dune::Std::is_detected_v<dynamicIndexAccess_t, std::remove_reference_t<C>>>;
 
   template<class C>
-  using isScalar = std::bool_constant<not Dune::Std::is_detected_v<staticIndexAccess_t, std::remove_reference_t<C>>>;
+  using isScalar = std::bool_constant<(not Dune::Std::is_detected_v<staticIndexAccess_t, std::remove_reference_t<C>>) or Dune::IsNumber<C>::value>;
 
   template<class C>
   using isVector = std::bool_constant<Dune::Std::is_detected_v<staticIndexAccess_t, std::remove_reference_t<C>>>;
@@ -267,13 +267,15 @@ public:
   template<class MultiIndex>
   decltype(auto) operator[](const MultiIndex& index) const
   {
-    return resolveDynamicMultiIndex(*vector_, index);
+    auto termination = [](auto&& c) { return isScalar<std::decay_t<decltype(c)>>{}; };
+    return resolveDynamicMultiIndex(*vector_, index, termination);
   }
 
   template<class MultiIndex>
   decltype(auto) operator[](const MultiIndex& index)
   {
-    return resolveDynamicMultiIndex(*vector_, index);
+    auto termination = [](auto&& c) { return isScalar<std::decay_t<decltype(c)>>{}; };
+    return resolveDynamicMultiIndex(*vector_, index, termination);
   }
 
   /**

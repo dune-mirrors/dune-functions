@@ -15,6 +15,13 @@ corresponding version of the Dune core modules.
   quadrilateral pyramids elements only order two is currently
   implemented.
 
+- The helper concepts `isLocalFunction` and `isDifferentiableLocalFunction`
+  now ignore const and reference qualifiers of the checked function type.
+  This makes checks such as `isLocalFunction<const F, ...>()` behave like
+  checks for `F`, which reflects the usual use in forwarding contexts where
+  `F` may be deduced as a qualified type. The local function object itself is
+  still required to provide mutable `bind()` and `unbind()` operations.
+
 - The `LagrangeBasis` now uses the same `LocalFiniteElement` implementation
   for run-time and compile-time order. This makes the run-time order
   implementation consistent with the former compile-time order case

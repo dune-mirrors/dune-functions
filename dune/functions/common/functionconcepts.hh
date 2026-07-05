@@ -7,6 +7,8 @@
 #ifndef DUNE_FUNCTIONS_COMMON_FUNCTIONCONCEPT_HH
 #define DUNE_FUNCTIONS_COMMON_FUNCTIONCONCEPT_HH
 
+#include <type_traits>
+
 #include <dune/common/typelist.hh>
 #include <dune/common/concept.hh>
 
@@ -168,7 +170,7 @@ struct LocalFunction<Range(Domain), LocalContext> :
 /// Check if F models the LocalFunction concept with given signature and local context \ingroup FunctionConcepts
 template<class F, class Signature, class LocalContext>
 static constexpr bool isLocalFunction()
-{ return models<Concept::LocalFunction<Signature, LocalContext>, F>(); }
+{ return models<Concept::LocalFunction<Signature, LocalContext>, std::remove_cvref_t<F>>(); }
 
 
 // DifferentiableLocalFunction concept ##############################################
@@ -206,7 +208,7 @@ struct DifferentiableLocalFunction<Range(Domain), LocalContext, DerivativeTraits
 /// Check if F models the DifferentiableLocalFunction concept with given signature and local context \ingroup FunctionConcepts
 template<class F, class Signature, class LocalContext, template<class> class DerivativeTraits = DefaultDerivativeTraits>
 static constexpr bool isDifferentiableLocalFunction()
-{ return models<Concept::DifferentiableLocalFunction<Signature, LocalContext, DerivativeTraits>, F>(); }
+{ return models<Concept::DifferentiableLocalFunction<Signature, LocalContext, DerivativeTraits>, std::remove_cvref_t<F>>(); }
 
 
 // EntitySet concept ##############################################

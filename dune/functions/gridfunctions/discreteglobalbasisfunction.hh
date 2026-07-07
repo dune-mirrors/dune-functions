@@ -351,7 +351,9 @@ public:
         // Non-scalar coefficients of dimension coeffDim are handled by
         // processing the coeffDim linear combinations independently
         // and storing them as entries of an array.
-        using Value = LocalBasisRange< std::decay_t<decltype(node)> >;
+        using CoeffType = Dune::AutonomousValue<decltype(flatVectorView(this->localDoFs_[node.localIndex(0)])[0])>;
+        using LFERangeType = LocalBasisRange< std::decay_t<decltype(node)>>;
+        using Value = Dune::AutonomousValue<decltype(std::declval<CoeffType>()*std::declval<LFERangeType>())>;
         static constexpr auto coeffDim = decltype(flatVectorView(this->localDoFs_[node.localIndex(0)]).size())::value;
         auto values = std::array<Value, coeffDim>{};
         istlVectorBackend(values) = 0;

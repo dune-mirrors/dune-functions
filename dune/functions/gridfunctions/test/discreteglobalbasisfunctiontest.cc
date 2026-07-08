@@ -12,6 +12,7 @@
 #include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
 #include <dune/common/hybridutilities.hh>
+#include <dune/common/simd/loop.hh>
 
 #include <dune/grid/yaspgrid.hh>
 
@@ -46,6 +47,14 @@ double infinityDiff(const bool& x, const bool& y)
   return std::fabs(x-y);
 }
 
+template<class T>
+auto infinityDiff(const T& x, const T& y)
+{
+  using std::fabs;
+  return fabs(x-y);
+}
+
+
 template<class R, class B, class C>
 bool checkInterpolationConsistency(B&& basis, C&& x)
 {
@@ -65,7 +74,7 @@ bool checkInterpolationConsistency(B&& basis, C&& x)
     interpolate(basis, y, ff);
     for (typename std::decay_t<C>::size_type i=0; i<x.size(); ++i)
     {
-      if (infinityDiff(x[i],y[i]) > 1e-10)
+      if (Dune::Simd::anyTrue(infinityDiff(x[i],y[i]) > 1e-10))
       {
         std::cout << "Interpolation of DiscreteGlobalBasisFunction differs from original coefficient vector" << std::endl;
         passed = false;
@@ -103,6 +112,27 @@ int main (int argc, char* argv[]) try
     std::vector<bool> x;
     interpolate(feBasis, x, f);
     using Range = bool;
+    auto passedThisTest = checkInterpolationConsistency<Range>(feBasis, x);
+    std::cout << "checkInterpolationConsistency for scalar Lagrange basis" << (passedThisTest? " " : " NOT ") << "successful." << std::endl;
+    passed = passed and passedThisTest;
+  }
+
+  // scalar Lagrange Basis with SIMD-type
+  {
+    constexpr std::size_t simdSize = 2;
+    using double_SIMD = Dune::LoopSIMD<double, simdSize>;
+
+    auto feBasis = makeBasis(gridView,lagrange<1>());
+
+    auto f = [](const auto& x){
+      auto y = double_SIMD();
+      for(auto i : Dune::range(y.size()))
+        y[i] += (x.two_norm()<0.5)*(i+1);
+      return y;
+    };
+    std::vector<double_SIMD> x;
+    interpolate(feBasis, x, f);
+    using Range = double_SIMD;
     auto passedThisTest = checkInterpolationConsistency<Range>(feBasis, x);
     std::cout << "checkInterpolationConsistency for scalar Lagrange basis" << (passedThisTest? " " : " NOT ") << "successful." << std::endl;
     passed = passed and passedThisTest;

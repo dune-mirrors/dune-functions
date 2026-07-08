@@ -157,8 +157,11 @@ void interpolateLocal(VectorBackend& vector, const BitVectorBackend& bitVector, 
     using Node = std::decay_t<decltype(node)>;
     using FiniteElement = typename Node::FiniteElement;
     using FiniteElementRangeField = typename FiniteElement::Traits::LocalBasisType::Traits::RangeFieldType;
+    using FiniteElementDomain = typename FiniteElement::Traits::LocalBasisType::Traits::DomainType;
+    using MultiIndex = typename LocalView::MultiIndex;
+    using Coefficient = Dune::AutonomousValue<decltype(vector[std::declval<MultiIndex>()]*std::declval<FiniteElementRangeField>())>;
 
-    auto interpolationCoefficients = std::vector<FiniteElementRangeField>();
+    auto interpolationCoefficients = std::vector<Coefficient>();
     auto&& fe = node.finiteElement();
     auto localF_RE = ComponentFunction(std::cref(localF), [&](auto&& y) { return nodeToRangeEntry(node, treePath, y); });
 

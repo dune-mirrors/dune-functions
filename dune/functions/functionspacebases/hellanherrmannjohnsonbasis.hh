@@ -156,6 +156,7 @@ namespace Dune::Functions
         using RangeFieldType = R;
         using RangeType = FieldMatrix<R,dim,dim>;
         using DivDivType = R;
+        using JacobianType = std::array<FieldMatrix<R,dim,dim>, dim>;
       };
 
     public:
@@ -195,11 +196,10 @@ namespace Dune::Functions
       void evaluateDivDiv(const typename Traits::DomainType& x,
                           std::vector<typename Traits::DivDivType>& out) const;
 
-      template <class Derivative>
-      void evaluate(const typename Traits::DomainType& x, Derivative d,
-                    std::vector<typename Traits::template Type<Derivative>>& out) const
+      void evaluateJacobian(const typename Traits::DomainType& x,
+                          std::vector<typename Traits::JacobianType>& out) const
       {
-
+        DUNE_THROW(Dune::NotImplemented, "evaluateJacobian not implemented for HHJ element.");
       }
 
     private:
@@ -241,6 +241,7 @@ namespace Dune::Functions
           using RangeFieldType = R;
           using RangeType = FieldMatrix<R,dimRange,dimRange>;
           using DivDivType = R;
+          using JacobianType = std::array<FieldMatrix<R,dimRange,dimRange>, dimDomain>;
         };
 
       public:
@@ -279,6 +280,12 @@ namespace Dune::Functions
           refLocalBasis_.evaluateDivDiv(x, divDivBuffer_);
           out.resize(size());
           transformDivDiv(x, divDivBuffer_, out);
+        }
+
+        void evaluateJacobian(const typename Traits::DomainType& x,
+                            std::vector<typename Traits::JacobianType>& out) const
+        {
+          DUNE_THROW(Dune::NotImplemented, "evaluateJacobian not implemented for HHJ element.");
         }
 
         //! \brief Polynomial order of the shape functions

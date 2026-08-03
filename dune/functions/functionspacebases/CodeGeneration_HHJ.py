@@ -2,16 +2,18 @@
 # SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 from sympy import *
 from sympy.polys.polyfuncs import horner
-from sympy.abc import x, y
+from sympy.abc import x, y, z
 import symfem
 import numpy as np
 
 from symfem.functions import parse_function_input as parse, _to_sympy_format
 
+coordinates = [x, y, z]
+
 def adaptReferenceElementToDune(fe):
   newRef = fe.reference
-  assert(newRef.name == "triangle")
-  newRef.edges = ((0,1),(0,2),(1,2))
+  if newRef.name == "triangle":
+    newRef.edges = ((0,1),(0,2),(1,2))
   if hasattr(fe, "variant"):
     newFe = type(fe)(newRef, fe.order, fe.variant)
   else:
@@ -26,26 +28,40 @@ def adaptReferenceToPhysicalElement(fe, vertices):
   return newFe
 
 def createGenericReferenceElement(refName, feName, order, **kwargs):
+  if refName == "interval" and feName == "HHJ":
+    return symfem.create_element(refName, "Lagrange", order, **kwargs)
   return(adaptReferenceElementToDune(symfem.create_element(refName, feName,order, **kwargs)))
 
 def createPhysicalElement(refName, feName, order, vertices):
   return(adaptReferenceToPhysicalElement(symfem.create_element(refName, feName, order), vertices))
 
+def asHHJMatrixBasis(fe):
+  basis = fe.get_basis_functions()
+  if fe.reference.name == "interval":
+    return [Matrix([[parse(_to_sympy_format(f))]]) for f in basis]
+  return basis
+
 ## apply a horner scheme on a function f
 def hornerScheme(f, derivative = [x,y], **kwargs):
   s = shape(f)
   assert(len(s) == 2)
+  dim = s[0]
+  variables = coordinates[:dim]
 
   if derivative == "Divdiv":
-    result = horner(diff(f[0,0].diff(x) + f[0,1].diff(y), x) +  diff(f[1,0].diff(x) + f[1,1].diff(y), y))
+    result = 0
+    for i in range(dim):
+      for j in range(dim):
+        result += diff(diff(f[i,j], variables[j]), variables[i])
+    result = horner(result)
   else:
     result =  [] # result is at least tensor order 1
-    for i in range(s[0]):
+    for i in range(dim):
       if derivative == "Div":
-        result.append(horner(f[i,0].diff(x) + f[i,1].diff(y)))
+        result.append(horner(sum(f[i,j].diff(variables[j]) for j in range(dim))))
       else:
         result.append([]) # result is at least tensor order 2
-        for j in range(s[1]):
+        for j in range(dim):
           if derivative is None: #values
             result[i].append(horner(f[i,j]))
           elif isinstance(derivative, list):  #multiple derivatives, typically jacobian
@@ -76,18 +92,20 @@ def getCodeForScalarorVector(f, **kwargs):
 
 def getCodeForMatrix(tensor, **kwargs):
   symmetric = kwargs.pop("symmetric", False)
+  dim = len(tensor)
   code = ""
   if symmetric:
-    code += "\n*(iter++) = sym<Range>(" + getCodeForList(tensor[0][0] , **kwargs) \
-    + ", " + getCodeForList( tensor[0][1], **kwargs)\
-    + ", " + getCodeForList( tensor[1][1], **kwargs)\
-    + ");"
+    entries = []
+    for i in range(dim):
+      for j in range(i, dim):
+        entries.append(getCodeForList(tensor[i][j], **kwargs))
+    code += "\n*(iter++) = sym<Range>(" + ", ".join(entries) + ");"
 
   else :
-    code += "\n*(iter++) = {{" + getCodeForList(tensor[0][0] , **kwargs)
-
-    code += ",\t" + getCodeForList( tensor[0][1], **kwargs)+ "},\n\t{"  + getCodeForList( tensor[1][0], **kwargs)+  ",\t"
-    code += getCodeForList( tensor[1][1], **kwargs)+"}};\n"
+    rows = []
+    for i in range(dim):
+      rows.append("{" + ",\t".join(getCodeForList(tensor[i][j], **kwargs) for j in range(dim)) + "}")
+    code += "\n*(iter++) = {" + ",\n\t".join(rows) + "};\n"
 
   return code
 
@@ -115,9 +133,11 @@ def getCodeForEvaluation(basis, **kwargs):
   return code
 
 ## Generate an include file for evaluation methods
-def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, symmetric = False, **kwargs):
+def printEvaluationCode(name, references, feType,minOrder  = 0, maxOrder  = 3, symmetric = False, **kwargs):
 
   assert(isinstance(name, str))
+  if isinstance(references, str):
+    references = [references]
   code = "// -*- tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-\n \
 // vi: set et ts=4 sw=2 sts=2: \n\n \
 // SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md\n\
@@ -126,28 +146,45 @@ def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, sy
   code += "#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n namespace Dune::Functions{\n  namespace Impl{ \n    "
   code += "template<class D, class R,int dim, unsigned int k>\n"
   code +='     void ' + name + 'LocalBasis<D,R, dim,k>::evaluateFunction(const typename Traits::DomainType &in,std::vector<typename Traits::RangeType> &out) const\n{\nout.resize(size());\n auto iter = out.begin();'
+  code += "\nusing Range = typename Traits::RangeType;"
+  code += "\nstatic_assert("
+  code += " || ".join("dim == {}".format(symfem.create_reference(reference).tdim) for reference in references)
+  code += ");"
   code += "\n\n// generated with sympy from symfem library\n"
-  code += "auto const&x = in[0], y = in[1];"
-  for i in range(minOrder, maxOrder +1):
-    fe = createGenericReferenceElement(reference, feType, i, **kwargs)
-    basis = fe.get_basis_functions()
-    code += "\n if constexpr (k =="+str(i)+"){\n"
-    code += getCodeForEvaluation(basis, symmetric = symmetric)
+  for reference in references:
+    refDim = symfem.create_reference(reference).tdim
+    coordinateDefinitions = ", ".join("{} = in[{}]".format(coordinates[i], i) for i in range(refDim))
+    code += "\nif constexpr (dim == {}) {{\n".format(refDim)
+    code += "auto const&{};".format(coordinateDefinitions)
+    for i in range(minOrder, maxOrder +1):
+      fe = createGenericReferenceElement(reference, feType, i, **kwargs)
+      basis = asHHJMatrixBasis(fe)
+      code += "\n if constexpr (k =="+str(i)+"){\n"
+      code += getCodeForEvaluation(basis, symmetric = symmetric)
 
-    code += "\n}"
+      code += "\n}"
+    code += "\n}\n"
 
   code +="\n}"
   code += 'template<class D, class R, int dim, unsigned int k>\n      void ' + name + 'LocalBasis<D,R,dim,k>::evaluateDivDiv(const typename Traits::DomainType &in,std::vector<typename Traits::DivDivType> &out) const\n{\nout.resize(size());\nauto iter = out.begin();'
+  code += "\nstatic_assert("
+  code += " || ".join("dim == {}".format(symfem.create_reference(reference).tdim) for reference in references)
+  code += ");"
   code += "\n\n// generated with sympy from symfem library\n"
-  code += "auto const&x = in[0], y = in[1];"
-  for i in range(minOrder, maxOrder +1):
-    fe = createGenericReferenceElement(reference, feType, i)
-    basis = fe.get_basis_functions()
-    code += "if constexpr (k =="+str(i)+"){"
+  for reference in references:
+    refDim = symfem.create_reference(reference).tdim
+    coordinateDefinitions = ", ".join("{} = in[{}]".format(coordinates[i], i) for i in range(refDim))
+    code += "\nif constexpr (dim == {}) {{\n".format(refDim)
+    code += "auto const&{};".format(coordinateDefinitions)
+    for i in range(minOrder, maxOrder +1):
+      fe = createGenericReferenceElement(reference, feType, i, **kwargs)
+      basis = asHHJMatrixBasis(fe)
+      code += "if constexpr (k =="+str(i)+"){"
 
-    code += getCodeForEvaluation(basis, derivative = "Divdiv", symmetric = symmetric)
+      code += getCodeForEvaluation(basis, derivative = "Divdiv", symmetric = symmetric)
 
-    code += "\n}"
+      code += "\n}"
+    code += "\n}\n"
   code += "\n}"
 
   print(code)
@@ -171,4 +208,4 @@ if __name__== "__main__":
   # print(hhj.get_basis_function(0)[0][1].diff(x))
 
 
-  printEvaluationCode("HellanHerrmannJohnsonReference", reference = "triangle", feType = "HHJ",minOrder  = 0, maxOrder= 6, symmetric = True, variant = "Dune")
+  printEvaluationCode("HellanHerrmannJohnsonReference", references = ["interval", "triangle"], feType = "HHJ",minOrder  = 0, maxOrder= 6, symmetric = True, variant = "dune")

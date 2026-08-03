@@ -18,9 +18,118 @@ void HellanHerrmannJohnsonReferenceLocalBasis<D, R, dim, k>::evaluateFunction(
   out.resize(size());
   auto iter = out.begin();
 
-  static_assert(dim == 2);
+  static_assert(dim == 1 || dim == 2);
 
   // generated with sympy from symfem library
+  if constexpr (dim == 1) {
+    auto const &x = in[0];
+ if constexpr (k ==0){
+
+//0th basis function
+*(iter++) = sym<Range>(1);
+
+}
+ if constexpr (k ==1){
+
+//0th basis function
+*(iter++) = sym<Range>(1 - x);
+
+//1th basis function
+*(iter++) = sym<Range>(x);
+
+}
+ if constexpr (k ==2){
+
+//0th basis function
+*(iter++) = sym<Range>(x*(2*x - 3) + 1);
+
+//1th basis function
+*(iter++) = sym<Range>(x*(4 - 4*x));
+
+//2th basis function
+*(iter++) = sym<Range>(x*(2*x - 1));
+
+}
+ if constexpr (k ==3){
+
+//0th basis function
+*(iter++) = sym<Range>(x*(x*(9 - 9.0/2.0*x) - 11.0/2.0) + 1);
+
+//1th basis function
+*(iter++) = sym<Range>(x*(x*((27.0/2.0)*x - 45.0/2.0) + 9));
+
+//2th basis function
+*(iter++) = sym<Range>(x*(x*(18 - 27.0/2.0*x) - 9.0/2.0));
+
+//3th basis function
+*(iter++) = sym<Range>(x*(x*((9.0/2.0)*x - 9.0/2.0) + 1));
+
+}
+ if constexpr (k ==4){
+
+//0th basis function
+*(iter++) = sym<Range>(x*(x*(x*((32.0/3.0)*x - 80.0/3.0) + 70.0/3.0) - 25.0/3.0) + 1);
+
+//1th basis function
+*(iter++) = sym<Range>(x*(x*(x*(96 - 128.0/3.0*x) - 208.0/3.0) + 16));
+
+//2th basis function
+*(iter++) = sym<Range>(x*(x*(x*(64*x - 128) + 76) - 12));
+
+//3th basis function
+*(iter++) = sym<Range>(x*(x*(x*(224.0/3.0 - 128.0/3.0*x) - 112.0/3.0) + 16.0/3.0));
+
+//4th basis function
+*(iter++) = sym<Range>(x*(x*(x*((32.0/3.0)*x - 16) + 22.0/3.0) - 1));
+
+}
+ if constexpr (k ==5){
+
+//0th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(625.0/8.0 - 625.0/24.0*x) - 2125.0/24.0) + 375.0/8.0) - 137.0/12.0) + 1);
+
+//1th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*((3125.0/24.0)*x - 4375.0/12.0) + 8875.0/24.0) - 1925.0/12.0) + 25));
+
+//2th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(8125.0/12.0 - 3125.0/12.0*x) - 7375.0/12.0) + 2675.0/12.0) - 25));
+
+//3th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*((3125.0/12.0)*x - 625) + 6125.0/12.0) - 325.0/2.0) + 50.0/3.0));
+
+//4th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(6875.0/24.0 - 3125.0/24.0*x) - 5125.0/24.0) + 1525.0/24.0) - 25.0/4.0));
+
+//5th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*((625.0/24.0)*x - 625.0/12.0) + 875.0/24.0) - 125.0/12.0) + 1));
+
+}
+ if constexpr (k ==6){
+
+//0th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(x*((324.0/5.0)*x - 1134.0/5.0) + 315) - 441.0/2.0) + 406.0/5.0) - 147.0/10.0) + 1);
+
+//1th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(x*(1296 - 1944.0/5.0*x) - 1674) + 1044) - 1566.0/5.0) + 36));
+
+//2th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(x*(972*x - 3078) + 3699) - 4149.0/2.0) + 1053.0/2.0) - 45));
+
+//3th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(x*(3888 - 1296*x) - 4356) + 2232) - 508) + 40));
+
+//4th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(x*(972*x - 2754) + 2889) - 2763.0/2.0) + 297) - 45.0/2.0));
+
+//5th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(x*(5184.0/5.0 - 1944.0/5.0*x) - 1026) + 468) - 486.0/5.0) + 36.0/5.0));
+
+//6th basis function
+*(iter++) = sym<Range>(x*(x*(x*(x*(x*((324.0/5.0)*x - 162) + 153) - 135.0/2.0) + 137.0/10.0) - 1));
+
+}
+  }
+  else if constexpr (dim == 2) {
   auto const &x = in[0], y = in[1];
   if constexpr (k == 0) {
 
@@ -4869,6 +4978,7 @@ void HellanHerrmannJohnsonReferenceLocalBasis<D, R, dim, k>::evaluateFunction(
             y * (y * (y * (y * (y * (357588 - 126126 * y) - 381150) + 189000) - 43470) + 3948) - 84,
         y * (y * (y * (y * (y * (36036 * y - 83160) + 69300) - 25200) + 3780) - 168));
   }
+  }
 }
 template<class D, class R, int dim, unsigned int k>
 void HellanHerrmannJohnsonReferenceLocalBasis<D, R, dim, k>::evaluateDivDiv(
@@ -4877,7 +4987,132 @@ void HellanHerrmannJohnsonReferenceLocalBasis<D, R, dim, k>::evaluateDivDiv(
   out.resize(size());
   auto iter = out.begin();
 
+  static_assert(dim == 1 || dim == 2);
+
   // generated with sympy from symfem library
+  if constexpr (dim == 1) {
+    auto const &x = in[0];if constexpr (k ==0){
+//0th basis function
+*(iter++) = 0;
+
+
+}if constexpr (k ==1){
+//0th basis function
+*(iter++) = 0;
+
+
+//1th basis function
+*(iter++) = 0;
+
+
+}if constexpr (k ==2){
+//0th basis function
+*(iter++) = 4;
+
+
+//1th basis function
+*(iter++) = -8;
+
+
+//2th basis function
+*(iter++) = 4;
+
+
+}if constexpr (k ==3){
+//0th basis function
+*(iter++) = 18 - 27*x;
+
+
+//1th basis function
+*(iter++) = 81*x - 45;
+
+
+//2th basis function
+*(iter++) = 36 - 81*x;
+
+
+//3th basis function
+*(iter++) = 27*x - 9;
+
+
+}if constexpr (k ==4){
+//0th basis function
+*(iter++) = x*(128*x - 160) + 140.0/3.0;
+
+
+//1th basis function
+*(iter++) = x*(576 - 512*x) - 416.0/3.0;
+
+
+//2th basis function
+*(iter++) = x*(768*x - 768) + 152;
+
+
+//3th basis function
+*(iter++) = x*(448 - 512*x) - 224.0/3.0;
+
+
+//4th basis function
+*(iter++) = x*(128*x - 96) + 44.0/3.0;
+
+
+}if constexpr (k ==5){
+//0th basis function
+*(iter++) = x*(x*(1875.0/2.0 - 3125.0/6.0*x) - 2125.0/4.0) + 375.0/4.0;
+
+
+//1th basis function
+*(iter++) = x*(x*((15625.0/6.0)*x - 4375) + 8875.0/4.0) - 1925.0/6.0;
+
+
+//2th basis function
+*(iter++) = x*(x*(8125 - 15625.0/3.0*x) - 7375.0/2.0) + 2675.0/6.0;
+
+
+//3th basis function
+*(iter++) = x*(x*((15625.0/3.0)*x - 7500) + 6125.0/2.0) - 325;
+
+
+//4th basis function
+*(iter++) = x*(x*(6875.0/2.0 - 15625.0/6.0*x) - 5125.0/4.0) + 1525.0/12.0;
+
+
+//5th basis function
+*(iter++) = x*(x*((3125.0/6.0)*x - 625) + 875.0/4.0) - 125.0/6.0;
+
+
+}if constexpr (k ==6){
+//0th basis function
+*(iter++) = x*(x*(x*(1944*x - 4536) + 3780) - 1323) + 812.0/5.0;
+
+
+//1th basis function
+*(iter++) = x*(x*(x*(25920 - 11664*x) - 20088) + 6264) - 3132.0/5.0;
+
+
+//2th basis function
+*(iter++) = x*(x*(x*(29160*x - 61560) + 44388) - 12447) + 1053;
+
+
+//3th basis function
+*(iter++) = x*(x*(x*(77760 - 38880*x) - 52272) + 13392) - 1016;
+
+
+//4th basis function
+*(iter++) = x*(x*(x*(29160*x - 55080) + 34668) - 8289) + 594;
+
+
+//5th basis function
+*(iter++) = x*(x*(x*(20736 - 11664*x) - 12312) + 2808) - 972.0/5.0;
+
+
+//6th basis function
+*(iter++) = x*(x*(x*(1944*x - 3240) + 1836) - 405) + 137.0/5.0;
+
+
+}
+  }
+  else if constexpr (dim == 2) {
   auto const &x = in[0], y = in[1];
   if constexpr (k == 0) {
     // 0th basis function
@@ -6157,6 +6392,7 @@ void HellanHerrmannJohnsonReferenceLocalBasis<D, R, dim, k>::evaluateDivDiv(
              14678496.0 / 125.0) +
         187488.0 / 25.0;
   }
+}
 }
 } // namespace Impl
 } // namespace Dune::Functions

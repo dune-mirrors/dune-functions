@@ -86,7 +86,22 @@ namespace Dune::Functions
         : localKeys_(size())
       {
         std::size_t idx = 0;
-        if constexpr (dim == 2) {
+        if constexpr (dim == 1) {
+          if constexpr (k == 0) {
+            localKeys_[idx++] = LocalKey(0,0,0);
+          }
+          else if constexpr (k == 1) {
+            localKeys_[idx++] = LocalKey(0,1,0);
+            localKeys_[idx++] = LocalKey(1,1,0);
+          }
+          else {
+            localKeys_[idx++] = LocalKey(0,1,0);
+            for (unsigned int i = 0; i < k-1; ++i)
+              localKeys_[idx++] = LocalKey(0,0,i);
+            localKeys_[idx++] = LocalKey(1,1,0);
+          }
+        }
+        else if constexpr (dim == 2) {
           // edge DOFs
           int edgeSize = k+1;
           for (unsigned int s = 0; s < 3; ++s) // three edges
@@ -118,7 +133,9 @@ namespace Dune::Functions
        */
       static constexpr size_type size()
       {
-        if constexpr (dim == 2)
+        if constexpr (dim == 1)
+          return k+1;
+        else if constexpr (dim == 2)
           return 3*(k+1)*(k+2)/2;
         else if constexpr (dim == 3)
           return (k+1)*(k+2)*(k+3);
@@ -162,7 +179,7 @@ namespace Dune::Functions
     public:
       HellanHerrmannJohnsonReferenceLocalBasis()
       {
-        static_assert(dim == 2 || dim == 3, "HellanHerrmannJohnsonReferenceLocalBasis only implemented for dim=2,3");
+        static_assert(dim == 1 || dim == 2 || dim == 3, "HellanHerrmannJohnsonReferenceLocalBasis only implemented for dim=1,2,3");
       }
 
       /** The number of basis functions in the basis
@@ -203,6 +220,11 @@ namespace Dune::Functions
       }
 
     private:
+      template <class Range>
+      static Range sym(R a00)
+      {
+        return Range({{a00}});
+      }
       template <class Range>
       static Range sym(R a00, R a01, R a11)
       {
@@ -306,8 +328,13 @@ namespace Dune::Functions
 
           for (std::size_t i = 0; i < inValues.size(); ++i)
           {
-            outValues[i] = Impl::pullback(inValues[i],Jt);
-            outValues[i] /= dx*dx;
+            if constexpr (dim == 1 && Traits::dimRange == 1) {
+              outValues[i][0][0] = inValues[i][0][0] * Jt[0][0] * Jt[0][0] / (dx*dx);
+            }
+            else {
+              outValues[i] = Impl::pullback(inValues[i],Jt);
+              outValues[i] /= dx*dx;
+            }
           }
         }
 
@@ -381,7 +408,16 @@ namespace Dune::Functions
         {
           auto Jit = geometry_.jacobianInverseTransposed(xi);
           auto dx = geometry_.integrationElement(xi);
-          return Impl::pullback(f_(xi), Jit) * (dx*dx);
+          if constexpr (dim == 1 && dimRange == 1) {
+            auto y = f_(xi);
+            using Value = decltype(y[0][0] * Jit[0][0] * Jit[0][0] * (dx*dx));
+            FieldMatrix<Value,1,1> value;
+            value[0][0] = y[0][0] * Jit[0][0] * Jit[0][0] * (dx*dx);
+            return value;
+          }
+          else {
+            return Impl::pullback(f_(xi), Jit) * (dx*dx);
+          }
         }
 
         F const& f_;
@@ -403,15 +439,40 @@ namespace Dune::Functions
 
         auto local_f = LocalValuedFunction{f, *geometry_};
 
-        if constexpr(dim == 2)
+        if constexpr(dim == 1)
+          interpolate1d(local_f, out);
+        else if constexpr(dim == 2)
           interpolate2d(local_f, out);
         else if constexpr(dim == 3)
           interpolate3d(local_f, out);
         else
-          DUNE_THROW(Dune::NotImplemented, "HHJ-interpolation only implemented for dim in {2,3}");
+          DUNE_THROW(Dune::NotImplemented, "HHJ-interpolation only implemented for dim in {1,2,3}");
       }
 
     private:
+      template<class F, class C>
+      void interpolate1d(const F& local_f, std::vector<C>& out) const
+      {
+        typename Geometry::LocalCoordinate x(0);
+
+        if constexpr (k == 0) {
+          x[0] = 0.5;
+          out[0] = local_f(x)[0][0];
+        }
+        else {
+          x[0] = 0;
+          out[0] = local_f(x)[0][0];
+
+          for (unsigned int i = 1; i < k; ++i) {
+            x[0] = D(i) / D(k);
+            out[i] = local_f(x)[0][0];
+          }
+
+          x[0] = 1;
+          out[k] = local_f(x)[0][0];
+        }
+      }
+
       template<class F, class C>
       void interpolate2d(const F& local_f, std::vector<C>& out) const
       {
@@ -588,7 +649,7 @@ namespace Dune::Functions
     public:
       HellanHerrmannJohnsonLocalFiniteElement()
       {
-        static_assert(dim==2 || dim==3, "HellanHerrmannJohnsonLocalFiniteElement only implemented for dim=2,3");
+        static_assert(dim==1 || dim==2 || dim==3, "HellanHerrmannJohnsonLocalFiniteElement only implemented for dim=1,2,3");
       }
 
       /** \brief Export number types, dimensions, etc.
@@ -732,15 +793,18 @@ namespace Dune::Functions
     static const int dim = GV::dimension;
 
   private:
+    static constexpr int vertexSize = (dim == 1 && k == 0) ? 0 : 1;
     static constexpr int edgeSize = (k+1);
     static constexpr int faceSize = (k+1)*(k+2)/2;
-    static constexpr int cellSize = (dim == 2 ? k*(k+1)/2 * 3 : (k+2)*(k+1)*(k+1));
+    static constexpr int cellSize = (dim == 1 ? (k == 0 ? 1 : (k > 1 ? k-1 : 0)) :
+        (dim == 2 ? k*(k+1)/2 * 3 : (k+2)*(k+1)*(k+1)));
 
     // helper methods to assign each subentity the number of dofs. Used by the LeafPreBasisMapperMixin.
     static constexpr std::size_t hellanHerrmannJohnsonLayout(Dune::GeometryType type, int gridDim)
     {
-      // currently only implemented for dim == 2
-      if (type.isLine() && gridDim == 2)
+      if (type.isVertex() && gridDim == 1)
+        return vertexSize;
+      else if (type.isLine() && gridDim == 2)
         return edgeSize;
       else if (type.isTriangle() && gridDim == 3)
         return faceSize;
@@ -771,7 +835,7 @@ namespace Dune::Functions
       , mapper_(gridView_, hellanHerrmannJohnsonLayout)
       , faceDOFPermutation_(gridView_.grid().globalIdSet(), k+2)
     {
-      static_assert(dim==2 || dim==3, "HellanHerrmannJohnsonPreBasis only implemented for dim=2,3");
+      static_assert(dim==1 || dim==2 || dim==3, "HellanHerrmannJohnsonPreBasis only implemented for dim=1,2,3");
     }
 
     //! Initialize the global indices

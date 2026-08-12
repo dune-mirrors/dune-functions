@@ -1,6 +1,8 @@
 #ifndef DUNE_C1ELEMENTS_ARNOLDWINTHER_HH
 #define DUNE_C1ELEMENTS_ARNOLDWINTHER_HH
 
+#include <array>
+#include <bitset>
 #include <numeric>
 #include <vector>
 
@@ -22,8 +24,6 @@
 #include <dune/localfunctions/common/localkey.hh>
 #include <dune/localfunctions/lagrange/lagrangesimplex.hh>
 
-#include <dune/functions/common/densevectorview.hh>
-#include <dune/functions/common/pullback.hh>
 #include <dune/functions/common/mapperutilities.hh>
 
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
@@ -206,6 +206,24 @@ private:
  * for Piola-mapped elements.
  */
 struct DoubleContravariantPiolaTransformator {
+private:
+  template <class Matrix, class Jacobian, class IntegrationElement>
+  static void applyToMatrix(Matrix &value, Jacobian const &jacobian,
+                            IntegrationElement integrationElement) {
+    auto referenceValue = value;
+    for (std::size_t k = 0; k < jacobian.N(); ++k) {
+      for (std::size_t l = 0; l < jacobian.N(); ++l) {
+        value[k][l] = 0;
+        for (std::size_t i = 0; i < jacobian.M(); ++i)
+          for (std::size_t j = 0; j < jacobian.M(); ++j)
+            value[k][l] += jacobian[k][i] * referenceValue[i][j]
+                           * jacobian[l][j];
+        value[k][l] /= integrationElement * integrationElement;
+      }
+    }
+  }
+
+public:
   /** \brief Double Piola-transform a set of shape-function values
    *
    * \param[in,out] values The values to be Piola-transformed
@@ -216,20 +234,32 @@ struct DoubleContravariantPiolaTransformator {
             &values,
         const LocalCoordinate &xi, const Geometry &geometry) {
     auto jacobian = geometry.jacobian(xi);
-    auto JT = geometry.jacobianTransposed(xi);
-
     auto integrationElement = geometry.integrationElement(xi);
     assert(values[0].N() == values[0].M());
     assert(values[0].N() == jacobian.N());
     assert(jacobian.M() == jacobian.N());
 
-    for (auto &value : values) {
-      // value = jacobian * value * transpose(jacobian);
-      value = Impl::pullback(value, JT, JT);
-      value /= (integrationElement * integrationElement);
-    }
+    for (auto &value : values)
+      applyToMatrix(value, jacobian, integrationElement);
 
     return;
+  }
+
+  /** \brief Transform derivatives of matrix-valued shape functions.
+   *
+   * For the affine geometries supported here, the double Piola matrix is
+   * constant, so it is applied independently to every reference derivative.
+   */
+  template <typename R, int dim, typename LocalCoordinate, typename Geometry>
+  static void apply(
+      std::vector<typename Impl::ArnoldWintherTensorTypes<R, dim>::ThreeTensor>
+          &jacobians,
+      const LocalCoordinate &xi, const Geometry &geometry) {
+    auto jacobian = geometry.jacobian(xi);
+    auto integrationElement = geometry.integrationElement(xi);
+    for (auto &shapeFunctionJacobian : jacobians)
+      for (auto &derivative : shapeFunctionJacobian)
+        applyToMatrix(derivative, jacobian, integrationElement);
   }
 
   /** \brief Piola-transform a set of shape-function derivatives
@@ -546,42 +576,6 @@ private:
 
 };
 
-// Class offering reading and writing access to a Vector starting from an index
-// \TODO check that this actually works also in debug mode or drop this
-// \TODO maybe make this private class of BlockDiagonalMatrix
-template <class Vector>
-class VectorSlice {
-public:
-  using value_type = typename Vector::value_type;
-  using size_type = typename Vector::size_type;
-
-  VectorSlice() = delete;
-  VectorSlice(Vector &vec, size_type index)
-      : VectorSlice(vec, index, vec.size()) {}
-  VectorSlice(Vector &vec, size_type index, size_type end)
-      : vec_(vec), i_(index), end_(end) {}
-
-  template <Concept::Number N>
-  VectorSlice &operator=(N scalar) {
-    for (size_type i = 0u; i < size(); ++i)
-      vec_[i_ + i] = scalar;
-    return *this;
-  }
-  value_type const &operator[](size_type const &index) const {
-    return vec_[i_ + index];
-  }
-  value_type &operator[](size_type const &index) { return vec_[i_ + index]; }
-
-  size_type N() const { return end_ - i_; }
-
-  size_type size() const { return end_ - i_; }
-
-private:
-  Vector &vec_;
-  size_type i_;
-  size_type end_;
-};
-
 // \TODO make this fullfill Dune interfaces
 // \TODO make generic in matrix Types and sizes
 // \TODO maybe make this private class
@@ -617,57 +611,38 @@ public:
 
   template <class VectorIn, class VectorOut>
   void mv(VectorIn const &x, VectorOut &y) const {
-    auto &&xx = Dune::Impl::asVector(x);
-    auto &&yy = Dune::Impl::asVector(y);
     DUNE_ASSERT_BOUNDS((void *)(&x) != (void *)(&y));
-    DUNE_ASSERT_BOUNDS(xx.N() == M());
-    DUNE_ASSERT_BOUNDS(yy.N() == N());
+    DUNE_ASSERT_BOUNDS(x.size() == 24);
+    DUNE_ASSERT_BOUNDS(y.size() == 24);
 
     size_type index = 0;
     for (auto const &mat : transformPointDofs_) {
-      auto res = VectorSlice(y, index, index + 3);
-      res = 0;
-      mat.mv(VectorSlice(x, index, index + 3), res);
+      applyBlock(mat, x, y, index, false);
       index += mat.M();
     }
     for (auto const &mat : transformEdgeDofs_) {
-      auto res = VectorSlice(y, index, index + 4);
-      res = 0;
-      mat.mv(VectorSlice(x, index, index + 4), res);
+      applyBlock(mat, x, y, index, false);
       index += mat.M();
     }
-
-    auto res = VectorSlice(y, index, index + 3);
-    res = 0;
-    transformElementDofs_.mv(VectorSlice(x, index, index + 3), res);
+    applyBlock(transformElementDofs_, x, y, index, false);
   }
 
   template <class VectorIn, class VectorOut>
   void mtv(VectorIn const &x, VectorOut &y) const {
-    auto &&xx = Dune::Impl::asVector(x);
-    auto &&yy = Dune::Impl::asVector(y);
     DUNE_ASSERT_BOUNDS((void *)(&x) != (void *)(&y));
-    DUNE_ASSERT_BOUNDS(xx.N() == M());
-    DUNE_ASSERT_BOUNDS(yy.N() == N());
+    DUNE_ASSERT_BOUNDS(x.size() == 24);
+    DUNE_ASSERT_BOUNDS(y.size() == 24);
 
-    // using y_field_type = typename FieldTraits<VectorOut>::field_type;
     size_type index = 0;
     for (auto const &mat : transformPointDofs_) {
-      auto res = VectorSlice(y, index, index + 3);
-      res = 0;
-      mat.mtv(VectorSlice(x, index, index + 3), res);
+      applyBlock(mat, x, y, index, true);
       index += mat.M();
     }
     for (auto const &mat : transformEdgeDofs_) {
-      auto res = VectorSlice(y, index, index + 4);
-      res = 0;
-      mat.mtv(VectorSlice(x, index, index + 4), res);
+      applyBlock(mat, x, y, index, true);
       index += mat.M();
     }
-
-    auto res = VectorSlice(y, index, index + 3);
-    res = 0;
-    transformElementDofs_.mtv(VectorSlice(x, index, index + 3), res);
+    applyBlock(transformElementDofs_, x, y, index, true);
   }
 
   This getInverse() {
@@ -677,6 +652,37 @@ public:
   }
 
 private:
+  template <class Value, class Scalar>
+  static void assignScaled(Value &out, Scalar factor, Value const &in) {
+    if constexpr (requires { out = factor * in; })
+      out = factor * in;
+    else
+      for (size_type i = 0; i < out.size(); ++i)
+        assignScaled(out[i], factor, in[i]);
+  }
+
+  template <class Value, class Scalar>
+  static void addScaled(Value &out, Scalar factor, Value const &in) {
+    if constexpr (requires { out += factor * in; })
+      out += factor * in;
+    else
+      for (size_type i = 0; i < out.size(); ++i)
+        addScaled(out[i], factor, in[i]);
+  }
+
+  template <class Matrix, class VectorIn, class VectorOut>
+  static void applyBlock(Matrix const &matrix, VectorIn const &x, VectorOut &y,
+                         size_type offset, bool transpose) {
+    for (size_type i = 0; i < matrix.N(); ++i) {
+      auto coefficient = [&](size_type j) -> auto const & {
+        return transpose ? matrix[j][i] : matrix[i][j];
+      };
+      assignScaled(y[offset + i], coefficient(0), x[offset]);
+      for (size_type j = 1; j < matrix.M(); ++j)
+        addScaled(y[offset + i], coefficient(j), x[offset + j]);
+    }
+  }
+
   void invert() {
     for (auto &mat : transformPointDofs_)
       mat.invert();
@@ -765,19 +771,12 @@ protected:
    */
   template <class InputValues, class OutputValues>
   void transform(InputValues const &inValues, OutputValues &outValues) const {
+    mat_.mtv(inValues, outValues);
 
-  // Here we cannot directly use
-  // mat_.mtv(inValues, outValues);
-  // because mv expects the DenseVector interface.
-  auto inValuesDenseVector = Impl::DenseVectorView(inValues);
-  auto outValuesDenseVector = Impl::DenseVectorView(outValues);
-  mat_.mtv(inValuesDenseVector, outValuesDenseVector);
-
-
-  auto x = Dune::referenceElement<double, 2>(GeometryTypes::simplex(2))
-                .position(0, 0);
-  DoubleContravariantPiolaTransformator::apply<R, 2>(outValues, x,
-                                                    element_->geometry());
+    auto x = Dune::referenceElement<double, 2>(GeometryTypes::simplex(2))
+                 .position(0, 0);
+    DoubleContravariantPiolaTransformator::apply<R, 2>(
+        outValues, x, element_->geometry());
   }
 
 private:
@@ -1024,11 +1023,6 @@ template <typename Range = double> auto arnoldWinther() {
 }
 } // namespace BasisFactory
 } // namespace Functions
-template <class T>
-struct FieldTraits<typename Functions::Impl::VectorSlice<T>> {
-  typedef typename FieldTraits<T>::field_type field_type;
-  typedef typename FieldTraits<T>::real_type real_type;
-};
 } // namespace Dune
 
 #include <dune/functions/functionspacebases/arnoldwintherbasis_inc.hh>

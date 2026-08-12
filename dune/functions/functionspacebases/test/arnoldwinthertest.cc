@@ -1,34 +1,22 @@
 // -*- tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
 // vi: set et ts=4 sw=2 sts=2:
 #include <config.h>
-#include <algorithm>
+
+#include <cmath>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #include <dune/common/test/testsuite.hh>
-#include <dune/geometry/referenceelements.hh>
-#include <dune/grid/common/rangegenerators.hh>
-#include <iostream>
-
-#include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
-
+#include <dune/geometry/referenceelements.hh>
+#include <dune/grid/common/gridfactory.hh>
+#include <dune/grid/common/rangegenerators.hh>
 #include <dune/grid/uggrid.hh>
-#include <dune/grid/yaspgrid.hh>
 
-#include <dune/functions/common/differentiablefunctionfromcallables.hh>
 #include <dune/functions/functionspacebases/arnoldwintherbasis.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/test/basistest.hh>
-#include <dune/functions/gridfunctions/discreteglobalbasisfunction.hh>
-#include <dune/grid/albertagrid.hh>
-#include <dune/grid/io/file/gmshreader.hh>
-#include <dune/grid/io/file/printgrid.hh>
-#include <dune/grid/io/file/vtk/subsamplingvtkwriter.hh>
-#include <dune/grid/onedgrid.hh>
-#include <dune/grid/utility/parmetisgridpartitioner.hh>
-#include <dune/grid/utility/structuredgridfactory.hh>
-#include <stdexcept>
-#include <string>
 
 using namespace Dune;
 using namespace Dune::Functions;
@@ -57,9 +45,7 @@ Dune::TestSuite testDeltaProperty(Basis const& basis, Interpolation const& inter
 }
 
 int main(int argc, char *argv[]) {
-  const MPIHelper &mpiHelper = Dune::MPIHelper::instance(argc, argv);
-  auto mpiSize = mpiHelper.size();
-  auto rank = mpiHelper.rank();
+  Dune::MPIHelper::instance(argc, argv);
   Dune::TestSuite test("arnold-winther");
   std::cout<<"Testing AW reference finite element"<<std::endl;
   // first test the plain reference basis and interpolation
@@ -89,7 +75,7 @@ int main(int argc, char *argv[]) {
       auto basis = makeBasis(gridView, arnoldWinther());
 
       test.subTest(
-          checkBasis(basis, EnableNormal_VectorContinuityCheck(), CheckLocalFiniteElementFlag<0>()));
+          checkBasis(basis, EnableNormal_VectorContinuityCheck()));
 
       std::cout<<"Edge orientations: \n";
       for (auto && bitset :  basis.preBasis().data_)
@@ -115,17 +101,16 @@ int main(int argc, char *argv[]) {
       auto gridView = grid->leafGridView();
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());
-      test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck(), CheckLocalFiniteElementFlag<0>()));
+      test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
     }
 
     grid->globalRefine(1);
 
     {
       auto gridView = grid->leafGridView();
-      Dune::printGrid(gridView.grid(), Dune::MPIHelper::instance(), "grid");
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());
-      test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck(), CheckLocalFiniteElementFlag<0>()));
+      test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
       std::cout<<"Edge orientations: \n";
       for (auto && bitset :  basis.preBasis().data_)
           std::cout<<bitset<<std::endl;

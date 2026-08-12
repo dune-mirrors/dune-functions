@@ -452,11 +452,15 @@ public:
     for (auto i = 0; i < refElement.size(1); ++i) {
       auto moments = LagrangeMoment<C,1>(f, refElement.template geometry<1>(i), quadratureOrder);
 
-      std::size_t lower = (i == 2) ? 1 : 0;
-      std::size_t upper = (i == 0) ? 1 : 2;
+      const auto lower = refElement.subEntity(i, 1, 0, dim);
+      const auto upper = refElement.subEntity(i, 1, 1, dim);
       auto tangent =
-          refElement.position(upper, 2) - refElement.position(lower, 2);
+          refElement.position(upper, dim) - refElement.position(lower, dim);
       tangent /= tangent.two_norm();
+      // Symfem defines the edge normal as the counterclockwise rotation of
+      // its oriented tangent.  This is not always Dune's outward reference
+      // normal, so refElement.integrationOuterNormal(i) cannot be used here
+      // without an additional, edge-dependent sign correction.
       std::decay_t<decltype(tangent)> normal = {
           -tangent[1], tangent[0]};
 
@@ -548,10 +552,12 @@ public:
 
       auto moments = LagrangeMoment<C, momentOrder>(f, refEdgeGeo, quadratureOrder);
 
-      std::size_t lower = (i == 2) ? 1 : 0;
-      std::size_t upper = (i == 0) ? 1 : 2;
+      const auto lower = refElement.subEntity(i, 1, 0, dim);
+      const auto upper = refElement.subEntity(i, 1, 1, dim);
       auto tangent = (*element).template subEntity<dim>(upper).geometry().center() - (*element).template subEntity<dim>(lower).geometry().center();
       tangent /= tangent.two_norm();
+      // Match the oriented-tangent normal convention used by Symfem for the
+      // generated reference DOFs; it is not necessarily the outward normal.
       std::decay_t<decltype(tangent)> normal = {
           -tangent[1], tangent[0]};
 
@@ -805,7 +811,13 @@ private:
 
     std::array<Dune::FieldMatrix<R, 2, 2>, 3> referenceG;
 
+    // Per-edge blocks of P=Q^{-1}.  They convert the four physical edge
+    // moments (two Lagrange moments, each with nn and nt components) to the
+    // corresponding reference functionals, including edge reorientation.
     std::array<Dune::FieldMatrix<R, 4, 4>, 3> W_k;
+    // Symmetric-tensor block of P=Q^{-1}.  Before inversion W represents
+    // vec_s(J tau J^T); the determinant scaling below specializes P to the
+    // vertex blocks (det(J)^2 W^{-1}) and cell block (det(J) W^{-1}).
     Dune::FieldMatrix<R, 3, 3> W;
     // \TODO For linear triangles any point inside is fine, for curved ones one
     // would need to chose them according to the dofs
@@ -822,8 +834,8 @@ private:
     // get local and global Tangents
     auto refElement = Dune::referenceElement<double, 2>(geometry.type());
     for (std::size_t i = 0; i < 3; ++i) {
-      std::size_t lower = (i == 2) ? 1 : 0;
-      std::size_t upper = (i == 0) ? 1 : 2;
+      const auto lower = refElement.subEntity(i, 1, 0, 2);
+      const auto upper = refElement.subEntity(i, 1, 1, 2);
       auto tangent =
           refElement.position(upper, 2) - refElement.position(lower, 2);
 

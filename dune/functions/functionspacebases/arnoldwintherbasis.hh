@@ -1,14 +1,15 @@
 #ifndef DUNE_C1ELEMENTS_ARNOLDWINTHER_HH
 #define DUNE_C1ELEMENTS_ARNOLDWINTHER_HH
 
-#include <dune/common/math.hh>
 #include <numeric>
 #include <vector>
 
 #include <dune/common/exceptions.hh>
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
+#include <dune/common/math.hh>
 #include <dune/common/scalarvectorview.hh>
+#include <dune/common/concepts/number.hh>
 
 #include <dune/geometry/quadraturerules.hh>
 #include <dune/geometry/referenceelements.hh>
@@ -17,12 +18,12 @@
 
 #include <dune/localfunctions/common/localbasis.hh>
 #include <dune/localfunctions/common/localfiniteelementtraits.hh>
-#include <dune/localfunctions/common/localinterpolation.hh>
+// #include <dune/localfunctions/common/localinterpolation.hh>
 #include <dune/localfunctions/common/localkey.hh>
 #include <dune/localfunctions/lagrange/lagrangesimplex.hh>
 
 #include <dune/functions/common/densevectorview.hh>
-#include <dune/functions/common/multidot.hh>
+#include <dune/functions/common/pullback.hh>
 #include <dune/functions/common/mapperutilities.hh>
 
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
@@ -224,7 +225,7 @@ struct DoubleContravariantPiolaTransformator {
 
     for (auto &value : values) {
       // value = jacobian * value * transpose(jacobian);
-      value = multiDot(value, JT, JT);
+      value = Impl::pullback(value, JT, JT);
       value /= (integrationElement * integrationElement);
     }
 
@@ -559,7 +560,9 @@ public:
       : VectorSlice(vec, index, vec.size()) {}
   VectorSlice(Vector &vec, size_type index, size_type end)
       : vec_(vec), i_(index), end_(end) {}
-  VectorSlice &operator=(value_type scalar) {
+
+  template <Concept::Number N>
+  VectorSlice &operator=(N scalar) {
     for (size_type i = 0u; i < size(); ++i)
       vec_[i_ + i] = scalar;
     return *this;

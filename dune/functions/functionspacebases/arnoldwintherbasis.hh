@@ -2,7 +2,6 @@
 #define DUNE_C1ELEMENTS_ARNOLDWINTHER_HH
 
 #include <array>
-#include <bitset>
 #include <numeric>
 #include <vector>
 
@@ -10,8 +9,6 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/math.hh>
-#include <dune/common/scalarvectorview.hh>
-#include <dune/common/concepts/number.hh>
 
 #include <dune/geometry/quadraturerules.hh>
 #include <dune/geometry/referenceelements.hh>
@@ -24,9 +21,8 @@
 #include <dune/localfunctions/common/localkey.hh>
 #include <dune/localfunctions/lagrange/lagrangesimplex.hh>
 
-#include <dune/functions/common/mapperutilities.hh>
-
 #include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
+#include <dune/functions/functionspacebases/lagrangebasis.hh>
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/transformedfiniteelementmixin.hh>
 
@@ -52,6 +48,21 @@ Patrick.
 */
 // \TODO Rework this to incorporate some stuff for nonaffine mappings
 namespace Impl {
+using ArnoldWintherFaceOrientations = Experimental::FaceOrientations<2>;
+
+template <class Element, class IdSet>
+ArnoldWintherFaceOrientations
+arnoldWintherFaceOrientations(const Element &element, const IdSet &idSet) {
+  constexpr int dim = 2;
+  const auto &referenceElement = Dune::referenceElement<double, dim>(element.type());
+  auto vertexIds = Dune::transformedRangeView(
+      referenceElement.subEntities(0, 0, dim), [&](auto localVertexIndex) {
+        return idSet.subId(element, localVertexIndex, dim);
+      });
+  using namespace Dune::Indices;
+  return ArnoldWintherFaceOrientations(element.type(), vertexIds, _1);
+}
+
 template <class R, int dim, int dimDomain = dim>
 struct ArnoldWintherTensorTypes {
   using Scalar = R;
@@ -495,8 +506,9 @@ public:
   : quadratureOrder(quadOrder)
   {}
 
-  void bind(std::bitset<3> data, Element const& e){
-    edgeOrientation_ = data;
+  void bind(const ArnoldWintherFaceOrientations &orientations,
+            Element const& e){
+    faceOrientations_ = orientations;
     element = &e;
   }
 
@@ -550,7 +562,7 @@ public:
 
       FieldVector<protomotedType, 2> normalTimesMoment;
       for (std::size_t m = 0; m < momentOrder + 1; ++m){
-        if (edgeOrientation_[i])
+        if (faceOrientations_.faceOrientationIndex(i, 1))
           moments[momentOrder -m].mtv(normal, normalTimesMoment);
         else
           moments[m].mtv(normal, normalTimesMoment);
@@ -571,7 +583,7 @@ public:
 
 private:
   int quadratureOrder;
-  std::bitset<3> edgeOrientation_;
+  ArnoldWintherFaceOrientations faceOrientations_;
   Element const* element = nullptr;
 
 };
@@ -746,13 +758,14 @@ public:
    *        Fills the transformation Matrix.
    *
    * \tparam Element
-   * \param data     Edge orientations
+   * \param orientations Face orientations relative to global vertex IDs
    * \param element
    */
-  void bind(std::bitset<3> data, Element const &element) {
-    edgeOrientation_ = data;
+  void bind(const ArnoldWintherFaceOrientations &orientations,
+            Element const &element) {
+    faceOrientations_ = orientations;
     element_ = &element;
-    interpolation_.bind(data, element);
+    interpolation_.bind(orientations, element);
     fillMatrix(element.geometry()); // barycenter, because we need some value.
   }
 
@@ -836,7 +849,7 @@ private:
       // already inverted W_k
       // By using Lagrange moments these matrices are orientation invariant.
       W_k[i] = 0;
-      if (edgeOrientation_[i]){
+      if (faceOrientations_.faceOrientationIndex(i, 1)){
 
         W_k[i][2][0] = 1.;
         W_k[i][3][0] = -alpha[i] / beta[i];
@@ -887,7 +900,7 @@ private:
   Traits::LocalInterpolationType interpolation_;
   // Blockmatrix This is the matrix P from the paper mentioned above
   ArnoldWintherBlockDiagonalMatrix<R> mat_;
-  std::bitset<3> edgeOrientation_;
+  ArnoldWintherFaceOrientations faceOrientations_;
   const Element *element_;
 };
 
@@ -897,12 +910,12 @@ template <class GV, class R> class ArnoldWintherNode;
 
 template <class GV, typename R>
 class ArnoldWintherPreBasis
-: public LeafPreBasisMapperMixin<GV>//, Impl::ModuloEdgeTwist<typename GV::IndexSet>>
+: public LeafPreBasisMapperMixin<GV>
 {
   static const int dim = GV::dimension;
   static_assert(dim == 2,
                 "ArnoldWinther PreBasis only implemented for 2d simplices");
-  using Base = LeafPreBasisMapperMixin<GV>;//, Impl::ModuloEdgeTwist<typename GV::IndexSet>>;
+  using Base = LeafPreBasisMapperMixin<GV>;
 
   // helper methods to assign each subentity the number of dofs. Used by the
   // LeafPreBasisMapperMixin.
@@ -919,8 +932,6 @@ class ArnoldWintherPreBasis
       return 0;
   }
 
-  using SubEntityMapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
-
 public:
   //! The grid view that the FE basis is defined on
   using GridView = GV;
@@ -933,28 +944,24 @@ public:
 
   //! Constructor for a given grid view object
   ArnoldWintherPreBasis(const GV &gv)
-      : Base(gv, arnoldWintherMapperLayout),//, Impl::ModuloEdgeTwist{gv.indexSet(), arnoldWintherMapperLayout(GeometryTypes::line, dim), 2}),
-        mapper_({gv, mcmgElementLayout()})
-  {
-    data_ = Impl::computeEdgeOrientations(mapper_);
-  }
+      : Base(gv, arnoldWintherMapperLayout)
+  {}
 
   //! Update the stored grid view, to be called if the grid has changed
   void update(GridView const &gv) {
     Base::update(gv);
-    mapper_.update(this->gridView());
-    data_ = Impl::computeEdgeOrientations(mapper_);
   }
 
   /**
    * \brief Create tree node
    */
-  Node makeNode() const { return Node{mapper_, data_}; }
+  Node makeNode() const { return Node{this->gridView()}; }
 
-private:
-  SubEntityMapper mapper_;
-public:
-  std::vector<std::bitset<3>> data_;
+  template <class Element>
+  auto faceOrientations(const Element &element) const {
+    return Impl::arnoldWintherFaceOrientations(
+        element, this->gridView().grid().globalIdSet());
+  }
 };
 
 template <class GV, class R>
@@ -962,14 +969,13 @@ class ArnoldWintherNode : public LeafBasisNode {
 public:
   using size_type = std::size_t;
   using Element = typename GV::template Codim<0>::Entity;
-  using Mapper = Dune::MultipleCodimMultipleGeomTypeMapper<GV>;
 
 public:
   using FiniteElement =
       Impl::ArnoldWintherLocalFiniteElement<Element, typename GV::ctype, R>;
 
-  ArnoldWintherNode(Mapper const &m, std::vector<std::bitset<3>> const &data)
-      : mapper_(&m), data_(&data) {
+  ArnoldWintherNode(GV const &gridView)
+      : gridView_(&gridView) {
     // this->setSize(finiteElement_.size());
   }
 
@@ -991,7 +997,10 @@ public:
       DUNE_THROW(Dune::NotImplemented,
                  "ArnoldWintherBasis can only be bound to simplex elements");
     element_ = &e;
-    finiteElement_.bind((*data_)[mapper_->index(e)], *element_);
+    finiteElement_.bind(
+        Impl::arnoldWintherFaceOrientations(
+            e, gridView_->grid().globalIdSet()),
+        *element_);
     this->setSize(finiteElement_.size());
   }
 
@@ -1000,8 +1009,7 @@ public:
 protected:
   FiniteElement finiteElement_;
   Element const *element_;
-  Mapper const *mapper_;
-  std::vector<std::bitset<3>> const *data_;
+  GV const *gridView_;
 };
 
 namespace BasisFactory {

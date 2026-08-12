@@ -2,32 +2,59 @@ from sympy import *
 from sympy.polys.polyfuncs import horner
 from sympy.abc import x, y
 import symfem
-import numpy as np
-
-from symfem.functions import parse_function_input as parse, _to_sympy_format
-
-def adaptReferenceElementToDune(fe):
-  newRef = fe.reference
-  assert(newRef.name == "triangle")
-  newRef.edges = ((0,1),(0,2),(1,2))
-  if hasattr(fe, "variant"):
-    newFe = type(fe)(newRef, fe.order, fe.variant)
-  else:
-    newFe = type(fe)(newRef, fe.order)
-  return newFe
-
-def adaptReferenceToPhysicalElement(fe, vertices):
-  physRef = symfem.create_reference("triangle", vertices= vertices)
-  assert(physRef.name == "triangle")
-  # physRef.edges = ((0,1),(0,2),(1,2))
-  newFe = type(fe)(physRef, fe.order)
-  return newFe
-
 def createGenericReferenceElement(refName, feName, order, **kwargs):
-  return(adaptReferenceElementToDune(symfem.create_element(refName, feName,order, **kwargs)))
+  fe = symfem.create_element(refName, feName, order, **kwargs)
+  assert fe.reference.name == "triangle"
+  assert fe.reference.edges == ((0, 1), (0, 2), (1, 2))
+  return fe
 
-def createPhysicalElement(refName, feName, order, vertices):
-  return(adaptReferenceToPhysicalElement(symfem.create_element(refName, feName, order), vertices))
+def verifyDuneDOFOrdering(fe):
+  """Verify the local-key order assumed by ArnoldWintherLocalCoefficients."""
+  def sympy_value(value):
+    return value.as_sympy() if hasattr(value, "as_sympy") else value
+
+  assert fe.order == 2
+  assert fe.variant == "dune"
+  assert len(fe.dofs) == 24
+
+  expected_entities = (
+      [(0, vertex) for vertex in range(3) for _ in range(3)]
+      + [(1, edge) for edge in range(3) for _ in range(4)]
+      + [(2, 0)] * 3
+  )
+  assert [dof.entity for dof in fe.dofs] == expected_entities
+
+  expected_vertex_components = (
+      ((1, 0), (1, 0)),
+      ((1, 0), (0, 1)),
+      ((0, 1), (0, 1)),
+  )
+  for vertex in range(3):
+    for component, (left, right) in enumerate(expected_vertex_components):
+      dof = fe.dofs[3 * vertex + component]
+      assert sympy_value(dof.lvec) == left
+      assert sympy_value(dof.rvec) == right
+
+  for edge in range(3):
+    edge_reference = fe.reference.sub_entity(1, edge)
+    normal = sympy_value(edge_reference.normal())
+    tangent = sympy_value(edge_reference.tangent())
+    for moment in range(2):
+      normal_dof = fe.dofs[9 + 4 * edge + 2 * moment]
+      tangent_dof = fe.dofs[10 + 4 * edge + 2 * moment]
+      assert normal_dof.dof.dof_point() == (moment,)
+      assert tangent_dof.dof.dof_point() == (moment,)
+      assert sympy_value(normal_dof.inner_with_left) == normal
+      assert sympy_value(normal_dof.inner_with_right) == normal
+      assert sympy_value(tangent_dof.inner_with_left) == tangent
+      assert sympy_value(tangent_dof.inner_with_right) == normal
+
+  expected_cell_components = (
+      Matrix(((1, 0), (0, 0))),
+      Matrix(((0, 1), (0, 0))),
+      Matrix(((0, 0), (0, 1))),
+  )
+  assert tuple(dof.f.as_sympy() for dof in fe.dofs[21:]) == expected_cell_components
 
 ## apply a horner scheme on a function f
 def hornerScheme(f, derivative = [x,y], **kwargs):
@@ -111,7 +138,7 @@ def getCodeForEvaluation(basis, **kwargs):
 
 ## Generate an include file for evaluation methods
 def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, symmetric = False, **kwargs):
-  variant = kwargs.pop("variant", "Dune")
+  variant = kwargs.pop("variant", "dune")
   assert(isinstance(name, str))
   code = "#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n namespace Dune::Functions{\n  namespace Impl{ \n    "
   code += "template<class D, class R,int dim, unsigned int k>\n"
@@ -119,7 +146,8 @@ def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, sy
   code += "\n\n// generated with sympy from symfem library\n"
   code += "auto const&x = in[0], y = in[1];"
   for i in range(minOrder, maxOrder +1):
-    fe = createGenericReferenceElement(reference, feType, i, **kwargs)
+    fe = createGenericReferenceElement(reference, feType, i, variant=variant, **kwargs)
+    verifyDuneDOFOrdering(fe)
     basis = fe.get_basis_functions()
     code += "\n if constexpr (k =="+str(i)+"){\n"
     code += getCodeForEvaluation(basis, symmetric = symmetric)
@@ -131,7 +159,8 @@ def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, sy
   code += "\n\n// generated with sympy from symfem library\n"
   code += "auto const&x = in[0], y = in[1];"
   for i in range(minOrder, maxOrder +1):
-    fe = createGenericReferenceElement(reference, feType, i, **kwargs)
+    fe = createGenericReferenceElement(reference, feType, i, variant=variant, **kwargs)
+    verifyDuneDOFOrdering(fe)
     basis = fe.get_basis_functions()
     code += "if constexpr (k =="+str(i)+"){"
 
@@ -147,17 +176,5 @@ def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, sy
 if __name__== "__main__":
   init_printing()
 
-  ## Note: in order to match the indices of the Lagrange from symfem to Dune we needed to introduce a "Dune-variant" of the Lagrange
-  ### The code for 1d and 2d added to symfem/elements/lagrange.py line 63 is
-  #          elif variant == "Dune" and reference.name in ("interval", "triangle"):
-    # if reference.name == "interval":
-    #     for i in range(order +1):
-    #         dim  = 0 if i == 0 or i == order else reference.tdim
-    #         subEntityCount = 1 if i == order else 0
-    #         dofs.append(PointEvaluation(reference, (sympy.Rational(i,order),), entity=(dim, subEntityCount)))
-  printEvaluationCode("ArnoldWintherReference", reference =  "triangle", feType = "AW",minOrder  = 2, maxOrder= 2, symmetric = True, variant = "equispaced")
-  # from symfem.elements.lagrange import Lagrange
-  # i = symfem.create_reference("interval", ((0,), (1,)))
-  # lagrange = Lagrange(i, 1, variant = "Dune")
-  # print(lagrange.get_basis_functions())
-  # aw = createGenericReferenceElement("triangle", "AW", 2, variant="Dune")
+  printEvaluationCode("ArnoldWintherReference", reference="triangle", feType="AW",
+                      minOrder=2, maxOrder=2, symmetric=True, variant="dune")

@@ -44,6 +44,67 @@ Dune::TestSuite testDeltaProperty(Basis const& basis, Interpolation const& inter
   return test;
 }
 
+template<class Basis>
+Dune::TestSuite testEdgeDOFNumbering(Basis const& basis)
+{
+  Dune::TestSuite test("Arnold-Winther edge DOF numbering");
+  auto insideLocalView = basis.localView();
+  auto outsideLocalView = basis.localView();
+  const auto& indexSet = basis.gridView().indexSet();
+  const auto& idSet = basis.gridView().grid().globalIdSet();
+
+  for (const auto& inside : elements(basis.gridView())) {
+    insideLocalView.bind(inside);
+    for (const auto& intersection : intersections(basis.gridView(), inside)) {
+      if (not intersection.neighbor())
+        continue;
+
+      const auto outside = intersection.outside();
+      if (indexSet.index(inside) >= indexSet.index(outside))
+        continue;
+
+      outsideLocalView.bind(outside);
+      const auto insideEdge = intersection.indexInInside();
+      const auto outsideEdge = intersection.indexInOutside();
+      const auto insideOrientations = basis.preBasis().faceOrientations(inside);
+      const auto outsideOrientations = basis.preBasis().faceOrientations(outside);
+      const bool insideFlipped = insideOrientations.faceOrientationIndex(insideEdge, 1);
+      const bool outsideFlipped = outsideOrientations.faceOrientationIndex(outsideEdge, 1);
+
+      auto referenceMomentVertexId = [&](const auto& element, auto edge,
+                                         bool flipped, std::size_t moment) {
+        const auto& referenceElement = Dune::referenceElement(element);
+        // A flipped edge swaps moment positions, but not the two tensor
+        // components stored at each position.
+        const auto referenceMoment = flipped ? 1 - moment : moment;
+        const auto vertex = referenceElement.subEntity(edge, 1, referenceMoment, 2);
+        return idSet.subId(element, vertex, 2);
+      };
+
+      for (std::size_t moment = 0; moment < 2; ++moment) {
+        test.check(referenceMomentVertexId(inside, insideEdge, insideFlipped, moment)
+                   == referenceMomentVertexId(outside, outsideEdge, outsideFlipped, moment))
+            << "FaceOrientations assigns different vertices to edge moment " << moment
+            << " (inside edge " << insideEdge << ", flip " << insideFlipped
+            << "; outside edge " << outsideEdge << ", flip " << outsideFlipped << ")";
+
+        for (std::size_t component = 0; component < 2; ++component) {
+          const auto edgeDOF = 2 * moment + component;
+          const auto insideLocalDOF = 9 + 4 * insideEdge + edgeDOF;
+          const auto outsideLocalDOF = 9 + 4 * outsideEdge + edgeDOF;
+          test.check(insideLocalView.index(insideLocalDOF)
+                     == outsideLocalView.index(outsideLocalDOF))
+              << "Edge moment " << moment << ", tensor component " << component
+              << " has inconsistent global basis indices (inside edge " << insideEdge
+              << ", flip " << insideFlipped << "; outside edge " << outsideEdge
+              << ", flip " << outsideFlipped << ")";
+        }
+      }
+    }
+  }
+  return test;
+}
+
 int main(int argc, char *argv[]) {
   Dune::MPIHelper::instance(argc, argv);
   Dune::TestSuite test("arnold-winther");
@@ -74,12 +135,10 @@ int main(int argc, char *argv[]) {
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());
 
+      test.subTest(testEdgeDOFNumbering(basis));
       test.subTest(
           checkBasis(basis, EnableNormal_VectorContinuityCheck()));
 
-      std::cout<<"Edge orientations: \n";
-      for (auto && bitset :  basis.preBasis().data_)
-          std::cout<<bitset<<std::endl;
     }
   }
 
@@ -101,6 +160,7 @@ int main(int argc, char *argv[]) {
       auto gridView = grid->leafGridView();
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());
+      test.subTest(testEdgeDOFNumbering(basis));
       test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
     }
 
@@ -110,11 +170,8 @@ int main(int argc, char *argv[]) {
       auto gridView = grid->leafGridView();
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());
+      test.subTest(testEdgeDOFNumbering(basis));
       test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
-      std::cout<<"Edge orientations: \n";
-      for (auto && bitset :  basis.preBasis().data_)
-          std::cout<<bitset<<std::endl;
-
     }
 
   }

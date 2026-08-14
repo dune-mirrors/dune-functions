@@ -5,8 +5,10 @@
 
 #include <config.h>
 
-#include <dune/common/exceptions.hh>
 #include <dune/common/timer.hh>
+#include <iostream>
+
+#include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
 
 #include <dune/grid/uggrid.hh>

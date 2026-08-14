@@ -277,7 +277,7 @@ int main(int argc, char* argv[])
       auto basis = makeBasis(gridView, arnoldWinther());
 
       test.subTest(testEdgeDOFNumbering(basis));
-      test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
+      test.subTest(checkBasis(basis, EnableNormalVectorContinuityCheck()));
     }
   }
 
@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());
       test.subTest(testEdgeDOFNumbering(basis));
-      test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
+      test.subTest(checkBasis(basis, EnableNormalVectorContinuityCheck()));
     }
 
     grid->globalRefine(1);
@@ -312,7 +312,7 @@ int main(int argc, char* argv[])
       test.subTest(testTransformedDeltaProperty(basis));
       test.subTest(testEdgeInterpolationConsistency(basis));
       test.subTest(testEdgeDOFNumbering(basis));
-      test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
+      test.subTest(checkBasis(basis, EnableNormalVectorContinuityCheck()));
     }
   }
 

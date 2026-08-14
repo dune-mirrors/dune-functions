@@ -24,7 +24,6 @@
 
 #include <dune/geometry/quadraturerules.hh>
 
-#include <dune/functions/common/pullback.hh>
 #include <dune/functions/functionspacebases/concepts.hh>
 #include <dune/functions/functionspacebases/test/enabledifferentiabilitycheck.hh>
 #include <dune/functions/functionspacebases/test/testboundlocalfe.hh>
@@ -459,31 +458,16 @@ struct EnableNormalContinuityCheck : public EnableContinuityCheck
   }
 };
 
-struct EnableNormal_VectorContinuityCheck : public EnableContinuityCheck
-{
-  auto localContinuityCheck() const {
-    auto normalJump = [this](auto&&jump, auto&& intersection, auto&& x) -> double {
-      auto tmp = intersection.unitOuterNormal(x);
-      jump.mv(intersection.unitOuterNormal(x), tmp);
-      return tmp.infinity_norm();
-    };
-    return localJumpContinuityCheck(normalJump, order_, tol_);
-  }
-};
-
-
-// Flag to enable a local normal-continuity check for checking strong
-// continuity across an intersection within checkBasisContinuity().
-//
-// For each inside basis function this will compute the normal jump against
-// zero or the corresponding inside basis function. The latter is then
-// checked for being (up to a tolerance) zero on a set of quadrature points.
-struct EnableNormalNormalContinuityCheck : public EnableContinuityCheck
+// Flag to enable a normal-continuity check for matrix-valued basis functions.
+// This checks continuity of the normal trace, i.e., the matrix-vector product
+// of the function jump with the intersection normal.
+struct EnableNormalVectorContinuityCheck : public EnableContinuityCheck
 {
   auto localContinuityCheck() const {
     auto normalJump = [](auto&& jump, auto&& intersection, auto&& x) -> double {
-      auto n = intersection.unitOuterNormal(x);
-      return Dune::Functions::Impl::pullback(jump,n,n);
+      auto tmp = intersection.unitOuterNormal(x);
+      jump.mv(intersection.unitOuterNormal(x), tmp);
+      return tmp.infinity_norm();
     };
     return localJumpContinuityCheck(normalJump, order_, tol_);
   }

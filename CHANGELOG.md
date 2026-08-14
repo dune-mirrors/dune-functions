@@ -10,6 +10,10 @@ corresponding version of the Dune core modules.
 
 # Master (will become release 2.12)
 
+- Add a Hellan-Herrmann-Johnson basis on triangular grids for orders zero
+  through six. A one-dimensional scalar Lagrange analogue with the double
+  contravariant Piola transformation is available on interval grids.
+
 - The `LagrangeBasis` now supports arbitrary order for grids
   in 1d, 2d, and 3d with one exception: On triangular prisms and
   quadrilateral pyramids elements only order two is currently

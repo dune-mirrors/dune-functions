@@ -417,9 +417,6 @@ namespace Dune::Functions
         Geometry const& geometry_;
       };
 
-      template <class F, class G>
-      LocalValuedFunction(const F&, const G&) -> LocalValuedFunction<F>;
-
       /** \brief Evaluate a given function and its derivatives at the nodes
        *
        * \tparam F Type of function to evaluate
@@ -433,7 +430,7 @@ namespace Dune::Functions
         out.clear();
         out.resize(size(), C(0));
 
-        auto local_f = LocalValuedFunction{f, *geometry_};
+        auto local_f = LocalValuedFunction<F>{f, *geometry_};
 
         if constexpr(dim == 1)
           interpolate1d(local_f, out);

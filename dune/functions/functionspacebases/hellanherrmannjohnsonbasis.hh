@@ -34,10 +34,18 @@
 #include <dune/functions/functionspacebases/nodes.hh>
 
 /**
- * \file hellanHerrmannjohnsonbasis.hh
- * \brief This file provides an implementation of the Hellan-Herrmann-Johnson finite element on triangles and tetrahedra.
+ * \file hellanherrmannjohnsonbasis.hh
+ * \brief Hellan-Herrmann-Johnson finite elements on triangles and their scalar 1D analogue
  *
- * For reference, see [...].
+ * The two-dimensional implementation is the classical HHJ element: symmetric
+ * matrix-valued polynomials on triangles with continuous normal-normal traces.
+ * See Arnold and Walker, https://arxiv.org/abs/1909.09687.
+ *
+ * In one dimension a symmetric 1-by-1 matrix is a scalar. The implementation
+ * therefore uses the scalar Lagrange element and applies the double
+ * contravariant Piola transformation. This is a useful degenerate analogue,
+ * not an HHJ element provided by Symfem. Three-dimensional HHJ elements are
+ * mathematically defined, but are deliberately not implemented here yet.
  *
  * It contains in the following order:
  *     - A GlobalBasis typedef HellanHerrmannJohnsonBasis
@@ -53,17 +61,17 @@ namespace Dune::Functions
   template<class GV, unsigned int k, class R>
   struct HellanHerrmannJohnsonPreBasis;
 
-  /** \brief Nodal basis of a scalar cubic Hermite finite element space
+  /** \brief Global Hellan-Herrmann-Johnson basis
    *
    * \ingroup FunctionSpaceBasesImplementations
    *
-   * \note This only works for simplex grids.
+   * \note This only works for one- and two-dimensional simplex grids.
    *
    * All arguments passed to the constructor will be forwarded to the constructor
    * of HellanHerrmannJohnsonPreBasis.
    *
    * \tparam GV The GridView that the space is defined on
-   * \tparam k  The polynomial order of the element
+   * \tparam k  The polynomial order of the element (zero through six)
    * \tparam R The range type of the local basis
    */
   template <class GV, unsigned int k, class R = double>
@@ -86,7 +94,22 @@ namespace Dune::Functions
         : localKeys_(size())
       {
         std::size_t idx = 0;
-        if constexpr (dim == 2) {
+        if constexpr (dim == 1) {
+          if constexpr (k == 0) {
+            localKeys_[idx++] = LocalKey(0,0,0);
+          }
+          else if constexpr (k == 1) {
+            localKeys_[idx++] = LocalKey(0,1,0);
+            localKeys_[idx++] = LocalKey(1,1,0);
+          }
+          else {
+            localKeys_[idx++] = LocalKey(0,1,0);
+            for (unsigned int i = 0; i < k-1; ++i)
+              localKeys_[idx++] = LocalKey(0,0,i);
+            localKeys_[idx++] = LocalKey(1,1,0);
+          }
+        }
+        else if constexpr (dim == 2) {
           // edge DOFs
           int edgeSize = k+1;
           for (unsigned int s = 0; s < 3; ++s) // three edges
@@ -99,29 +122,16 @@ namespace Dune::Functions
             for (int i = 0; i < cellSize; ++i)
               localKeys_[idx++] = LocalKey(s,0,i);
         }
-        else if constexpr (dim == 3) {
-          // face DOFs
-          int faceSize = (k+1)*(k+2)/2;
-          for (unsigned int s = 0; s < 4; ++s) // four faces
-            for (int i = 0; i < faceSize; ++i)
-              localKeys_[idx++] = LocalKey(s,1,i);
-
-          // cell DOFs
-          int cellSize = (k+1)*(k+1)*(k+2);
-          for (unsigned int s = 0; s < 1; ++s) // one cell
-            for (int i = 0; i < cellSize; ++i)
-              localKeys_[idx++] = LocalKey(s,0,i);
-        }
       }
 
       /** \brief number of coefficients
        */
       static constexpr size_type size()
       {
-        if constexpr (dim == 2)
+        if constexpr (dim == 1)
+          return k+1;
+        else if constexpr (dim == 2)
           return 3*(k+1)*(k+2)/2;
-        else if constexpr (dim == 3)
-          return (k+1)*(k+2)*(k+3);
         else
           return 0;
       }
@@ -141,7 +151,7 @@ namespace Dune::Functions
     /** \brief Implementation of Hellan-Herrmann-Johnson basis function on the reference element
      * \tparam D Type to represent the field in the domain
      * \tparam R Type to represent the field in the range
-     * \tparam dim Dimension of the domain simplex (limited to dim=2)
+     * \tparam dim Dimension of the domain simplex (one or two)
      * \tparam k The polynomial order of the basis
      */
     template<class D, class R, int dim, unsigned int k>
@@ -156,12 +166,15 @@ namespace Dune::Functions
         using RangeFieldType = R;
         using RangeType = FieldMatrix<R,dim,dim>;
         using DivDivType = R;
+        using JacobianType = std::array<FieldMatrix<R,dim,dim>, dim>;
       };
 
     public:
       HellanHerrmannJohnsonReferenceLocalBasis()
       {
-        static_assert(dim == 2 || dim == 3, "HellanHerrmannJohnsonReferenceLocalBasis only implemented for dim=2,3");
+        static_assert(dim == 1 || dim == 2,
+                      "HellanHerrmannJohnsonReferenceLocalBasis only implemented for dim=1,2");
+        static_assert(k <= 6, "HellanHerrmannJohnsonReferenceLocalBasis only implemented up to order 6");
       }
 
       /** The number of basis functions in the basis
@@ -195,23 +208,27 @@ namespace Dune::Functions
       void evaluateDivDiv(const typename Traits::DomainType& x,
                           std::vector<typename Traits::DivDivType>& out) const;
 
-      template <class Derivative>
-      void evaluate(const typename Traits::DomainType& x, Derivative d,
-                    std::vector<typename Traits::template Type<Derivative>>& out) const
+      /** \brief Evaluate first derivatives of all shape functions
+       *
+       * The derivative of the geometry-dependent double Piola transformation
+       * is not implemented yet.
+       */
+      void evaluateJacobian(const typename Traits::DomainType&,
+                            std::vector<typename Traits::JacobianType>&) const
       {
-
+        DUNE_THROW(Dune::NotImplemented, "evaluateJacobian not implemented for HHJ element");
       }
 
     private:
       template <class Range>
+      static Range sym(R a00)
+      {
+        return Range({{a00}});
+      }
+      template <class Range>
       static Range sym(R a00, R a01, R a11)
       {
         return Range({{a00,a01},{a01,a11}});
-      }
-      template <class Range>
-      static Range sym(R a00, R a01, R a02, R a11, R a12, R a22)
-      {
-        return Range({{a00,a01,a02},{a01,a11,a12}, {a02,a12,a22}});
       }
     };
 
@@ -241,6 +258,7 @@ namespace Dune::Functions
           using RangeFieldType = R;
           using RangeType = FieldMatrix<R,dimRange,dimRange>;
           using DivDivType = R;
+          using JacobianType = std::array<FieldMatrix<R,dimRange,dimRange>, dimDomain>;
         };
 
       public:
@@ -281,6 +299,12 @@ namespace Dune::Functions
           transformDivDiv(x, divDivBuffer_, out);
         }
 
+        void evaluateJacobian(const typename Traits::DomainType&,
+                              std::vector<typename Traits::JacobianType>&) const
+        {
+          DUNE_THROW(Dune::NotImplemented, "evaluateJacobian not implemented for HHJ element");
+        }
+
         //! \brief Polynomial order of the shape functions
         auto order() const { return refLocalBasis_.order(); }
 
@@ -292,15 +316,18 @@ namespace Dune::Functions
         {
           assert(inValues.size() == size());
           assert(outValues.size() == inValues.size());
-          //...
-
           auto Jt = geometry_->jacobianTransposed(x);
           auto dx = geometry_->integrationElement(x);
 
           for (std::size_t i = 0; i < inValues.size(); ++i)
           {
-            outValues[i] = Impl::pullback(inValues[i],Jt);
-            outValues[i] /= dx*dx;
+            if constexpr (dim == 1 && Traits::dimRange == 1) {
+              outValues[i][0][0] = inValues[i][0][0] * Jt[0][0] * Jt[0][0] / (dx*dx);
+            }
+            else {
+              outValues[i] = Impl::pullback(inValues[i],Jt);
+              outValues[i] /= dx*dx;
+            }
           }
         }
 
@@ -374,7 +401,16 @@ namespace Dune::Functions
         {
           auto Jit = geometry_.jacobianInverseTransposed(xi);
           auto dx = geometry_.integrationElement(xi);
-          return Impl::pullback(f_(xi), Jit) * (dx*dx);
+          if constexpr (dim == 1 && dimRange == 1) {
+            auto y = f_(xi);
+            using Value = decltype(y[0][0] * Jit[0][0] * Jit[0][0] * (dx*dx));
+            FieldMatrix<Value,1,1> value;
+            value[0][0] = y[0][0] * Jit[0][0] * Jit[0][0] * (dx*dx);
+            return value;
+          }
+          else {
+            return Impl::pullback(f_(xi), Jit) * (dx*dx);
+          }
         }
 
         F const& f_;
@@ -396,15 +432,38 @@ namespace Dune::Functions
 
         auto local_f = LocalValuedFunction{f, *geometry_};
 
-        if constexpr(dim == 2)
+        if constexpr(dim == 1)
+          interpolate1d(local_f, out);
+        else if constexpr(dim == 2)
           interpolate2d(local_f, out);
-        else if constexpr(dim == 3)
-          interpolate3d(local_f, out);
         else
-          DUNE_THROW(Dune::NotImplemented, "HHJ-interpolation only implemented for dim in {2,3}");
+          DUNE_THROW(Dune::NotImplemented, "HHJ interpolation only implemented for dim in {1,2}");
       }
 
     private:
+      template<class F, class C>
+      void interpolate1d(const F& local_f, std::vector<C>& out) const
+      {
+        typename Geometry::LocalCoordinate x(0);
+
+        if constexpr (k == 0) {
+          x[0] = 0.5;
+          out[0] = local_f(x)[0][0];
+        }
+        else {
+          x[0] = 0;
+          out[0] = local_f(x)[0][0];
+
+          for (unsigned int i = 1; i < k; ++i) {
+            x[0] = D(i) / D(k);
+            out[i] = local_f(x)[0][0];
+          }
+
+          x[0] = 1;
+          out[k] = local_f(x)[0][0];
+        }
+      }
+
       template<class F, class C>
       void interpolate2d(const F& local_f, std::vector<C>& out) const
       {
@@ -468,96 +527,6 @@ namespace Dune::Functions
         }
       }
 
-      template<class F, class C>
-      void interpolate3d(const F& local_f, std::vector<C>& out) const
-      {
-        auto refElem = referenceElement(*geometry_);
-        auto const& faceQuadRule = Dune::QuadratureRules<D,dim-1>::rule(refElem.type(0,1), 2*k+1);
-        auto const& cellQuadRule = Dune::QuadratureRules<D,dim>::rule(refElem.type(), 2*k);
-
-        using T = FieldMatrix<D,dim,dim>;
-        std::array<T,4> directions1{T({{0, 1, 1}, {1, 0, 1}, {1, 1, 0}}),
-                                    T({{-6, 1, 1}, {1, 0, 1}, {1, 1, 0}}),
-                                    T({{0, 1, 1}, {1, -6, 1}, {1, 1, 0}}),
-                                    T({{0, 1, 1}, {1,  0, 1}, {1, 1, -6}})};
-        std::array<T,2> directions2{T({{0, 0, -1}, {0, 0, 1}, {-1, 1, 0}}),
-                                    T({{0, -1, 0}, {-1, 0, 1}, {0, 1, 0}})};
-
-        if constexpr (k == 0) {
-          for (int i = 0; i < refElem.size(1); ++i) {
-            auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
-            auto geoInCell = refElem.template geometry<1>(i);
-            auto vol = geoInCell.volume();
-
-            for (auto const& [x,w] : faceQuadRule) {
-              auto dx = geoInCell.integrationElement(x) * w;
-              out[i] += Impl::pullback(local_f(geoInCell.global(x)),n) * vol * dx;
-            }
-          }
-
-          int startCell = refElem.size(1);
-          auto geoInCell = refElem.template geometry<0>(0);
-
-          for (auto const& [x,w] : cellQuadRule) {
-            auto dx = geoInCell.integrationElement(x) * w;
-            auto V = local_f(geoInCell.global(x));
-            for (std::size_t i = 0; i < directions2.size(); ++i) {
-              out[startCell + i] += Impl::innerProduct(V,directions2[i]) * dx;
-            }
-          }
-        }
-        else {
-          Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim-1, k> faceLagrangebasis;
-          thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C, dim-1, k>::Traits::RangeType> faceValues;
-          static constexpr std::size_t faceSize = faceLagrangebasis.size();
-
-          for (int i = 0; i < refElem.size(1); ++i) {
-            auto n = refElem.integrationOuterNormal(i); n/= n.two_norm();
-            auto geoInCell = refElem.template geometry<1>(i);
-            auto vol = geoInCell.volume();
-
-            for (auto const& [x,w] : faceQuadRule) {
-              faceLagrangebasis.evaluateFunction(x, faceValues);
-              auto dx = geoInCell.integrationElement(x) * w;
-              auto nVn = Impl::pullback(local_f(geoInCell.global(x)),n) * vol * dx;
-              for (std::size_t j = 0; j < faceSize; j++)
-                out[faceSize*i + j] += faceValues[j] * nVn;
-            }
-          }
-
-          Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k - 1> cellLagrangebasis1;
-          thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k-1>::Traits::RangeType > cellValues1;
-          static constexpr std::size_t cellSize1 = cellLagrangebasis1.size();
-
-          Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k> cellLagrangebasis2;
-          thread_local std::vector< typename Dune::Impl::LagrangeSimplexLocalBasis<D,C,dim, k>::Traits::RangeType > cellValues2;
-          static constexpr std::size_t cellSize2 = cellLagrangebasis2.size();
-
-          int startCell1 = refElem.size(1) * faceSize;
-          int n1 = directions1.size();
-          int startCell2 = startCell1 + cellSize1 * n1;
-          int n2 = directions2.size();
-          auto geoInCell = refElem.template geometry<0>(0);
-
-          for (auto const& [x,w] : cellQuadRule) {
-            cellLagrangebasis1.evaluateFunction(x, cellValues1);
-            cellLagrangebasis2.evaluateFunction(x, cellValues2);
-            auto dx = geoInCell.integrationElement(x) * w;
-            auto V = local_f(geoInCell.global(x));
-            for (std::size_t j = 0; j < cellSize1; ++j) {
-              for (std::size_t i = 0; i < directions1.size(); ++i) {
-                out[startCell1 + n1*j + i] += cellValues1[j] * Impl::innerProduct(V,directions1[i]) * dx;
-              }
-            }
-            for (std::size_t j = 0; j < cellSize2; ++j) {
-              for (std::size_t i = 0; i < directions2.size(); ++i) {
-                out[startCell2 + n2*j + i] += cellValues2[j] * Impl::innerProduct(V,directions1[i]) * dx;
-              }
-            }
-          }
-        }
-      }
-
     private:
       std::optional<Geometry> geometry_ = std::nullopt;
     };
@@ -581,7 +550,8 @@ namespace Dune::Functions
     public:
       HellanHerrmannJohnsonLocalFiniteElement()
       {
-        static_assert(dim==2 || dim==3, "HellanHerrmannJohnsonLocalFiniteElement only implemented for dim=2,3");
+        static_assert(dim == 1 || dim == 2,
+                      "HellanHerrmannJohnsonLocalFiniteElement only implemented for dim=1,2");
       }
 
       /** \brief Export number types, dimensions, etc.
@@ -713,7 +683,7 @@ namespace Dune::Functions
    *
    * \tparam GV  The grid view that the FE basis is defined on
    * \tparam R   Range type used for shape function values
-   * \note This only works for simplex grids
+   * \note This only works for one- and two-dimensional simplex grids.
    */
   template<class GV, unsigned int k, class R>
   class HellanHerrmannJohnsonPreBasis
@@ -725,18 +695,17 @@ namespace Dune::Functions
     static const int dim = GV::dimension;
 
   private:
-    static constexpr int edgeSize = (k+1);
-    static constexpr int faceSize = (k+1)*(k+2)/2;
-    static constexpr int cellSize = (dim == 2 ? k*(k+1)/2 * 3 : (k+2)*(k+1)*(k+1));
+    static constexpr int vertexSize = (dim == 1 && k > 0) ? 1 : 0;
+    static constexpr int edgeSize = k+1;
+    static constexpr int cellSize = (dim == 1) ? (k == 0 ? 1 : k-1) : k*(k+1)/2 * 3;
 
     // helper methods to assign each subentity the number of dofs. Used by the LeafPreBasisMapperMixin.
     static constexpr std::size_t hellanHerrmannJohnsonLayout(Dune::GeometryType type, int gridDim)
     {
-      // currently only implemented for dim == 2
-      if (type.isLine() && gridDim == 2)
+      if (type.isVertex() && gridDim == 1)
+        return vertexSize;
+      else if (type.isLine() && gridDim == 2)
         return edgeSize;
-      else if (type.isTriangle() && gridDim == 3)
-        return faceSize;
       else if (int(type.dim()) == gridDim)
         return cellSize;
       else
@@ -764,7 +733,9 @@ namespace Dune::Functions
       , mapper_(gridView_, hellanHerrmannJohnsonLayout)
       , faceDOFPermutation_(gridView_.grid().globalIdSet(), k+2)
     {
-      static_assert(dim==2 || dim==3, "HellanHerrmannJohnsonPreBasis only implemented for dim=2,3");
+      static_assert(dim == 1 || dim == 2,
+                    "HellanHerrmannJohnsonPreBasis only implemented for dim=1,2");
+      static_assert(k <= 6, "HellanHerrmannJohnsonPreBasis only implemented up to order 6");
     }
 
     //! Initialize the global indices
@@ -811,7 +782,7 @@ namespace Dune::Functions
       const auto& element = node.element();
       const auto& localCoefficients = node.finiteElement().localCoefficients();
 
-      // Precompute orientations of all faces
+      // Precompute orientations of all facets
       auto faceOrientations = faceDOFPermutation_.computeFaceOrientations(element);
       for(auto localIndex : Dune::range(localCoefficients.size()))
       {
@@ -870,4 +841,4 @@ namespace Dune::Functions
   } // end namespace BasisFactory
 } // end namespace Dune::Functions
 #include <dune/functions/functionspacebases/hellanherrmannjohnsonbasis_inc.hh>
-#endif // DUNE_FUNCTIONS_FUNCTIONSPACEBASES_HELLANHerrmannJOHNSONBASIS_HH
+#endif // DUNE_FUNCTIONS_FUNCTIONSPACEBASES_HELLANHERRMANNJOHNSONBASIS_HH

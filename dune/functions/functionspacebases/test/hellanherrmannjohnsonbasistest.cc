@@ -13,32 +13,54 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/common/parallel/mpihelper.hh>
 
+#include <dune/grid/onedgrid.hh>
 #include <dune/grid/uggrid.hh>
-#include <dune/grid/yaspgrid.hh>
-#include <dune/grid/io/file/gmshreader.hh>
-#include <dune/grid/io/file/printgrid.hh>
+#include <dune/grid/utility/structuredgridfactory.hh>
 #include <dune/functions/functionspacebases/hellanherrmannjohnsonbasis.hh>
 #include <dune/functions/functionspacebases/test/basistest.hh>
 
 
 using namespace Dune;
 
+template<class Basis>
+TestSuite checkHhjLocalFiniteElements(Basis& basis)
+{
+  TestSuite test("HHJ local finite elements");
+  auto localView = basis.localView();
+  for (const auto& element : elements(basis.gridView())) {
+    localView.bind(element);
+    const auto& finiteElement = localView.tree().finiteElement();
+    test.check(testLocalInterpolation(finiteElement, element));
+    test.check(testCanRepresentDifferentiableConstants(finiteElement));
+  }
+  return test;
+}
+
 template<int k, class GridView>
 void testHellanHerrmannJohnsonBasis(TestSuite& test, const GridView& gridView)
 {
-  std::cout<<"  Testing order: "<< k <<std::endl;
+  std::cout << "  Testing order: " << k << std::endl;
+
+  auto check = [&](auto& basis) {
+    if constexpr (GridView::dimension == 1 && k == 0)
+      test.subTest(checkBasis(basis));
+    else
+      test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck()));
+    test.subTest(checkHhjLocalFiniteElements(basis));
+  };
+
   // Check basis created 'manually'
   {
     Functions::HellanHerrmannJohnsonBasis<GridView,k> basis(gridView);
-    test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck(), CheckLocalFiniteElementFlag<0>()));
+    check(basis);
   }
 
   // Check basis created using basis builder mechanism
-  // {
-  //   using namespace Functions::BasisFactory;
-  //   auto basis = makeBasis(gridView, hhj<k>());
-  //   test.subTest(checkBasis(basis, EnableNormalNormalContinuityCheck()));
-  // }
+  {
+    using namespace Functions::BasisFactory;
+    auto basis = makeBasis(gridView, hhj<k>());
+    check(basis);
+  }
 }
 
 TestSuite test2d()
@@ -72,33 +94,28 @@ TestSuite test2d()
     testHellanHerrmannJohnsonBasis<1>(test, gridView);
     testHellanHerrmannJohnsonBasis<2>(test, gridView);
     testHellanHerrmannJohnsonBasis<3>(test, gridView);
-    // testHellanHerrmannJohnsonBasis<4>(test, gridView);
-    // testHellanHerrmannJohnsonBasis<5>(test, gridView);
-    // testHellanHerrmannJohnsonBasis<6>(test, gridView);
 
   }
 
   return test;
 }
 
-TestSuite test3d()
+TestSuite test1d()
 {
-  TestSuite test("HHJ_3d");
+  TestSuite test("HHJ_1d");
 
-  // Test with pure simplex grid
-  std::cout<<"Testing Hellan-Herrmann-Johnson basis in 3D with simplex grid\n";
+  std::cout << "Testing the scalar 1D HHJ analogue on an interval grid\n";
   {
-    auto tetGrid = Dune::StructuredGridFactory<UGGrid<3>>::createSimplexGrid({0.0,0.0,0.0},{1.0,1.0,1.0},{1u,1u,1u});
-    tetGrid->globalRefine(2);
-    auto tetGridView = tetGrid->leafGridView();
-    testHellanHerrmannJohnsonBasis<0>(test, tetGridView);
-    testHellanHerrmannJohnsonBasis<1>(test, tetGridView);
-    testHellanHerrmannJohnsonBasis<2>(test, tetGridView);
+    auto grid = Dune::StructuredGridFactory<OneDGrid>::createSimplexGrid({0.0}, {1.0}, {4u});
+    auto gridView = grid->leafGridView();
+    testHellanHerrmannJohnsonBasis<0>(test, gridView);
+    testHellanHerrmannJohnsonBasis<1>(test, gridView);
+    testHellanHerrmannJohnsonBasis<2>(test, gridView);
+    testHellanHerrmannJohnsonBasis<3>(test, gridView);
   }
 
   return test;
 }
-
 
 int main (int argc, char* argv[])
 {
@@ -106,8 +123,8 @@ int main (int argc, char* argv[])
 
   TestSuite test;
 
+  test.subTest(test1d());
   test.subTest(test2d());
-  // test.subTest(test3d());
 
   return test.exit();
 }

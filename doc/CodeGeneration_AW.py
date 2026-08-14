@@ -1,7 +1,14 @@
-from sympy import *
-from sympy.polys.polyfuncs import horner
-from sympy.abc import x, y
+# SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md
+# SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
+
+"""Generate the Arnold-Winther reference basis from Symfem."""
+
 import symfem
+from sympy import Matrix, cxxcode, diff, init_printing, shape
+from sympy.abc import x, y
+from sympy.polys.polyfuncs import horner
+
+
 def createGenericReferenceElement(refName, feName, order, **kwargs):
   fe = symfem.create_element(refName, feName, order, **kwargs)
   assert fe.reference.name == "triangle"
@@ -56,8 +63,8 @@ def verifyDuneDOFOrdering(fe):
   )
   assert tuple(dof.f.as_sympy() for dof in fe.dofs[21:]) == expected_cell_components
 
-## apply a horner scheme on a function f
-def hornerScheme(f, derivative = [x,y], **kwargs):
+# Apply a Horner scheme to a tensor-valued function.
+def hornerScheme(f, derivative=None, **kwargs):
   s = shape(f)
   assert(len(s) == 2)
 
@@ -140,7 +147,12 @@ def getCodeForEvaluation(basis, **kwargs):
 def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, symmetric = False, **kwargs):
   variant = kwargs.pop("variant", "dune")
   assert(isinstance(name, str))
-  code = "#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + name.upper() + "_INC_HH\n namespace Dune::Functions{\n  namespace Impl{ \n    "
+  guard_name = name.upper().replace("REFERENCE", "BASIS")
+  code = "// SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md\n"
+  code += "// SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later\n\n"
+  code += "#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + guard_name + "_INC_HH\n"
+  code += "#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + guard_name + "_INC_HH\n"
+  code += "namespace Dune::Functions{\n  namespace Impl{ \n    "
   code += "template<class D, class R,int dim, unsigned int k>\n"
   code +='     void ' + name + 'LocalBasis<D,R, dim,k>::evaluateFunction(const typename Traits::DomainType &in,std::vector<typename Traits::RangeType> &out) const\n{\nout.resize(size());\n auto iter = out.begin();'
   code += "\n\n// generated with sympy from symfem library\n"

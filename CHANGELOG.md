@@ -23,6 +23,11 @@ corresponding version of the Dune core modules.
   consistently implemented as macro elements based on a split
   into two tetrahedra.
 
+- Add `ArnoldWintherBasis`, an implementation of the lowest-order
+  conforming Arnold-Winther stress element on affine planar
+  triangle grids. The implementation supports globally consistent edge
+  orientations and element-specific double-Piola transformations.
+
 ## Deprecations and removals
 
 - Dune-functions no longer depends on dune-typetree.

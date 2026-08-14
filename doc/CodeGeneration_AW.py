@@ -148,8 +148,11 @@ def printEvaluationCode(name, reference, feType,minOrder  = 0, maxOrder  = 3, sy
   variant = kwargs.pop("variant", "dune")
   assert(isinstance(name, str))
   guard_name = name.upper().replace("REFERENCE", "BASIS")
-  code = "// SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md\n"
-  code += "// SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later\n\n"
+  # Assemble the marker at runtime so REUSE does not mistake these generated
+  # annotations for additional annotations of this Python source file.
+  spdxMarker = "SPDX"
+  code = f"// {spdxMarker}-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md\n"
+  code += f"// {spdxMarker}-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later\n\n"
   code += "#ifndef DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + guard_name + "_INC_HH\n"
   code += "#define DUNE_FUNCTIONS_FUNCTIONSPACEBASES_" + guard_name + "_INC_HH\n"
   code += "namespace Dune::Functions{\n  namespace Impl{ \n    "

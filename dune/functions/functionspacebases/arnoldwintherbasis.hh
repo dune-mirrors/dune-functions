@@ -3,6 +3,7 @@
 
 #include <array>
 #include <numeric>
+#include <type_traits>
 #include <vector>
 
 #include <dune/common/exceptions.hh>
@@ -14,7 +15,6 @@
 #include <dune/geometry/referenceelements.hh>
 
 #include <dune/grid/common/mcmgmapper.hh>
-
 #include <dune/localfunctions/common/localbasis.hh>
 #include <dune/localfunctions/common/localfiniteelementtraits.hh>
 // #include <dune/localfunctions/common/localinterpolation.hh>
@@ -33,20 +33,27 @@ namespace Functions {
 * \brief Implementation of the conforming Arnold-Winther element
 *   This is a finite element used to discretize the stress for two-dimensional
 * elasticity, originally proposed in "Arnold, D. N., & Winther, R. (2002).
-* Mixed finite elements for elasticity." As such, its shapefunctions take
-values
-* in the space of symmetric 2x2 matrices, whose (rowwise) divergence is in L2.
+* Mixed finite elements for elasticity." As such, its shape functions take
+* values in the space of symmetric 2x2 matrices, whose (rowwise) divergence is
+* in L2.
 * This comes with some complications in the Dune framework, in particular,
-* there is no datastructure for 3-tensors, which is the JacobianType of this
-finite element.
-* This therefore omits the evaluateJacobian method and only implements
-evaluateDivergence directly
-*   The implementation, in particular the transformation accounting for the
-* non-affinity is based on "Aznaran, Francis & Kirby, Robert & Farrell,
-Patrick.
+* there is no data structure for 3-tensors, which is the JacobianType of this
+* finite element.  This therefore omits the evaluateJacobian method and only
+* implements evaluateDivergence directly.  The transformation is based on
+* "Aznaran, Francis & Kirby, Robert & Farrell, Patrick.
 * (2021). Transformations for Piola-mapped elements."
+*
+* Only grids with dimension=dimensionworld=2 are supported.  A conforming
+* Arnold-Winther space on an embedded surface would have to identify traction
+* vectors and vertex tensor values in different tangent spaces.  This requires
+* an explicit tangent-space transport on the non-coplanar neighboring elements
+* occurring in ordinary surface meshes.
+*
+* Non-affine geometries are rejected.  Their double-Piola divergence contains
+* derivatives of the geometry Jacobian and integration element, which the
+* generic dune-grid Geometry interface does not expose.  Moreover, their DOF
+* push-forward is no longer represented by the constant blocks used here.
 */
-// \TODO Rework this to incorporate some stuff for nonaffine mappings
 namespace Impl {
 using ArnoldWintherFaceOrientations = Experimental::FaceOrientations<2>;
 
@@ -218,10 +225,11 @@ private:
  */
 struct DoubleContravariantPiolaTransformator {
 private:
-  template <class Matrix, class Jacobian, class IntegrationElement>
-  static void applyToMatrix(Matrix &value, Jacobian const &jacobian,
+  template <class ReferenceMatrix, class WorldMatrix, class Jacobian,
+            class IntegrationElement>
+  static void applyToMatrix(const ReferenceMatrix& referenceValue,
+                            WorldMatrix& value, Jacobian const &jacobian,
                             IntegrationElement integrationElement) {
-    auto referenceValue = value;
     for (std::size_t k = 0; k < jacobian.N(); ++k) {
       for (std::size_t l = 0; l < jacobian.N(); ++l) {
         value[k][l] = 0;
@@ -235,25 +243,17 @@ private:
   }
 
 public:
-  /** \brief Double Piola-transform a set of shape-function values
-   *
-   * \param[in,out] values The values to be Piola-transformed
-   */
-  template <typename R, int dim, typename LocalCoordinate, typename Geometry>
-  static auto
-  apply(std::vector<typename Impl::ArnoldWintherTensorTypes<R, dim>::Matrix>
-            &values,
-        const LocalCoordinate &xi, const Geometry &geometry) {
+  /** \brief Double Piola-transform shape-function values to world tensors. */
+  template <class ReferenceValues, class WorldValues, class LocalCoordinate,
+            class Geometry>
+  static void applyValues(const ReferenceValues& referenceValues,
+                          WorldValues& values, const LocalCoordinate &xi,
+                          const Geometry &geometry) {
     auto jacobian = geometry.jacobian(xi);
     auto integrationElement = geometry.integrationElement(xi);
-    assert(values[0].N() == values[0].M());
-    assert(values[0].N() == jacobian.N());
-    assert(jacobian.M() == jacobian.N());
-
-    for (auto &value : values)
-      applyToMatrix(value, jacobian, integrationElement);
-
-    return;
+    for (std::size_t i = 0; i < referenceValues.size(); ++i)
+      applyToMatrix(referenceValues[i], values[i], jacobian,
+                    integrationElement);
   }
 
   /** \brief Transform derivatives of matrix-valued shape functions.
@@ -261,85 +261,49 @@ public:
    * For the affine geometries supported here, the double Piola matrix is
    * constant, so it is applied independently to every reference derivative.
    */
-  template <typename R, int dim, typename LocalCoordinate, typename Geometry>
-  static void apply(
-      std::vector<typename Impl::ArnoldWintherTensorTypes<R, dim>::ThreeTensor>
-          &jacobians,
-      const LocalCoordinate &xi, const Geometry &geometry) {
+  template <class ReferenceJacobians, class WorldJacobians,
+            class LocalCoordinate, class Geometry>
+  static void applyJacobians(const ReferenceJacobians& referenceJacobians,
+                             WorldJacobians& jacobians,
+                             const LocalCoordinate &xi,
+                             const Geometry &geometry) {
     auto jacobian = geometry.jacobian(xi);
     auto integrationElement = geometry.integrationElement(xi);
-    for (auto &shapeFunctionJacobian : jacobians)
-      for (auto &derivative : shapeFunctionJacobian)
-        applyToMatrix(derivative, jacobian, integrationElement);
+    for (std::size_t i = 0; i < referenceJacobians.size(); ++i)
+      for (std::size_t derivative = 0;
+           derivative < referenceJacobians[i].size(); ++derivative)
+        applyToMatrix(referenceJacobians[i][derivative],
+                      jacobians[i][derivative], jacobian,
+                      integrationElement);
   }
 
-  /** \brief Piola-transform a set of shape-function derivatives
+  /** \brief Piola-transform affine reference divergences to world vectors
    *
-   * \param[in,out] gradients The shape function derivatives to be
-   * Piola-transformed
-   * \TODO This transfroms the divergence. There is no implementation of
-   * gradients We want the physical divergence of tau \f$ div \tau =
-   * \frac{1}{(det J)^2}J\hat{div}\tau  \f$ \bug The current implementation
-   * works only for affine geometries. The Piola transformation for non-affine
-   * geometries requires second derivatives of the geometry, which we don't get
-   *   from the dune-grid Geometry interface.
+   * \param[in] referenceDivergences Reference divergence values
+   * \param[out] divergences World-dimensional divergence values
+   * This uses \f$ div\,\tau = g^{-2}J\widehat{div}\,\hat\tau\f$ with
+   * integration element \f$g\f$.  ArnoldWintherLocalFiniteElement::bind()
+   * enforces affine geometry before this method can be reached.
    */
-  template <typename R, int dim, typename LocalCoordinate, typename Geometry>
-  static auto
-  apply(std::vector<typename Impl::ArnoldWintherTensorTypes<R, dim>::Vector>
-            &divergences,
-        const LocalCoordinate &xi, const Geometry &geometry) {
+  template <class ReferenceDivergences, class WorldDivergences,
+            class LocalCoordinate, class Geometry>
+  static void applyDivergences(const ReferenceDivergences& referenceDivergences,
+                               WorldDivergences& divergences,
+                               const LocalCoordinate &xi,
+                               const Geometry &geometry) {
     auto jacobian = geometry.jacobian(xi);
     auto integrationElement2 =
         geometry.integrationElement(xi) * geometry.integrationElement(xi);
-    assert(dim == jacobian.N());
-    assert(jacobian.M() ==
-           jacobian.N()); // \TODO think this through for (linear) surface
-                          // meshs. Maybe this works
-
-    for (auto &value : divergences) {
-      auto tmp = value;
-      value = 0;
-      for (std::size_t k = 0; k < dim; k++) {
-        for (auto &&[jacobian_k_i, i] : sparseRange(jacobian[k]))
-          value[k] += jacobian_k_i * tmp[i];
-        value[k] /= integrationElement2;
+    for (std::size_t i = 0; i < referenceDivergences.size(); ++i) {
+      divergences[i] = 0;
+      for (std::size_t k = 0; k < jacobian.N(); ++k) {
+        for (std::size_t j = 0; j < jacobian.M(); ++j)
+          divergences[i][k] +=
+              jacobian[k][j] * referenceDivergences[i][j];
+        divergences[i][k] /= integrationElement2;
       }
     }
   }
-
-  /** \brief Wrapper around a callable that applies the inverse Piola
-   * transform
-   *
-   * The LocalInterpolation implementations in dune-localfunctions expect
-   * local-valued functions, but the ones dune-functions expect
-   * global-valued ones.  Therefore, we need to stuff the inverse Piola
-   * transform between dune-functions and dune-localfunctions, and this is
-   * what this class does.
-   */
-  template <class Function, class LocalCoordinate, class Element>
-  class LocalValuedFunction {
-    const Function &f_;
-    const Element &element_;
-
-  public:
-    LocalValuedFunction(const Function &f, const Element &element)
-        : f_(f), element_(element) {}
-
-    auto operator()(const LocalCoordinate &xi) const {
-      auto globalValue = f_(xi);
-
-      // Apply the inverse Piola transform
-      auto jacobianInverse = element_.geometry().jacobianInverse(xi);
-      auto integrationElement = element_.geometry().integrationElement(xi);
-
-      globalValue = jacobianInverse * globalValue * transpose(jacobianInverse);
-
-      globalValue *= integrationElement * integrationElement;
-
-      return globalValue;
-    }
-  };
 };
 
 
@@ -502,12 +466,10 @@ template <class Element, class R>
 class ArnoldWintherLocalInterpolation {
   using size_type = std::size_t;
   using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
-  using GlobalCoordinate = typename Element::Geometry::GlobalCoordinate;
 
   using ctype = typename Element::Geometry::ctype;
   static constexpr size_type dim = Element::Geometry::mydimension;
-  static constexpr size_type dimWorld = Element::Geometry::coordimension;
-  static constexpr int size = 24; // number of dofs. TODO generalize this!
+  static constexpr int size = 24; // number of dofs.
 public:
   ArnoldWintherLocalInterpolation(int quadOrder = 10)
   : quadratureOrder(quadOrder)
@@ -560,15 +522,14 @@ public:
       tangent /= tangent.two_norm();
       // Match the oriented-tangent normal convention used by Symfem for the
       // generated reference DOFs; it is not necessarily the outward normal.
-      std::decay_t<decltype(tangent)> normal = {
-          -tangent[1], tangent[0]};
+      std::decay_t<decltype(tangent)> normal = {-tangent[1], tangent[0]};
 
-      using fRange = typename std::decay_t<std::remove_cv_t<decltype(f(std::declval<GlobalCoordinate>()))>>;
+      using fRange = typename std::decay_t<std::remove_cv_t<decltype(f(std::declval<LocalCoordinate>()))>>;
       using protomotedType =
           typename PromotionTraits<typename FieldTraits<fRange>::field_type,
                                    ctype>::PromotedType;
 
-      FieldVector<protomotedType, 2> normalTimesMoment;
+      FieldVector<protomotedType, dim> normalTimesMoment;
       // Symfem scales each edge moment by the edge length.  Since moments
       // above are integrated with the reference-edge geometry, changing
       // variables to the physical edge gives the factor |e|^2/|e_hat|.
@@ -728,19 +689,21 @@ class ArnoldWintherLocalFiniteElement
           ArnoldWintherLocalFiniteElement<Element, D, R>,
           typename ArnoldWintherReferenceLocalBasis<D, R>::Traits>
 {
+  static constexpr int dim = Element::Geometry::mydimension;
+  static constexpr int dimWorld = Element::Geometry::coorddimension;
+  using ReferenceTraits = typename ArnoldWintherReferenceLocalBasis<D, R>::Traits;
+  using This = ArnoldWintherLocalFiniteElement<Element, D, R>;
   using Base = Impl::TransformedFiniteElementMixin<
-      ArnoldWintherLocalFiniteElement<Element, D, R>,
-      typename ArnoldWintherReferenceLocalBasis<D, R>::Traits>;
+      This, ReferenceTraits>;
   friend class Impl::TransformedLocalBasis<
-      ArnoldWintherLocalFiniteElement<Element, D, R>,
-      typename ArnoldWintherReferenceLocalBasis<D, R>::Traits>;
+      This, ReferenceTraits>;
 
 public:
   /** \brief Export number types, dimensions, etc.
    */
 
   using Traits = LocalFiniteElementTraits<
-      Impl::ArnoldWintherReferenceLocalBasis<D, R>,
+      Impl::TransformedLocalBasis<This, ReferenceTraits>,
       Impl::ArnoldWintherLocalCoefficients,
       Impl::ArnoldWintherLocalInterpolation<Element, R>>;
 
@@ -776,10 +739,21 @@ public:
    */
   void bind(const ArnoldWintherFaceOrientations &orientations,
             Element const &element) {
-    faceOrientations_ = orientations;
-    element_ = &element;
-    interpolation_.bind(orientations, element);
-    fillMatrix(element.geometry()); // barycenter, because we need some value.
+    if constexpr (dim != dimWorld)
+      DUNE_THROW(Dune::NotImplemented,
+                 "Arnold-Winther requires dimension=dimensionworld=2");
+    else {
+      if (not element.geometry().affine())
+        DUNE_THROW(Dune::NotImplemented,
+                   "Arnold-Winther requires an affine geometry: the generic "
+                   "dune-grid Geometry interface does not expose the Jacobian "
+                   "derivatives required by the non-affine double-Piola "
+                   "divergence and DOF transformations");
+      faceOrientations_ = orientations;
+      element_ = &element;
+      interpolation_.bind(orientations, element);
+      fillMatrix(element.geometry());
+    }
   }
 
 protected:
@@ -794,15 +768,32 @@ protected:
   /** Apply the transformation. Note that we do distinguish for
    * Vector/Matrix Type via the DoublePiolas function overload,
    * We assume random access containers.
-   */
+  */
   template <class InputValues, class OutputValues>
   void transform(InputValues const &inValues, OutputValues &outValues) const {
-    mat_.mtv(inValues, outValues);
+    using InputValue = typename InputValues::value_type;
+    std::vector<InputValue> transformedReferenceValues(size());
+    mat_.mtv(inValues, transformedReferenceValues);
+    // bind() rejects non-affine geometries, so the Piola map is constant and
+    // can be evaluated at any reference point.
+    const auto x = Dune::referenceElement<double, 2>(GeometryTypes::simplex(2))
+                       .position(0, 0);
 
-    auto x = Dune::referenceElement<double, 2>(GeometryTypes::simplex(2))
-                 .position(0, 0);
-    DoubleContravariantPiolaTransformator::apply<R, 2>(
-        outValues, x, element_->geometry());
+    if constexpr (std::is_same_v<
+                      InputValue, typename ReferenceTraits::RangeType>)
+      DoubleContravariantPiolaTransformator::applyValues(
+          transformedReferenceValues, outValues, x, element_->geometry());
+    else if constexpr (std::is_same_v<
+                           InputValue, typename ReferenceTraits::DivergenceType>)
+      DoubleContravariantPiolaTransformator::applyDivergences(
+          transformedReferenceValues, outValues, x, element_->geometry());
+    else if constexpr (std::is_same_v<
+                           InputValue, typename ReferenceTraits::JacobianType>)
+      DoubleContravariantPiolaTransformator::applyJacobians(
+          transformedReferenceValues, outValues, x, element_->geometry());
+    else
+      static_assert(Dune::AlwaysFalse<InputValue>::value,
+                    "Unsupported Arnold-Winther transformed value type");
   }
 
 private:
@@ -813,15 +804,15 @@ private:
     // corresponding reference functionals, including edge reorientation.
     std::array<Dune::FieldMatrix<R, 4, 4>, 3> W_k;
     // Symmetric-tensor block of P=Q^{-1}.  Before inversion W represents
-    // vec_s(J tau J^T); the determinant scaling below specializes P to the
-    // vertex blocks (det(J)^2 W^{-1}) and cell block (det(J) W^{-1}).
+    // vec_s(J tau J^T).  The integration element g specializes P to the
+    // vertex blocks (g^2 W^{-1}) and cell block (g W^{-1}).
     Dune::FieldMatrix<R, 3, 3> W;
-    // \TODO For linear triangles any point inside is fine, for curved ones one
-    // would need to chose them according to the dofs
+    // The geometry is affine, so any point in the reference triangle is valid.
     auto x = Dune::referenceElement<double, 2>(GeometryTypes::simplex(2))
                  .position(0, 0);
-    auto jacobianTransposed = geometry.jacobianTransposed(x);
-    auto jacobianDeterminant = jacobianTransposed.determinant(); //geometry.integrationElement(x);
+    const auto jacobian = geometry.jacobian(x);
+    const auto integrationElement = geometry.integrationElement(x);
+    const auto jacobianDeterminant = jacobian.determinant();
 
     // By default, edges point from the vertex with the smaller index
     // to the vertex with the larger index. Note that the alpha and beta are
@@ -841,8 +832,8 @@ private:
       Dune::FieldMatrix<R, 2, 2> referenceG =
           {{-tangent[1], tangent[0]}, {tangent[0], tangent[1]}};
       auto tmp = tangent, tmp2 = tangent;
-      jacobianTransposed.mtv(tangent, tmp);
-      jacobianTransposed.mv(tmp, tmp2);
+      jacobian.mv(tangent, tmp);
+      jacobian.mtv(tmp, tmp2);
       referenceG.mtv(tmp2, tmp);
       // This computes referenceG^T J^T J tangent.
       const auto alpha = tmp[0] / jacobianDeterminant;
@@ -873,23 +864,23 @@ private:
     // TODO this should be improved to handle DiagonalMatrices as well. Since we
     // only have simplices, I think this case currently cannot arise tho.
     // first W tilde
-    W[0][0] = jacobianTransposed[0][0] * jacobianTransposed[0][0];
-    W[0][1] = 2. * jacobianTransposed[0][0] * jacobianTransposed[1][0];
-    W[0][2] = jacobianTransposed[1][0] * jacobianTransposed[1][0];
-    W[1][0] = jacobianTransposed[0][0] * jacobianTransposed[0][1];
-    W[1][1] = jacobianTransposed[0][0] * jacobianTransposed[1][1] +
-              jacobianTransposed[1][0] * jacobianTransposed[0][1];
-    W[1][2] = jacobianTransposed[1][0] * jacobianTransposed[1][1];
-    W[2][0] = jacobianTransposed[0][1] * jacobianTransposed[0][1];
-    W[2][1] = 2. * jacobianTransposed[0][1] * jacobianTransposed[1][1];
-    W[2][2] = jacobianTransposed[1][1] * jacobianTransposed[1][1];
+    W[0][0] = jacobian[0][0] * jacobian[0][0];
+    W[0][1] = 2. * jacobian[0][0] * jacobian[0][1];
+    W[0][2] = jacobian[0][1] * jacobian[0][1];
+    W[1][0] = jacobian[0][0] * jacobian[1][0];
+    W[1][1] = jacobian[0][0] * jacobian[1][1] +
+              jacobian[0][1] * jacobian[1][0];
+    W[1][2] = jacobian[0][1] * jacobian[1][1];
+    W[2][0] = jacobian[1][0] * jacobian[1][0];
+    W[2][1] = 2. * jacobian[1][0] * jacobian[1][1];
+    W[2][2] = jacobian[1][1] * jacobian[1][1];
     W.invert();
     // now we have the inverted W breve
-    W *= jacobianDeterminant * jacobianDeterminant;
+    W *= integrationElement * integrationElement;
     // fill matrix
     mat_ = ArnoldWintherBlockDiagonalMatrix<R>{
         std::array<Dune::FieldMatrix<R, 3, 3>, 3>{W, W, W}, W_k,
-        W / jacobianDeterminant};
+        W / integrationElement};
   }
 
 private:
@@ -943,7 +934,11 @@ public:
   //! Constructor for a given grid view object
   ArnoldWintherPreBasis(const GV &gv)
       : Base(gv, arnoldWintherMapperLayout)
-  {}
+  {
+    if constexpr (GV::dimension != GV::dimensionworld)
+      DUNE_THROW(Dune::NotImplemented,
+                 "Arnold-Winther requires dimension=dimensionworld=2.");
+  }
 
   //! Update the stored grid view, to be called if the grid has changed
   void update(GridView const &gv) {

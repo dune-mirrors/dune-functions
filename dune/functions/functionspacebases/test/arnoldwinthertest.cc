@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include <dune/geometry/referenceelements.hh>
 #include <dune/grid/common/gridfactory.hh>
 #include <dune/grid/common/rangegenerators.hh>
+#include <dune/grid/geometrygrid.hh>
 #include <dune/grid/uggrid.hh>
 
 #include <dune/functions/functionspacebases/arnoldwintherbasis.hh>
@@ -20,6 +22,39 @@
 
 using namespace Dune;
 using namespace Dune::Functions;
+
+class AffineSurfaceCoordinates
+    : public Dune::AnalyticalCoordFunction<double, 2, 3,
+                                           AffineSurfaceCoordinates>
+{
+public:
+  void evaluate(const DomainVector& x, RangeVector& y) const
+  {
+    y = {x[0] + 0.2*x[1], 0.3*x[0] + x[1], 0.4*x[0] - 0.2*x[1]};
+  }
+};
+
+struct NonAffineGeometryStub
+{
+  using ctype = double;
+  using LocalCoordinate = FieldVector<double, 2>;
+  using GlobalCoordinate = FieldVector<double, 2>;
+  static constexpr int mydimension = 2;
+  static constexpr int coorddimension = 2;
+  bool affine() const { return false; }
+  GeometryType type() const { return GeometryTypes::simplex(2); }
+  FieldMatrix<double, 2, 2> jacobian(const LocalCoordinate&) const
+  {
+    return {{1, 0}, {0, 1}};
+  }
+  double integrationElement(const LocalCoordinate&) const { return 1; }
+};
+
+struct NonAffineElementStub
+{
+  using Geometry = NonAffineGeometryStub;
+  Geometry geometry() const { return {}; }
+};
 
 template<class Basis, class Interpolation>
 Dune::TestSuite testDeltaProperty(Basis const& basis, Interpolation const& interpolation){
@@ -162,6 +197,40 @@ Dune::TestSuite testEdgeInterpolationConsistency(Basis const& basis)
   return test;
 }
 
+Dune::TestSuite testNonAffineGeometryRejection()
+{
+  Dune::TestSuite test("Non-affine Arnold-Winther geometry rejection");
+  using FiniteElement = Dune::Functions::Impl::ArnoldWintherLocalFiniteElement<
+      NonAffineElementStub, double, double>;
+  FiniteElement finiteElement;
+  bool rejected = false;
+  try {
+    finiteElement.bind({}, NonAffineElementStub{});
+  } catch (const Dune::NotImplemented&) {
+    rejected = true;
+  }
+  test.check(rejected)
+      << "A non-affine geometry must not use the affine divergence formula";
+  return test;
+}
+
+template<class GridView>
+Dune::TestSuite testEmbeddedSurfaceRejection(const GridView& gridView)
+{
+  Dune::TestSuite test("Embedded Arnold-Winther surface rejection");
+  bool rejected = false;
+  try {
+    [[maybe_unused]] auto basis = makeBasis(
+        gridView, BasisFactory::arnoldWinther());
+  } catch (const Dune::NotImplemented&) {
+    rejected = true;
+  }
+  test.check(rejected)
+      << "Arnold-Winther must reject dimension != dimensionworld when the "
+         "basis is constructed";
+  return test;
+}
+
 int main(int argc, char *argv[]) {
   Dune::MPIHelper::instance(argc, argv);
   Dune::TestSuite test("arnold-winther");
@@ -234,5 +303,24 @@ int main(int argc, char *argv[]) {
     }
 
   }
+
+  std::cout << "Testing rejection of an embedded surface" << std::endl;
+  {
+    auto gridFactory = GridFactory<Grid>();
+    gridFactory.insertVertex({0., 0.});
+    gridFactory.insertVertex({1.1, 0.});
+    gridFactory.insertVertex({1.1, 1.});
+    gridFactory.insertVertex({0., 1.});
+    gridFactory.insertElement(GeometryTypes::simplex(2), {0, 1, 2});
+    gridFactory.insertElement(GeometryTypes::simplex(2), {2, 0, 3});
+    std::shared_ptr<Grid> hostGrid = gridFactory.createGrid();
+    auto coordinates = std::make_shared<AffineSurfaceCoordinates>();
+    using SurfaceGrid = GeometryGrid<Grid, AffineSurfaceCoordinates>;
+    auto surfaceGrid =
+        std::make_shared<SurfaceGrid>(hostGrid, coordinates);
+    test.subTest(testEmbeddedSurfaceRejection(surfaceGrid->leafGridView()));
+  }
+
+  test.subTest(testNonAffineGeometryRejection());
   return test.exit();
 }

@@ -105,6 +105,63 @@ Dune::TestSuite testEdgeDOFNumbering(Basis const& basis)
   return test;
 }
 
+template<class Basis>
+Dune::TestSuite testTransformedDeltaProperty(Basis const& basis)
+{
+  Dune::TestSuite test("Transformed Arnold-Winther delta property");
+  auto localView = basis.localView();
+  for (const auto& element : elements(basis.gridView())) {
+    localView.bind(element);
+    test.subTest(testDeltaProperty(
+        localView.tree().finiteElement().localBasis(),
+        localView.tree().finiteElement().localInterpolation()));
+  }
+  return test;
+}
+
+template<class Basis>
+Dune::TestSuite testEdgeInterpolationConsistency(Basis const& basis)
+{
+  Dune::TestSuite test("Arnold-Winther edge interpolation consistency");
+  auto insideLocalView = basis.localView();
+  auto outsideLocalView = basis.localView();
+  const auto& indexSet = basis.gridView().indexSet();
+
+  auto constantTensor = [](const auto&) {
+    return FieldMatrix<double, 2, 2>{{1.0, 0.25}, {0.25, 2.0}};
+  };
+
+  for (const auto& inside : elements(basis.gridView())) {
+    insideLocalView.bind(inside);
+    for (const auto& intersection : intersections(basis.gridView(), inside)) {
+      if (not intersection.neighbor())
+        continue;
+      const auto outside = intersection.outside();
+      if (indexSet.index(inside) >= indexSet.index(outside))
+        continue;
+
+      outsideLocalView.bind(outside);
+      std::vector<double> insideCoefficients;
+      std::vector<double> outsideCoefficients;
+      insideLocalView.tree().finiteElement().localInterpolation().interpolate(
+          constantTensor, insideCoefficients);
+      outsideLocalView.tree().finiteElement().localInterpolation().interpolate(
+          constantTensor, outsideCoefficients);
+
+      const auto insideEdge = intersection.indexInInside();
+      const auto outsideEdge = intersection.indexInOutside();
+      for (std::size_t edgeDOF = 0; edgeDOF < 4; ++edgeDOF) {
+        const auto insideDOF = 9 + 4 * insideEdge + edgeDOF;
+        const auto outsideDOF = 9 + 4 * outsideEdge + edgeDOF;
+        test.check(std::abs(insideCoefficients[insideDOF]
+                            - outsideCoefficients[outsideDOF]) < 1e-12)
+            << "Edge interpolation differs for local edge DOF " << edgeDOF;
+      }
+    }
+  }
+  return test;
+}
+
 int main(int argc, char *argv[]) {
   Dune::MPIHelper::instance(argc, argv);
   Dune::TestSuite test("arnold-winther");
@@ -170,6 +227,8 @@ int main(int argc, char *argv[]) {
       auto gridView = grid->leafGridView();
       using namespace Dune::Functions::BasisFactory;
       auto basis = makeBasis(gridView, arnoldWinther());
+      test.subTest(testTransformedDeltaProperty(basis));
+      test.subTest(testEdgeInterpolationConsistency(basis));
       test.subTest(testEdgeDOFNumbering(basis));
       test.subTest(checkBasis(basis, EnableNormal_VectorContinuityCheck()));
     }

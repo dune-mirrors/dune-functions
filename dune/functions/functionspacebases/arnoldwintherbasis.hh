@@ -473,8 +473,11 @@ public:
       for (auto&& val : moments){
         val.mtv(normal, tmp);
 
-        it[0] = dot(tmp, normal)*refElement.template geometry<1>(i).volume();
-        it[1] = dot(tmp, tangent)*refElement.template geometry<1>(i).volume();
+        // Match Symfem's length-scaled edge-moment convention.
+        const auto referenceEdgeLength =
+            refElement.template geometry<1>(i).volume();
+        it[0] = dot(tmp, normal) * referenceEdgeLength;
+        it[1] = dot(tmp, tangent) * referenceEdgeLength;
         it += 2;
       }
 
@@ -529,7 +532,6 @@ public:
     out.resize(size);
     auto it = out.begin();
     auto refElement = referenceElement(*element);
-    auto lf = DoubleContravariantPiolaTransformator::LocalValuedFunction<F, typename Element::Geometry::LocalCoordinate, Element>(f, *element);
     // point evaluations
     // 9 DOFs in total
     for (auto i = 0u; i < element->subEntities(dim); ++i) {
@@ -567,13 +569,18 @@ public:
                                    ctype>::PromotedType;
 
       FieldVector<protomotedType, 2> normalTimesMoment;
+      // Symfem scales each edge moment by the edge length.  Since moments
+      // above are integrated with the reference-edge geometry, changing
+      // variables to the physical edge gives the factor |e|^2/|e_hat|.
+      const auto edgeMomentScale =
+          edgeGeo.volume() * edgeGeo.volume() / refEdgeGeo.volume();
       for (std::size_t m = 0; m < momentOrder + 1; ++m){
         if (faceOrientations_.faceOrientationIndex(i, 1))
           moments[momentOrder -m].mtv(normal, normalTimesMoment);
         else
           moments[m].mtv(normal, normalTimesMoment);
-        it[0] = dot(normalTimesMoment, normal)*edgeGeo.volume();
-        it[1] = dot(normalTimesMoment, tangent)*edgeGeo.volume();
+        it[0] = dot(normalTimesMoment, normal) * edgeMomentScale;
+        it[1] = dot(normalTimesMoment, tangent) * edgeMomentScale;
         it += 2;
       }
 
@@ -801,16 +808,6 @@ protected:
 private:
   template <class Geometry>
   void fillMatrix(Geometry const &geometry) {
-    std::array<R, 3> alpha;
-    std::array<R, 3> beta;
-
-    std::array<Dune::FieldVector<R, 2>, 3> referenceTangents; // normalized
-
-    std::array<R, 3> referenceEdgeLength;
-    std::array<R, 3> globalEdgeLength;
-
-    std::array<Dune::FieldMatrix<R, 2, 2>, 3> referenceG;
-
     // Per-edge blocks of P=Q^{-1}.  They convert the four physical edge
     // moments (two Lagrange moments, each with nn and nt components) to the
     // corresponding reference functionals, including edge reorientation.
@@ -831,7 +828,7 @@ private:
     // invariant of orientation, since the normals/tangents appear twice in
     // their definitions.
 
-    // get local and global Tangents
+    // Get local tangents and construct the edge transformation blocks.
     auto refElement = Dune::referenceElement<double, 2>(geometry.type());
     for (std::size_t i = 0; i < 3; ++i) {
       const auto lower = refElement.subEntity(i, 1, 0, 2);
@@ -839,49 +836,38 @@ private:
       auto tangent =
           refElement.position(upper, 2) - refElement.position(lower, 2);
 
-      referenceEdgeLength[i] = tangent.two_norm();
-      tangent /= referenceEdgeLength[i];
+      tangent /= tangent.two_norm();
 
-      auto globalEdge = geometry.global(refElement.position(upper, 2)) -
-                        geometry.global(refElement.position(lower, 2));
-
-      globalEdgeLength[i] = globalEdge.two_norm();
-
-      referenceG[i] = {{-tangent[1], tangent[0]}, {tangent[0], tangent[1]}};
+      Dune::FieldMatrix<R, 2, 2> referenceG =
+          {{-tangent[1], tangent[0]}, {tangent[0], tangent[1]}};
       auto tmp = tangent, tmp2 = tangent;
       jacobianTransposed.mtv(tangent, tmp);
       jacobianTransposed.mv(tmp, tmp2);
-      referenceG[i].mtv(tmp2, tmp);
-      // auto tmp = transpose(referenceG[i]) * jacobianTransposed * (transpose(jacobianTransposed) * tangent);
-      alpha[i] = tmp[0] / jacobianDeterminant;
-      beta[i] = tmp[1] / jacobianDeterminant;
+      referenceG.mtv(tmp2, tmp);
+      // This computes referenceG^T J^T J tangent.
+      const auto alpha = tmp[0] / jacobianDeterminant;
+      const auto beta = tmp[1] / jacobianDeterminant;
 
-
-
-      // already inverted W_k
-      // By using Lagrange moments these matrices are orientation invariant.
+      // Store the inverse edge push-forward block.  Symfem's edge moments are
+      // scaled by their edge length, so the |e_hat|/|e| factor in the
+      // unscaled push-forward cancels and no edge-length ratio appears here.
       W_k[i] = 0;
-      if (faceOrientations_.faceOrientationIndex(i, 1)){
-
+      if (faceOrientations_.faceOrientationIndex(i, 1)) {
         W_k[i][2][0] = 1.;
-        W_k[i][3][0] = -alpha[i] / beta[i];
-        W_k[i][3][1] = 1. / beta[i];
+        W_k[i][3][0] = -alpha / beta;
+        W_k[i][3][1] = 1. / beta;
         W_k[i][0][2] = 1.;
-        W_k[i][1][2] = -alpha[i] / beta[i];
-        W_k[i][1][3] = 1. / beta[i];
+        W_k[i][1][2] = -alpha / beta;
+        W_k[i][1][3] = 1. / beta;
 
-      }
-      else{
+      } else {
         W_k[i][0][0] = 1.;
-        W_k[i][1][0] = -alpha[i] / beta[i];
-        W_k[i][1][1] = 1. / beta[i];
+        W_k[i][1][0] = -alpha / beta;
+        W_k[i][1][1] = 1. / beta;
         W_k[i][2][2] = 1.;
-        W_k[i][3][2] = -alpha[i] / beta[i];
-        W_k[i][3][3] = 1. / beta[i];
+        W_k[i][3][2] = -alpha / beta;
+        W_k[i][3][3] = 1. / beta;
       }
-
-
-      W_k[i] *= globalEdgeLength[i] / referenceEdgeLength[i];
     }
     // Fill W  (not yet inverted)
     // TODO this should be improved to handle DiagonalMatrices as well. Since we

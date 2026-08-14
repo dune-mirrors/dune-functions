@@ -117,7 +117,7 @@ namespace Dune::Functions
     template <class D, class R, int dim = 2, unsigned int k = 2>
     class ArnoldWintherReferenceLocalBasis
     {
-      using Range = ArnoldWintherTensorTypes<R, dim>::Matrix;
+      using Range = typename ArnoldWintherTensorTypes<R, dim>::Matrix;
 
     public:
       static_assert(dim == 2, "Arnold-Winther is only implemented in 2D");
@@ -145,13 +145,13 @@ namespace Dune::Functions
         constexpr static int dimRange = dim * dim;
 
         /** \brief Symmetric matrix-valued range type */
-        using RangeType = ArnoldWintherTensorTypes<R, dim>::Matrix;
+        using RangeType = typename ArnoldWintherTensorTypes<R, dim>::Matrix;
 
         /** \brief Derivative tensor type */
-        using JacobianType = ArnoldWintherTensorTypes<R, dim, dim>::ThreeTensor;
+        using JacobianType = typename ArnoldWintherTensorTypes<R, dim, dim>::ThreeTensor;
 
         /** \brief Row-wise divergence type */
-        using DivergenceType = ArnoldWintherTensorTypes<R, dim>::Vector;
+        using DivergenceType = typename ArnoldWintherTensorTypes<R, dim>::Vector;
       };
 
       /** \brief Number of local basis functions */
@@ -377,7 +377,7 @@ namespace Dune::Functions
       using ctype = typename Geometry::ctype;
       using LocalCoordinate = typename Geometry::LocalCoordinate;
       using GlobalCoordinate = typename Geometry::GlobalCoordinate;
-      using D = LocalCoordinate::field_type;
+      using D = typename LocalCoordinate::field_type;
       static constexpr int dim = Geometry::mydimension;
 
       using EdgeBasis = Dune::Impl::LagrangeSimplexLocalBasis<D, C, dim, lagrangeOrder>;
@@ -894,8 +894,8 @@ namespace Dune::Functions
 
     private:
       Impl::ArnoldWintherReferenceLocalBasis<D, R> basis_;
-      Traits::LocalCoefficientsType coefficients_;
-      Traits::LocalInterpolationType interpolation_;
+      typename Traits::LocalCoefficientsType coefficients_;
+      typename Traits::LocalInterpolationType interpolation_;
       // Matrix P from Aznaran, Farrell, and Kirby.
       ArnoldWintherBlockDiagonalMatrix<R> mat_;
       ArnoldWintherFaceOrientations faceOrientations_;

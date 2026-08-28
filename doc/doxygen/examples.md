@@ -12,6 +12,7 @@ and is also available in the @subpage examples-sources section.
 ### C++ examples
 1. @subpage poisson-pq2-cpp
 1. @subpage poisson-mfem-cpp
+1. @subpage stokes-taylorhood-cpp
 
 ### Python examples
 1. @subpage poisson-pq2-py
@@ -28,6 +29,7 @@ The commented versions can be found in the @ref tutorial section.
 ### C++ examples
 1. @subpage source-poisson-pq2-cpp
 1. @subpage source-poisson-mfem-cpp
+1. @subpage source-stokes-taylorhood-cpp
 
 ### Python examples
 1. @subpage source-poisson-pq2-py

@@ -8,10 +8,10 @@ Below you can find commented examples explaining the building
 blocks of dune-functions. The source code of all examples
 can be found in the `examples/` subdirectory of the [dune-functions][] module
 and is also available in the @subpage examples-sources section.
-Currently there is only one commented example in the tutorial:
 
 ### C++ examples
 1. @subpage poisson-pq2-cpp
+1. @subpage poisson-mfem-cpp
 
 ### Python examples
 1. @subpage poisson-pq2-py
@@ -27,6 +27,7 @@ The commented versions can be found in the @ref tutorial section.
 
 ### C++ examples
 1. @subpage source-poisson-pq2-cpp
+1. @subpage source-poisson-mfem-cpp
 
 ### Python examples
 1. @subpage source-poisson-pq2-py

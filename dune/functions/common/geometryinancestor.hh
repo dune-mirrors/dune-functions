@@ -67,7 +67,7 @@ public:
     : storedFineElement_(other.storedFineElement_)
     , storedCoarseElement_(other.storedCoarseElement_)
     , fineElementPtr_(&storedFineElement_)
-    , coarseElementPtr_(&storedFineElement_)
+    , coarseElementPtr_(&storedCoarseElement_)
     , geometryInFathersVector_(other.geometryInFathersVector_)
   {
     // If other points to external fine element,
@@ -90,7 +90,7 @@ public:
     : storedFineElement_(other.storedFineElement_)
     , storedCoarseElement_(other.storedCoarseElement_)
     , fineElementPtr_(&fineElement)
-    , coarseElementPtr_(&storedFineElement_)
+    , coarseElementPtr_(&storedCoarseElement_)
     , geometryInFathersVector_(other.geometryInFathersVector_)
   {
     // If the other coarse element is not the stored one,
@@ -150,7 +150,7 @@ public:
   const Element& bind(Element&& fineElement, F&& includeFather)
   {
     storedFineElement_ = fineElement;
-    bind(storedFineElement_, includeFather);
+    return bind(storedFineElement_, includeFather);
   }
 
   //! Return the fine element

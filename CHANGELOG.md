@@ -30,6 +30,10 @@ corresponding version of the Dune core modules.
   consistently implemented as macro elements based on a split
   into two tetrahedra.
 
+- Fix `GeometryInAncestor`: Copies now correctly refer to their own stored
+  coarse element, and `bind()` for an r-value fine element now returns the
+  coarse element as documented.
+
 ## Deprecations and removals
 
 - Dune-functions no longer depends on dune-typetree.

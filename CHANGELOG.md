@@ -30,6 +30,11 @@ corresponding version of the Dune core modules.
   consistently implemented as macro elements based on a split
   into two tetrahedra.
 
+- Fix taking the derivative of an unbound local function of
+  `CoarseFunctionOnFineGridView`. This dereferenced an empty `std::optional`
+  and triggered an assertion with libstdc++ assertions enabled (e.g. by
+  default in unoptimized builds with GCC 15).
+
 ## Deprecations and removals
 
 - Dune-functions no longer depends on dune-typetree.

@@ -96,7 +96,7 @@ private:
       : element_(element)
       , localFunction_(localFunction)
       , coarseEntitySet_(coarseEntitySet)
-      , geometryInAncestor_(geometryInAncestor, *element_)
+      , geometryInAncestor_(copyGeometryInAncestor(geometryInAncestor, element_))
     {}
 
     //! Bind to an element from the GridView
@@ -141,6 +141,18 @@ private:
     }
 
   private:
+
+    // Copy the GeometryInAncestor and point it to the element stored
+    // in this local function. If the local function is not bound,
+    // there is no such element, and we simply copy.
+    static GeometryInAncestor copyGeometryInAncestor(const GeometryInAncestor& geometryInAncestor, const std::optional<Element>& element)
+    {
+      if (element)
+        return GeometryInAncestor(geometryInAncestor, *element);
+      else
+        return GeometryInAncestor(geometryInAncestor);
+    }
+
     std::optional<Element> element_;
     RawLocalFunction localFunction_;
     const CoarseEntitySet& coarseEntitySet_;

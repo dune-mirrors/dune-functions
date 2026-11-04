@@ -96,7 +96,7 @@ private:
       : element_(element)
       , localFunction_(localFunction)
       , coarseEntitySet_(coarseEntitySet)
-      , geometryInAncestor_(geometryInAncestor, *element_)
+      , geometryInAncestor_(element_ ? GeometryInAncestor(geometryInAncestor, *element_) : GeometryInAncestor())
     {}
 
     //! Bind to an element from the GridView

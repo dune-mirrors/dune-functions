@@ -150,24 +150,38 @@ namespace Dune
       const std::size_t dimRange = Impl::nodeRangeDim< RawTree >();
       const std::size_t dimWorld = GridView::dimensionworld;
 
-      cls.def( pybind11::init( constructCall ), pybind11::keep_alive< 1, 2 >() );
-      cls.def( "__len__", [](const GlobalBasis& self) { return self.dimension(); } );
+      cls.def( pybind11::init( constructCall ), pybind11::keep_alive< 1, 2 >(), "gridView"_a,
+               R"doc(Construct a global basis on the given grid view
+
+                     :param gridView: The grid view the basis is defined on
+               )doc" );
+
+      cls.def( "__len__", [](const GlobalBasis& self) { return self.dimension(); },
+               R"doc(Return the dimension of the basis, i.e. the total number of degrees of freedom)doc" );
+
       cls.def("size",
                pybind11::overload_cast<>(&GlobalBasis::size, pybind11::const_),
                "Return number of possible values for next position in empty multi index" );
+
       cls.def("size",
               pybind11::overload_cast<const typename GlobalBasis::SizePrefix&>(&GlobalBasis::size, pybind11::const_),
+              "prefix"_a,
               "Return number of possible values for next position in multi index");
 
       if constexpr (hasUpdate)
       {
         cls.def_property( "gridView",
                           [](const GlobalBasis& basis) { return basis.gridView(); },
-                          [](GlobalBasis& basis, const GridView& gridView) { basis.update(gridView); });
+                          [](GlobalBasis& basis, const GridView& gridView) { basis.update(gridView); },
+                          R"doc(The grid view the basis is defined on
+
+                                Assigning a new grid view triggers an update of the basis.
+                          )doc" );
       }
       else
       {
-        cls.def_property_readonly( "gridView", [](const GlobalBasis& basis) { return basis.gridView(); });
+        cls.def_property_readonly( "gridView", [](const GlobalBasis& basis) { return basis.gridView(); },
+                                   R"doc(The grid view the basis is defined on)doc" );
       }
 
       using LocalView = LocalViewWrapper< GlobalBasis >;
@@ -177,19 +191,45 @@ namespace Dune
       auto lv = insertClass< LocalView >( module, "LocalView",
           GenerateTypeName("Dune::Python::LocalViewWrapper", MetaType<GlobalBasis>()),
           includes).first;
-      lv.def( "bind", &LocalView::bind );
-      lv.def( "unbind", &LocalView::unbind );
-      lv.def( "element", &LocalView::element );
-      lv.def( "index", [] ( const LocalView &localView, int index ) { return localView.index( index ); });
-      lv.def( "__len__", [] ( LocalView &self ) -> int { return self.size(); } );
-      lv.def( "size", [] ( LocalView &self ) -> int { return self.size(); } );
-      lv.def( "maxSize", [] ( LocalView &self ) -> int { return self.maxSize(); } );
+
+      lv.def( "bind", &LocalView::bind, "entity"_a,
+              R"doc(Bind the local view to the given grid entity
+
+                    :param entity: The grid element to bind to
+              )doc" );
+
+      lv.def( "unbind", &LocalView::unbind,
+              R"doc(Unbind the local view from the entity it is currently bound to)doc" );
+
+      lv.def( "element", &LocalView::element,
+              R"doc(Return the grid entity the local view is currently bound to)doc" );
+
+      lv.def( "index", [] ( const LocalView &localView, int index ) { return localView.index( index ); },
+              "i"_a,
+              R"doc(Return the global indices of the local degree of freedom with local index i
+
+                    :param i: The local index of the degree of freedom
+              )doc" );
+
+      lv.def( "__len__", [] ( LocalView &self ) -> int { return self.size(); },
+              R"doc(Return the number of local degrees of freedom of the bound entity)doc" );
+
+      lv.def( "size", [] ( LocalView &self ) -> int { return self.size(); },
+              R"doc(Return the number of local degrees of freedom of the bound entity)doc" );
+
+      lv.def( "maxSize", [] ( LocalView &self ) -> int { return self.maxSize(); },
+              R"doc(Return the maximum number of local degrees of freedom over all entities)doc" );
 
       Functions::registerTree<Tree>(lv);
-      lv.def("tree", [](const LocalView& view) { return Dune::stackobject_to_shared_ptr(view.tree()); });
+      lv.def("tree", [](const LocalView& view) { return Dune::stackobject_to_shared_ptr(view.tree()); },
+             R"doc(Return the tree of local finite elements of the bound entity)doc" );
 
-      cls.def( "localView", [] ( const GlobalBasis &self ) -> LocalView { return self.localView(); }, pybind11::keep_alive< 0, 1 >() );
-      cls.def_property_readonly( "dimension", [] ( const GlobalBasis &self ) -> int { return self.dimension(); } );
+      cls.def( "localView", [] ( const GlobalBasis &self ) -> LocalView { return self.localView(); },
+               pybind11::keep_alive< 0, 1 >(),
+               R"doc(Return a new local view of this basis)doc" );
+
+      cls.def_property_readonly( "dimension", [] ( const GlobalBasis &self ) -> int { return self.dimension(); },
+                                 R"doc(The dimension of the basis, i.e. the total number of degrees of freedom)doc" );
 
       // Register the 'interpolate' method
       // TODO: Currently we only register the method for cases where either scalars or FieldVector<double,dimRange>
@@ -197,15 +237,72 @@ namespace Dune
       // composite bases.  Support for them is planned for the future.
       if constexpr (dimRange==1)
       {
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, double> );
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, bool> );
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, int> );
+        cls.def("interpolate",
+                &Dune::Python::Functions::interpolate<GlobalBasis, double>,
+                "x"_a, "f"_a,
+                R"doc(Project a given function onto the finite element space, and return the coefficients of the projection
+
+                      This is the implementation for double-valued functions
+
+                      :param x: The finite element coefficients of the result
+                      :param f: The function to be projected
+        )doc");
+
+        cls.def("interpolate",
+                &Dune::Python::Functions::interpolate<GlobalBasis, bool>,
+                "x"_a, "f"_a,
+                R"doc(Project a given function onto the finite element space, and return the coefficients of the projection
+
+                      This is the implementation for bool-valued functions
+
+                      :param x: The finite element coefficients of the result
+                      :param f: The function to be projected
+                )doc" );
+
+        cls.def("interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, int>,
+                "x"_a, "f"_a,
+                R"doc(Project a given function onto the finite element space, and return the coefficients of the projection
+
+                      This is the implementation for int-valued functions
+
+                      :param x: The finite element coefficients of the result
+                      :param f: The function to be projected
+                )doc" );
       }
       else if constexpr (LeafTreeNode<RawTree> or UniformInnerTreeNode<RawTree>)
       {
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, double, FieldVector<double,dimRange> > );
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, bool, std::array<bool,dimRange> > );
-        cls.def( "interpolate", &Dune::Python::Functions::interpolate<GlobalBasis, int, FieldVector<int,dimRange> > );
+        cls.def("interpolate",
+                &Dune::Python::Functions::interpolate<GlobalBasis, double, FieldVector<double,dimRange> >,
+                "x"_a, "f"_a,
+                R"doc(Project a given function onto the finite element space, and return the coefficients of the projection
+
+                      This is the implementation for FieldVector<double,dimRange>-valued functions
+
+                      :param x: The finite element coefficients of the result
+                      :param f: The function to be projected
+                )doc");
+
+        cls.def("interpolate",
+                &Dune::Python::Functions::interpolate<GlobalBasis, bool, std::array<bool,dimRange> >,
+                "x"_a, "f"_a,
+                R"doc(Project a given function onto the finite element space, and return the coefficients of the projection
+
+                      This is the implementation for std::array<bool,dimRange>-valued functions
+
+                      :param x: The finite element coefficients of the result
+                      :param f: The function to be projected
+                )doc");
+
+        cls.def("interpolate",
+                &Dune::Python::Functions::interpolate<GlobalBasis, int, FieldVector<int,dimRange> >,
+                "x"_a, "f"_a,
+                R"doc(Project a given function onto the finite element space, and return the coefficients of the projection
+
+                      This is the implementation for FieldVector<int,dimRange>-valued functions
+
+                      :param x: The finite element coefficients of the result
+                      :param f: The function to be projected
+                )doc" );
       }
 
       // Register various grid function types
@@ -240,14 +337,22 @@ namespace Dune
             MetaType<Range(Domain)>(),
             MetaType<GridView>()
             ), includes);
-        clsGridViewFunction.first.def(pybind11::init<DiscreteFunction>());
+        clsGridViewFunction.first.def(pybind11::init<DiscreteFunction>(), "discreteFunction"_a,
+          R"doc(Construct a grid view function from a discrete function
+
+                :param discreteFunction: The discrete function providing basis and coefficients
+          )doc");
         pybind11::implicitly_convertible<DiscreteFunction, GridViewFunction>();
 
         registerDiscreteFunction<GlobalBasis>( module, clsDiscreteFunction.first );
 
         cls.def("asFunction", [] ( GlobalBasis &self, pybind11::buffer dofVector ) {
             return new DiscreteFunction( self, HierarchicPythonVector<double>(dofVector), Dune::Functions::HierarchicNodeToRangeMap());
-          }, pybind11::keep_alive< 0, 1 >(), pybind11::keep_alive< 0, 2 >(), "dofVector"_a );
+          }, pybind11::keep_alive< 0, 1 >(), pybind11::keep_alive< 0, 2 >(), "dofVector"_a,
+          R"doc(Create a discrete global basis function from a vector of coefficients
+
+                :param dofVector: Buffer containing the coefficients of the function
+          )doc" );
       }
     }
 

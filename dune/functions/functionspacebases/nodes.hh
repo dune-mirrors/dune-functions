@@ -173,6 +173,11 @@ namespace Dune {
         return (size_ == 0);
       }
 
+      /**
+       * \brief Lexicographic index that uniquely identifies the node within a tree
+       *
+       * The set of all such indices in a tree is consecutive and starts at 0.
+       */
       size_type treeIndex() const
       {
         return treeIndex_;

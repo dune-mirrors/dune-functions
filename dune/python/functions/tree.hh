@@ -47,14 +47,51 @@ void registerTreeCommon(pybind11::class_<Tree, std::shared_ptr<Tree>>& cls)
   /* dune-typetree properties */
   cls.def_property_readonly_static("isComposite", [](pybind11::object) {
     return StaticDegreeInnerTreeNode<Tree> and (not UniformInnerTreeNode<Tree>);
-  });
-  cls.def_property_readonly_static("isLeaf", [](pybind11::object) { return LeafTreeNode<Tree>; });
-  cls.def_property_readonly_static("isPower", [](pybind11::object) { return UniformInnerTreeNode<Tree>; });
-  cls.def("degree", [](pybind11::object) -> std::size_t { return Tree::degree(); });
-  cls.def( "__len__", [] (const Tree& self) -> int { return self.size(); } );
-  cls.def( "size", [] (const Tree& self) -> int { return self.size(); } );
-  cls.def("localIndex", [](const Tree& self, unsigned int index) { return self.localIndex(index); });
-  cls.def("treeIndex", [](const Tree& self) { return self.treeIndex(); });
+  },
+                                   R"doc(Whether this node is a composite node, i.e., has a static degree and non-uniform children)doc");
+
+  cls.def_property_readonly_static("isLeaf",
+                                   [](pybind11::object) { return LeafTreeNode<Tree>; },
+                                   R"doc(Whether this node is a leaf node)doc");
+
+  cls.def_property_readonly_static("isPower",
+                                   [](pybind11::object) { return UniformInnerTreeNode<Tree>; },
+                                   R"doc(Whether this node is a power node, i.e., has uniform children)doc");
+
+  cls.def("degree",
+          [](pybind11::object) -> std::size_t { return Tree::degree(); },
+          R"doc(Return the degree of the node, i.e., the number of its children)doc");
+
+  cls.def("__len__",
+          [] (const Tree& self) -> int { return self.size(); },
+          R"doc(Return the number of children of the node)doc");
+
+  cls.def("size",
+          [] (const Tree& self) -> int { return self.size(); },
+          R"doc(Return the number of children of the node)doc");
+
+  cls.def("localIndex",
+          [](const Tree& self, unsigned int index) { return self.localIndex(index); },
+                  pybind11::arg("leafLocalIndex"),
+          R"doc(Return the index of a degree of freedom with respect to the full
+                basis tree of the current element from its index with respect to
+                the current leaf node basis.
+
+                If calling this method for a basis that is not part of a larger
+                tree of bases, then the input and output ranges of this method agree.
+                For most basis implementations this method then simply returns
+                its input, but this is not guaranteed.
+
+                :param leafLocalIndex: The index of a degree of freedom in the numbering
+                                       of the current leaf node basis.
+                :returns: The index of the degree of freedom used for element matrices.
+                          This is a flat index, not a multi-index.
+          )doc");
+
+  cls.def("treeIndex", [](const Tree& self) { return self.treeIndex(); },
+          R"doc(:returns: An integer that uniquely identifies this node in the tree.
+                The total set of indices is consecutive and starts at 0.
+               )doc");
 }
 
 template<typename Tree, std::size_t i>
@@ -80,7 +117,11 @@ void registerTreeChildAccessor(pybind11::class_<Tree, std::shared_ptr<Tree>>& cl
   cls.def(
     "child",
     [accessors](Tree& tree, std::size_t i) { return accessors.at(i)(tree); },
-    pybind11::arg("i"));
+    pybind11::arg("i"),
+            R"doc(Return the i-th tree child node
+
+          :param i: The index of the tree child to return
+    )doc");
 }
 
 template<typename Tree>
@@ -116,7 +157,8 @@ void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree>
     cls.def(
       "finiteElement",
       &Tree::finiteElement,
-      pybind11::return_value_policy::reference_internal
+      pybind11::return_value_policy::reference_internal,
+      R"doc(Return the local finite element associated with this leaf node)doc"
       );
   }
 }

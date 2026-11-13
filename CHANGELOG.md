@@ -30,6 +30,14 @@ corresponding version of the Dune core modules.
   consistently implemented as macro elements based on a split
   into two tetrahedra.
 
+## Python
+
+- Fix a bug in the Python API: The `treeIndex` method of the `Tree` class
+  took an integer argument which was then ignored. The corresponding
+  method in the C++ API does not have the argument. Given that the
+  Python API of `dune-functions` is still considered as experimental
+  we have removed the spurious argument without prior deprecation.
+
 ## Deprecations and removals
 
 - Dune-functions no longer depends on dune-typetree.

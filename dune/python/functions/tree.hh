@@ -54,7 +54,7 @@ void registerTreeCommon(pybind11::class_<Tree, std::shared_ptr<Tree>>& cls)
   cls.def( "__len__", [] (const Tree& self) -> int { return self.size(); } );
   cls.def( "size", [] (const Tree& self) -> int { return self.size(); } );
   cls.def("localIndex", [](const Tree& self, unsigned int index) { return self.localIndex(index); });
-  cls.def("treeIndex", [](const Tree& self, unsigned int index) { return self.treeIndex(); });
+  cls.def("treeIndex", [](const Tree& self) { return self.treeIndex(); });
 }
 
 template<typename Tree, std::size_t i>

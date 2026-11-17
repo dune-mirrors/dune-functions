@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md
 # SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 
-from .tree import Composite, DG, Argyris, Lagrange, Nedelec, Power, RaviartThomas, Tree
+from .tree import Composite, DG, Argyris, Lagrange, Morley, Nedelec, Power, RaviartThomas, Tree
 
 duneFunctionsLayouts = {"lexicographic": "Lexicographic", "interleaved": "Interleaved"}
 
@@ -12,9 +12,11 @@ def indexMergingStrategy(blocked, layout):
 def preBasisTypeName(tree, gridViewTypeName):
     assert isinstance(tree, Tree)
     if isinstance(tree, Argyris):
-        return "Dune::Functions::ArgyrisPreBasis< " + gridViewTypeName + ",double >"
+        return "Dune::Functions::ArgyrisPreBasis< " + gridViewTypeName + ", double >"
     elif isinstance(tree, Lagrange):
         return "Dune::Functions::LagrangePreBasis< " + gridViewTypeName + " , " + str(tree.order) + " >"
+    if isinstance(tree, Morley):
+        return "Dune::Functions::MorleyPreBasis< " + gridViewTypeName + ", double >"
     elif isinstance(tree, DG):
         raise Exception(repr(tree) + " not supported by dune-functions.")
     elif isinstance(tree, Nedelec):
@@ -40,6 +42,7 @@ def defaultGlobalBasis(gridView, tree):
                "compositebasis",
                "argyrisbasis",
                "lagrangebasis",
+               "morleybasis",
                "nedelecbasis",
                "raviartthomasbasis",
                "subspacebasis",

@@ -38,6 +38,16 @@ class Lagrange(Tree):
         return "Lagrange<" + str(self.order) + ">"
 
 
+class Morley(Tree):
+    def __init__(self):
+        Tree.__init__(self, "Morley")
+        # The Morley element implemented here consists of 2nd-order polynomials
+        self.order = 2
+
+    def __repr__(self):
+        return "Morley"
+
+
 class DG(Tree):
     def __init__(self, order, dimRange=1):
         Tree.__init__(self, "DG")

@@ -27,7 +27,10 @@ void interpolate(const Basis& basis, pybind11::array_t<T> x, const std::function
   // TODO: The present code does not work if interpolation requires evaluating derivatives of f.
   // As an intermediate work-around, simply skip the interpolation in that case,
   // and report an error.
-  constexpr bool hasHermiteDofs = std::is_same_v<Basis,Dune::Functions::DefaultGlobalBasis<Dune::Functions::ArgyrisPreBasis<typename Basis::GridView,double> > >;
+  constexpr bool isArgyrisBasis = std::is_same_v<Basis,Dune::Functions::DefaultGlobalBasis<Dune::Functions::ArgyrisPreBasis<typename Basis::GridView,double> > >;
+  constexpr bool isMorleyBasis = std::is_same_v<Basis,Dune::Functions::DefaultGlobalBasis<Dune::Functions::MorleyPreBasis<typename Basis::GridView,double> > >;
+
+  constexpr bool hasHermiteDofs = isArgyrisBasis || isMorleyBasis;
 
   if constexpr (!hasHermiteDofs)
     interpolate(basis, x2, f);

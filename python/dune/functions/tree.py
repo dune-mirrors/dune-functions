@@ -18,6 +18,17 @@ class Tree(object):
         return Power(self, p)
 
 
+class Argyris(Tree):
+    def __init__(self):
+        Tree.__init__(self, "Argyris")
+        # There is really just one Argyris element, and it consists of polynomials
+        # of order up to 5.
+        self.order = 5
+
+    def __repr__(self):
+        return "Argyris"
+
+
 class Lagrange(Tree):
     def __init__(self, order):
         Tree.__init__(self, "Lagrange")

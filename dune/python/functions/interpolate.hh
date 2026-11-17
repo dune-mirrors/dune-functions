@@ -24,7 +24,15 @@ void interpolate(const Basis& basis, pybind11::array_t<T> x, const std::function
 
   auto x2 = Dune::Functions::istlVectorBackend(x1);
 
-  interpolate(basis, x2, f);
+  // TODO: The present code does not work if interpolation requires evaluating derivatives of f.
+  // As an intermediate work-around, simply skip the interpolation in that case,
+  // and report an error.
+  constexpr bool hasHermiteDofs = std::is_same_v<Basis,Dune::Functions::DefaultGlobalBasis<Dune::Functions::ArgyrisPreBasis<typename Basis::GridView,double> > >;
+
+  if constexpr (!hasHermiteDofs)
+    interpolate(basis, x2, f);
+  else
+    DUNE_THROW(NotImplemented, "Method 'interpolate' not implemented for bases with Hermite degrees of freedom");
 }
 
 } /* namespace Functions */

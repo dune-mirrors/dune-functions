@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright © DUNE Project contributors, see file AUTHORS.md
 # SPDX-License-Identifier: LicenseRef-GPL-2.0-only-with-DUNE-exception OR LGPL-3.0-or-later
 
-from .tree import Composite, DG, Lagrange, Nedelec, Power, RaviartThomas, Tree
+from .tree import Composite, DG, Argyris, Lagrange, Nedelec, Power, RaviartThomas, Tree
 
 duneFunctionsLayouts = {"lexicographic": "Lexicographic", "interleaved": "Interleaved"}
 
@@ -11,7 +11,9 @@ def indexMergingStrategy(blocked, layout):
 
 def preBasisTypeName(tree, gridViewTypeName):
     assert isinstance(tree, Tree)
-    if isinstance(tree, Lagrange):
+    if isinstance(tree, Argyris):
+        return "Dune::Functions::ArgyrisPreBasis< " + gridViewTypeName + ",double >"
+    elif isinstance(tree, Lagrange):
         return "Dune::Functions::LagrangePreBasis< " + gridViewTypeName + " , " + str(tree.order) + " >"
     elif isinstance(tree, DG):
         raise Exception(repr(tree) + " not supported by dune-functions.")
@@ -34,7 +36,14 @@ def preBasisTypeName(tree, gridViewTypeName):
 def defaultGlobalBasis(gridView, tree):
     from dune.functions import load
 
-    headers = ["powerbasis", "compositebasis", "lagrangebasis", "nedelecbasis", "raviartthomasbasis", "subspacebasis", "defaultglobalbasis"]
+    headers = ["powerbasis",
+               "compositebasis",
+               "argyrisbasis",
+               "lagrangebasis",
+               "nedelecbasis",
+               "raviartthomasbasis",
+               "subspacebasis",
+               "defaultglobalbasis"]
 
     includes = []
     includes += list(gridView.cppIncludes)

@@ -10,7 +10,7 @@
 #include <utility>
 #include <memory>
 
-// for void_t, in <type_traits> for C++17
+// for index_constant
 #include <dune/common/typetraits.hh>
 #include <dune/common/visibility.hh>
 
@@ -54,7 +54,7 @@ void registerTreeCommon(pybind11::class_<Tree, std::shared_ptr<Tree>>& cls)
   cls.def( "__len__", [] (const Tree& self) -> int { return self.size(); } );
   cls.def( "size", [] (const Tree& self) -> int { return self.size(); } );
   cls.def("localIndex", [](const Tree& self, unsigned int index) { return self.localIndex(index); });
-  cls.def("treeIndex", [](const Tree& self, unsigned int index) { return self.treeIndex(); });
+  cls.def("treeIndex", [](const Tree& self) { return self.treeIndex(); });
 }
 
 template<typename Tree, std::size_t i>
@@ -105,33 +105,20 @@ void registerTree_(pybind11::handle scope, const char* name)
   }
 }
 
-template<typename Tree, typename = void_t<>>
-struct hasFiniteElement
-  : std::false_type
-{};
-
 template<typename Tree>
-struct hasFiniteElement<Tree, void_t<typename Tree::FiniteElement>>
-  : std::true_type
-{};
-
-template< typename Tree, std::enable_if_t< !hasFiniteElement<Tree>::value, int > = 0>
-void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree> >&)
-{
-  /* Nothing. */
-}
-
-template< typename Tree, std::enable_if_t< hasFiniteElement<Tree>::value, int > = 0>
 void registerFiniteElementProperty(pybind11::class_< Tree, std::shared_ptr<Tree> >& cls)
 {
-  // this should probably be fixed in dune-localfunctions
-  if (!pybind11::already_registered< typename Tree::FiniteElement >())
-    registerLocalFiniteElement<typename Tree::FiniteElement>(cls);
-  cls.def(
-    "finiteElement",
-    &Tree::finiteElement,
-    pybind11::return_value_policy::reference_internal
-    );
+  if constexpr (requires { typename Tree::FiniteElement; })
+  {
+    // this should probably be fixed in dune-localfunctions
+    if (!pybind11::already_registered< typename Tree::FiniteElement >())
+      registerLocalFiniteElement<typename Tree::FiniteElement>(cls);
+    cls.def(
+      "finiteElement",
+      &Tree::finiteElement,
+      pybind11::return_value_policy::reference_internal
+      );
+  }
 }
 
 // fatal error: template parameter redefines default argument (clang)

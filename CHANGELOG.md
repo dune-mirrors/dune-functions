@@ -36,6 +36,11 @@ corresponding version of the Dune core modules.
   `RannacherTurekBasis` class as fall-back for simplex grids.
   Providing them under their own name makes them more discoverable.
 
+- The default index merging strategy of power nodes in the C++ API has changed.
+  Previously, the default merging strategy was `BlockedInterleaved`,
+  and this has now changed to `FlatInterleaved`.  Create power nodes
+  with `power(..., blockedInterleaved())` to retain the old behavior.
+
 ## Python
 
 - Fix a bug in the Python API: The `treeIndex` method of the `Tree` class

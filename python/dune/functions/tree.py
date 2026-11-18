@@ -72,7 +72,23 @@ class Composite(Tree):
 
 
 class Power(Tree):
-    def __init__(self, children, exponent, **kwargs):
+    def __init__(self, child, exponent: int, **kwargs):
+        """
+        Create a tree node with n identical children.
+
+        In finite element parlance, this takes a finite-element basis
+        of scalar-valued functions and turns it into a basis for a space
+        of vector-valued functions.
+
+        :param child: A Tree object, to be copied exponent-many times
+        :param exponent: The desired number of children
+        :param kwargs: The index merging strategy
+        :keyword blocked: Whether the children are accessed via a new digit in a multi-index
+        :type blocked bool:
+        :keyword layout: "lexicographic" or "interleaved" (default: "Interleaved")
+        :type layout str:
+        """
+
         assert children is not None
         Tree.__init__(self, "Power", [children])
         assert len(self.children) == 1

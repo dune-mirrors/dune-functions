@@ -40,8 +40,15 @@ corresponding version of the Dune core modules.
   Previously, the default merging strategy was `BlockedInterleaved`,
   and this has now changed to `FlatInterleaved`.  Create power nodes
   with `power(..., blockedInterleaved())` to retain the old behavior.
+  With a corresponding change in the Python API, the default is now the same
+  in both languages.
 
 ## Python
+
+- The `layout` part of the default index merging strategy of power nodes
+  in the Python API has changed. Previously, the default was `lexicographic`,
+  and this has now changed to `interleaved`.
+  Please add the argument `layout="lexicographic"` explicitly to retain the old behavior!
 
 - Fix a bug in the Python API: The `treeIndex` method of the `Tree` class
   took an integer argument which was then ignored. The corresponding

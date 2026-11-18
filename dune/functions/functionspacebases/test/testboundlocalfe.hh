@@ -79,18 +79,6 @@ public:
   Element const &e_;
 };
 
-// Test whether a Finite Element has an `evaluateHessian(...)` method and exports `HessianType`.
-template<class FE, class = void>
-struct hasEvaluateHessian{
-  static constexpr bool value = false;
-};
-
-template<class FE>
-struct hasEvaluateHessian<FE, std::void_t<decltype(std::declval<FE>().evaluateHessian(FE::Traits::LocalBasisType::Traits::DomainType, FE::Traits::LocalBasisType::Traits::HessianType))>>
-{
-  static constexpr bool value = true;
-};
-
 // The derivative of one shape function
 // implements Dune::Functions::DifferentiableFunction
 template<class FE, class Element>
@@ -115,7 +103,8 @@ public:
 
   auto friend derivative(ShapeFunctionDerivativeAsCallable const &t)
   {
-    if constexpr (hasEvaluateHessian<FE>::value){
+    // Test whether a Finite Element has an `evaluateHessian(...)` method and exports `HessianType`.
+    if constexpr (requires { std::declval<FE>().evaluateHessian(std::declval<Base::DomainType>(), std::declval<typename FE::Traits::LocalBasisType::Traits::HessianType>()); }){
       return [t](typename Base::DomainType const& x){
 
         std::array<typename FE::Traits::LocalBasisType::Traits::HessianType, Base::dimRange> hessian;

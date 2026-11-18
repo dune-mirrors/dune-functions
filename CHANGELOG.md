@@ -30,6 +30,10 @@ corresponding version of the Dune core modules.
   consistently implemented as macro elements based on a split
   into two tetrahedra.
 
+- The default index merging strategy of power nodes in the C++ API has changed.
+  Previously, the default merging strategy was `BlockedInterleaved`,
+  and this has now changed to `FlatInterleaved`.
+  Create power nodes with `power(..., blockedInterleaved())` to retain the old behavior.
 ## Python
 
 - Fix a bug in the Python API: The `treeIndex` method of the `Tree` class

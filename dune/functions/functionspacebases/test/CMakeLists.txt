@@ -15,6 +15,11 @@ dune_add_test(SOURCES bsplinebasistest.cc LABELS quick)
 
 dune_add_test(SOURCES containerdescriptortest.cc LABELS quick)
 
+dune_add_test(NAME "crouzeixraviartbasistest"
+              SOURCES crouzeixraviartrannacherturekbasistest.cc
+              COMPILE_DEFINITIONS "TEST_RANNACHER_TUREK_BASIS=0"
+              LABELS quick)
+
 dune_add_test(SOURCES cubichermitetest.cc LABELS quick)
 
 dune_add_test(SOURCES morleytest.cc LABELS quick)
@@ -35,7 +40,10 @@ dune_add_test(SOURCES periodicbasistest.cc LABELS quick)
 
 dune_add_test(SOURCES taylorhoodbasistest.cc LABELS quick)
 
-dune_add_test(SOURCES rannacherturekbasistest.cc LABELS quick)
+dune_add_test(NAME "rannacherturekbasistest"
+              SOURCES crouzeixraviartrannacherturekbasistest.cc
+              COMPILE_DEFINITIONS "TEST_RANNACHER_TUREK_BASIS=1"
+              LABELS quick)
 
 dune_add_test(SOURCES raviartthomasbasistest.cc LABELS quick)
 

@@ -200,6 +200,11 @@ namespace BasisFactory {
 /**
  * \brief Create a pre-basis factory that can create a Rannacher-Turek pre-basis
  *
+ * The Rannacher-Turek basis is only defined for quadrilateral elements.
+ * A Crouzeix-Raviart basis is used if the grid contains simplex elements.
+ * The implementation is therefore identical to the CrouzeixRaviartBasis
+ * implementation.
+ *
  * \ingroup FunctionSpaceBasesImplementations
  */
 template<class Dummy=void>
@@ -223,6 +228,10 @@ auto rannacherTurek()
  * See
  *  Rolf Rannacher and Stefan Turek. Simple nonconforming quadrilateral Stokes
  *  element. Numerical Methods for Partial Differential Equations, 8:97–111, 1992.
+ *
+ * An actual Crouzeix-Raviart basis is used if the grid contains simplex elements.
+ * The implementation is therefore identical to the CrouzeixRaviartBasis
+ * implementation.
  *
  * \tparam GV The GridView that the space is defined on
  */

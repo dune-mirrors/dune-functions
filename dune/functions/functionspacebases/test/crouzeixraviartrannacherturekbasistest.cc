@@ -16,7 +16,11 @@
 #include <dune/grid/io/file/gmshreader.hh>
 #include <dune/grid/utility/structuredgridfactory.hh>
 
+#if TEST_RANNACHER_TUREK_BASIS
 #include <dune/functions/functionspacebases/rannacherturekbasis.hh>
+#else
+#include <dune/functions/functionspacebases/crouzeixraviartbasis.hh>
+#endif
 
 #include <dune/functions/functionspacebases/test/basistest.hh>
 
@@ -24,13 +28,13 @@ using namespace Dune;
 using namespace Dune::Functions;
 
 template<int dim>
-void testRannacherTurekBasis(TestSuite& test)
+void testBasis(TestSuite& test)
 {
   ///////////////////////////
   /////  Simplex grids  /////
   ///////////////////////////
 
-  // Check RannacherTurekBasis created 'manually'
+  // Check basis created 'manually'
   // Use grid with unknown-at-compile-time element type
   {
     using Grid = UGGrid<dim>;
@@ -38,7 +42,11 @@ void testRannacherTurekBasis(TestSuite& test)
     auto grid = (dim==2) ? GmshReader<Grid>::read(path + "curved2d.msh")
                          : GmshReader<Grid>::read(path + "telescope1storder.msh");
 
+#if TEST_RANNACHER_TUREK_BASIS
     Functions::RannacherTurekBasis<typename Grid::LeafGridView> basis(grid->leafGridView());
+#else
+    Functions::CrouzeixRaviartBasis<typename Grid::LeafGridView> basis(grid->leafGridView());
+#endif
     test.subTest(checkBasis(basis, EnableCenterContinuityCheck()));
 
     // Modify grid, update basis and check again
@@ -48,7 +56,7 @@ void testRannacherTurekBasis(TestSuite& test)
     test.subTest(checkBasis(basis, EnableCenterContinuityCheck()));
   }
 
-  // Check RannacherTurekBasis created using basis builder mechanism
+  // Check basis created using basis builder mechanism
   // Use grid with unknown-at-compile-time element type
   {
     using Grid = UGGrid<dim>;
@@ -57,7 +65,11 @@ void testRannacherTurekBasis(TestSuite& test)
                          : GmshReader<Grid>::read(path + "telescope1storder.msh");
 
     using namespace Functions::BasisFactory;
+#if TEST_RANNACHER_TUREK_BASIS
     auto basis = makeBasis(grid->leafGridView(), rannacherTurek());
+#else
+    auto basis = makeBasis(grid->leafGridView(), crouzeixRaviart());
+#endif
     test.subTest(checkBasis(basis, EnableCenterContinuityCheck()));
 
     // Modify grid, update basis and check again
@@ -82,7 +94,11 @@ void testRannacherTurekBasis(TestSuite& test)
 
     Grid grid(one, elems);
 
+#if TEST_RANNACHER_TUREK_BASIS
     Functions::RannacherTurekBasis<typename Grid::LeafGridView> basis(grid.leafGridView());
+#else
+    Functions::CrouzeixRaviartBasis<typename Grid::LeafGridView> basis(grid.leafGridView());
+#endif
     test.subTest(checkBasis(basis, EnableCenterContinuityCheck()));
 
     // Modify grid, update basis and check again
@@ -102,7 +118,11 @@ void testRannacherTurekBasis(TestSuite& test)
     Grid grid(one, elems);
 
     using namespace Functions::BasisFactory;
+#if TEST_RANNACHER_TUREK_BASIS
     auto basis = makeBasis(grid.leafGridView(), rannacherTurek());
+#else
+    auto basis = makeBasis(grid.leafGridView(), crouzeixRaviart());
+#endif
     test.subTest(checkBasis(basis, EnableCenterContinuityCheck()));
 
     // Modify grid, update basis and check again
@@ -129,7 +149,11 @@ void testRannacherTurekBasis(TestSuite& test)
       auto grid = (dim==2) ? GmshReader<Grid>::read(path + "hybrid-testgrid-2d.msh")
                          : GmshReader<Grid>::read(path + "hybrid-testgrid-3d.msh");
 
+#if TEST_RANNACHER_TUREK_BASIS
       Functions::RannacherTurekBasis<typename Grid::LeafGridView> basis(grid->leafGridView());
+#else
+      Functions::CrouzeixRaviartBasis<typename Grid::LeafGridView> basis(grid->leafGridView());
+#endif
       test.subTest(checkBasis(basis, EnableCenterContinuityCheck()));
 
       // Modify grid, update basis and check again
@@ -150,7 +174,12 @@ void testRannacherTurekBasis(TestSuite& test)
                          : GmshReader<Grid>::read(path + "hybrid-testgrid-3d.msh");
 
       using namespace Functions::BasisFactory;
+#if TEST_RANNACHER_TUREK_BASIS
       auto basis = makeBasis(grid->leafGridView(), rannacherTurek());
+#else
+      auto basis = makeBasis(grid->leafGridView(), crouzeixRaviart());
+#endif
+
       test.subTest(checkBasis(basis, EnableCenterContinuityCheck()));
 
       // Modify grid, update basis and check again
@@ -172,8 +201,8 @@ int main (int argc, char* argv[]) try
   Dune::TestSuite test;
 
 
-  testRannacherTurekBasis<2>(test);
-  testRannacherTurekBasis<3>(test);
+  testBasis<2>(test);
+  testBasis<3>(test);
 
 
   return test.exit();

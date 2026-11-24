@@ -30,6 +30,12 @@ corresponding version of the Dune core modules.
   consistently implemented as macro elements based on a split
   into two tetrahedra.
 
+- Introduce new finite element basis `CrouzeixRaviartBasis`.
+  As the name says, this implements the well-known Crouzeix-Raviart
+  finite elements. These elements already appeared in the
+  `RannacherTurekBasis` class as fall-back for simplex grids.
+  Providing them under their own name makes them more discoverable.
+
 ## Python
 
 - Fix a bug in the Python API: The `treeIndex` method of the `Tree` class

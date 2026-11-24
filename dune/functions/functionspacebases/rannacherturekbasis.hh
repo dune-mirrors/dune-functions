@@ -10,6 +10,7 @@
 #include <dune/common/exceptions.hh>
 
 #include <dune/grid/common/capabilities.hh>
+#include <dune/grid/common/mcmgmapper.hh>
 
 #include <dune/localfunctions/common/localfiniteelementvariant.hh>
 #include <dune/localfunctions/rannacherturek.hh>
@@ -17,7 +18,7 @@
 
 #include <dune/functions/functionspacebases/nodes.hh>
 #include <dune/functions/functionspacebases/defaultglobalbasis.hh>
-#include <dune/functions/functionspacebases/leafprebasismixin.hh>
+#include <dune/functions/functionspacebases/leafprebasismappermixin.hh>
 
 
 namespace Dune {
@@ -54,10 +55,8 @@ class RannacherTurekPreBasis;
  */
 template<typename GV>
 class RannacherTurekPreBasis :
-  public LeafPreBasisMixin< RannacherTurekPreBasis<GV> >
+  public LeafPreBasisMapperMixin<GV>
 {
-  static const int dim = GV::dimension;
-
 public:
 
   //! The grid view that the FE basis is defined on
@@ -71,27 +70,11 @@ public:
 
   //! Constructor for a given grid view object
   RannacherTurekPreBasis(const GridView& gv) :
-    gridView_(gv)
+    LeafPreBasisMapperMixin<GV>(gv, mcmgLayout(Codim<1>{}))
   {
     for(auto type : gv.indexSet().types(0))
       if (!type.isSimplex() && !type.isCube())
         DUNE_THROW(Dune::NotImplemented, "Rannacher-Turek or Crouzeix-Raviart elements are only implemented for grids with simplex or cube elements.");
-  }
-
-  //! Initialize the global indices
-  void initializeIndices()
-  {}
-
-  //! Obtain the grid view that the basis is defined on
-  const GridView& gridView() const
-  {
-    return gridView_;
-  }
-
-  //! Update the stored grid view, to be called if the grid has changed
-  void update (const GridView& gv)
-  {
-    gridView_ = gv;
   }
 
   /**
@@ -101,35 +84,6 @@ public:
   {
     return Node{};
   }
-
-  //! Same as size(prefix) with empty prefix
-  size_type dimension() const
-  {
-    return (size_type)(gridView_.size(1));
-  }
-
-  //! Get the maximal number of DOFs associated to node for any element
-  size_type maxNodeSize() const
-  {
-    return 2*GV::dimension;
-  }
-
-  template<typename It>
-  It indices(const Node& node, It it) const
-  {
-    for (size_type i = 0, end = node.size() ; i < end ; ++i, ++it)
-      {
-        Dune::LocalKey localKey = node.finiteElement().localCoefficients().localKey(i);
-        const auto& gridIndexSet = gridView().indexSet();
-        const auto& element = node.element();
-
-        *it = {{ (size_type)(gridIndexSet.subIndex(element,localKey.subEntity(),1)) }};
-      }
-    return it;
-  }
-
-protected:
-  GridView gridView_;
 };
 
 
@@ -200,6 +154,11 @@ namespace BasisFactory {
 /**
  * \brief Create a pre-basis factory that can create a Rannacher-Turek pre-basis
  *
+ * The Rannacher-Turek basis is only defined for quadrilateral elements.
+ * A Crouzeix-Raviart basis is used if the grid contains simplex elements.
+ * The implementation is therefore identical to the CrouzeixRaviartBasis
+ * implementation.
+ *
  * \ingroup FunctionSpaceBasesImplementations
  */
 template<class Dummy=void>
@@ -223,6 +182,10 @@ auto rannacherTurek()
  * See
  *  Rolf Rannacher and Stefan Turek. Simple nonconforming quadrilateral Stokes
  *  element. Numerical Methods for Partial Differential Equations, 8:97–111, 1992.
+ *
+ * An actual Crouzeix-Raviart basis is used if the grid contains simplex elements.
+ * The implementation is therefore identical to the CrouzeixRaviartBasis
+ * implementation.
  *
  * \tparam GV The GridView that the space is defined on
  */

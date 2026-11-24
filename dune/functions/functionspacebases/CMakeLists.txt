@@ -11,6 +11,7 @@ install(FILES
         compositebasis.hh
         concepts.hh
         containerdescriptors.hh
+        crouzeixraviartbasis.hh
         cubichermitebasis.hh
         defaultglobalbasis.hh
         defaultlocalview.hh

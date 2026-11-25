@@ -79,9 +79,7 @@ class Power(Tree):
         self.exponent = exponent
         # Please do not change the defaults here without taking the C++ interface into account
         self.blocked = kwargs.get("blocked", False)
-        if (not "layout" in kwargs):
-            warnings.warn('''The default layout of Power nodes will change from 'lexicographic' to 'interleaved' in release 2.11. Please add the argument 'layout="lexicographic"' explicitly to retain the old behavior!''')
-        self.layout = kwargs.get("layout", "lexicographic")
+        self.layout = kwargs.get("layout", "interleaved")
 
     def __repr__(self):
         if self.exponent == 1:

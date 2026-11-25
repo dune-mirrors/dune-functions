@@ -25,6 +25,7 @@ install(FILES
         hierarchicnodetorangemap.hh
         interpolate.hh
         lagrangebasis.hh
+        lobattobasis.hh
         lagrangedgbasis.hh
         leafprebasismappermixin.hh
         leafprebasismixin.hh

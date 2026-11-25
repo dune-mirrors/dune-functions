@@ -10,6 +10,14 @@ corresponding version of the Dune core modules.
 
 # Master (will become release 2.12)
 
+- Add the hierarchic Lobatto bases `LobattoBasis` (uniform order, `BasisFactory::lobatto(p)`) and
+  `LobattoAdaptiveBasis` (variable order per element, `BasisFactory::lobatto(elementOrder)`)
+  on grids with simplex and cube elements, based on the Lobatto finite elements from dune-localfunctions.
+  For the adaptive basis, the polynomial order of each element is given by a user function
+  (anisotropic on cube elements). The orders of edges and faces are determined by the minimum rule
+  or by an optional user function. Changing the element orders and calling `update()`
+  allows for p-adaptivity on sequential grids.
+
 - The `LagrangeDG(Pre)Basis` now associates all basis functions to
   the element in the `LocalKey`s provided by
   `LagrangeDGNode().finiteElement().localCoefficients().localKey(i)`.
